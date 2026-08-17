@@ -842,7 +842,7 @@ Login, logout, refresh. JWT con `usuario_id` + `organizacion_id` + `rol` (si apl
 
 **Done cuando:** un user de la org A no puede leer ni mutar la org B (prueba manual o e2e).
 
-### Fase 4 — Sistema de módulos
+### Fase 4 — Sistema de módulos ✅
 
 CRUD interno de catálogo (usado luego por admin). `ModuleGuard`. `GET /me` incluye `modulos: [{ codigo, habilitado }]`.
 
@@ -951,8 +951,8 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Request context: `usuarioId`, `organizacionId`, `rol`
 - [x] Aislamiento: org A no ve datos de org B
 - [ ] Soft delete: listados con `estado = 1`
-- [ ] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
-- [ ] Guards de membresía, rol y módulo
+- [x] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
+- [x] Guards de membresía, rol y módulo
 - [ ] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
 - [ ] OAuth Meta + `page_id` + ad account + `token_cifrado`
 - [ ] Webhook enruta por `page_id` y guarda `leads` con origen
@@ -970,4 +970,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 4 (sistema de módulos + `ModuleGuard` + `modulos` en `GET /me`).
+**Siguiente paso concreto:** Fase 5 (panel admin SaaS: empresas, usuarios, módulos, matriz org × módulo).
