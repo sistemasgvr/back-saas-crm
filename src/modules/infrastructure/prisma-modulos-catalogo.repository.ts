@@ -11,7 +11,7 @@ export class PrismaModulosCatalogoRepository implements ModulosCatalogoRepositor
   constructor(private readonly prisma: PrismaService) {}
 
   listar() {
-    return this.prisma.modulo.findMany({ orderBy: { orden: 'asc' } });
+    return this.prisma.modulo.findMany({ where: { estado: 1 }, orderBy: { orden: 'asc' } });
   }
 
   obtenerPorId(id: string) {

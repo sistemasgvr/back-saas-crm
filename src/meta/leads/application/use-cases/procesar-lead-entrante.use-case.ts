@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { META_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../connections/application/ports/meta-graph-client.port';
@@ -12,6 +12,7 @@ import { ANUNCIOS_REPOSITORY } from '../../../ads/application/ports/anuncios.rep
 import type { AnunciosRepository } from '../../../ads/application/ports/anuncios.repository.port';
 import { LEADS_REPOSITORY } from '../ports/leads.repository.port';
 import type { LeadsRepository } from '../ports/leads.repository.port';
+import { PageSinConexionError } from '../errors/page-sin-conexion.error';
 import { extraerContactoLead } from '../extraer-contacto-lead';
 
 export interface ResultadoProcesarLead {
@@ -22,8 +23,6 @@ export interface ResultadoProcesarLead {
 
 @Injectable()
 export class ProcesarLeadEntranteUseCase {
-  private readonly logger = new Logger(ProcesarLeadEntranteUseCase.name);
-
   constructor(
     @Inject(META_CONEXIONES_REPOSITORY) private readonly conexiones: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
@@ -37,8 +36,7 @@ export class ProcesarLeadEntranteUseCase {
   async execute(pageId: string, leadgenId: string): Promise<ResultadoProcesarLead> {
     const conexion = await this.conexiones.findActivaPorPageId(pageId);
     if (!conexion?.tokenCifrado) {
-      this.logger.warn(`Webhook de leadgen para page_id sin conexión activa: ${pageId}`);
-      return { procesado: false, motivo: 'page_id sin conexión activa' };
+      throw new PageSinConexionError(pageId);
     }
 
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
@@ -50,30 +48,36 @@ export class ProcesarLeadEntranteUseCase {
     let anuncioId: string | undefined;
 
     if (lead.campaignId) {
+      const nombreCampana =
+        (await this.graph.obtenerNombreRecurso(lead.campaignId, accessToken)) ?? lead.campaignId;
       const campana = await this.campanas.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         metaCampanaId: lead.campaignId,
-        nombre: lead.campaignId,
+        nombre: nombreCampana,
       });
       campanaId = campana.id;
     }
 
     if (lead.adsetId && campanaId) {
+      const nombreConjunto =
+        (await this.graph.obtenerNombreRecurso(lead.adsetId, accessToken)) ?? lead.adsetId;
       const conjunto = await this.conjuntos.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         campanaId,
         metaConjuntoId: lead.adsetId,
-        nombre: lead.adsetId,
+        nombre: nombreConjunto,
       });
       conjuntoAnuncioId = conjunto.id;
     }
 
     if (lead.adId && conjuntoAnuncioId) {
+      const nombreAnuncio =
+        (await this.graph.obtenerNombreRecurso(lead.adId, accessToken)) ?? lead.adId;
       const anuncio = await this.anuncios.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         conjuntoAnuncioId,
         metaAnuncioId: lead.adId,
-        nombre: lead.adId,
+        nombre: nombreAnuncio,
       });
       anuncioId = anuncio.id;
     }

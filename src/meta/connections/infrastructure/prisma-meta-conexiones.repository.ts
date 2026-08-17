@@ -19,6 +19,16 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     return this.prisma.metaConexion.findFirst({ where: { pageId, estado: 1 } });
   }
 
+  findActivaPorWebhookVerifyToken(token: string) {
+    return this.prisma.metaConexion.findFirst({ where: { webhookVerifyToken: token, estado: 1 } });
+  }
+
+  listActivasConAppSecret() {
+    return this.prisma.metaConexion.findMany({
+      where: { estado: 1, appSecretCifrado: { not: null } },
+    });
+  }
+
   async guardarCredencialesApp(input: GuardarCredencialesInput) {
     const existente = await this.findActivaPorOrganizacion(input.organizacionId);
 

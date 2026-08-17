@@ -73,7 +73,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
     });
 
     const ids = grupos.map((g) => g.campanaId).filter((id): id is string => id !== null);
-    const campanas = await this.prisma.campana.findMany({ where: { id: { in: ids } } });
+    const campanas = await this.prisma.campana.findMany({ where: { id: { in: ids }, estado: 1 } });
     const nombrePorId = new Map(campanas.map((c) => [c.id, c.nombre]));
 
     return grupos
@@ -98,7 +98,7 @@ export class PrismaDashboardRepository implements DashboardRepository {
     });
 
     const ids = grupos.map((g) => g.anuncioId).filter((id): id is string => id !== null);
-    const anuncios = await this.prisma.anuncio.findMany({ where: { id: { in: ids } } });
+    const anuncios = await this.prisma.anuncio.findMany({ where: { id: { in: ids }, estado: 1 } });
     const nombrePorId = new Map(anuncios.map((a) => [a.id, a.nombre]));
 
     return grupos

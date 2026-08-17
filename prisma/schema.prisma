@@ -228,8 +228,8 @@ model MetaConexion {
 
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
 
-  // page_id único entre conexiones activas se aplica a nivel de aplicación
-  // (Prisma no soporta unique índices parciales/filtrados en el schema DSL).
+  // page_id único entre conexiones activas: índice parcial en migración
+  // 20260817223000_meta_conexiones_page_id_unique (Prisma DSL no soporta partial unique).
   @@index([organizacionId])
   @@index([pageId])
   @@index([adAccountId])

@@ -49,14 +49,20 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 
 ---
 
-## 2. Estado actual (punto de partida)
+## 2. Estado actual
 
-| Área | Hoy | Falta |
-|------|-----|--------|
-| Backend | NestJS 11 vacío (`AppController` / `AppService`) | Prisma, auth, módulos, Meta |
-| Frontend | Next.js 16 starter + plantilla TailAdmin en `free-nextjs-admin-dashboard-main/` | App real; copiar componentes a nuestra estructura |
-| Datos | Neon PostgreSQL disponible | Prisma + schema multi-tenant |
-| Infra | Puerto 3000 por defecto (conflicto con Next) | Config, CORS, prefijo `/api`, `.env` |
+**MVP (fases 0–11) implementado** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
+
+| Área | Estado |
+|------|--------|
+| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, webhook, leads, dashboard KPIs) |
+| Frontend | Next.js 16, login, admin, settings+Meta, `/leads`, `/dashboard`, TanStack Query, RHF+Zod |
+| Datos | Neon PostgreSQL + migraciones + seed |
+| Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
+
+**Pendiente operativo (no bloquea código):** deploy HTTPS público para Meta OAuth/webhook en producción, rotar `SEED_ADMIN_PASSWORD`, smoke test E2E con Meta real.
+
+Ver **§15 Huecos conocidos** para deuda técnica priorizada post-MVP.
 
 ### Decisión de frontend — TailAdmin por copia
 
@@ -775,7 +781,7 @@ FRONTEND_URL=https://{dominio-app}
 | `/profile` | Perfil del usuario logueado (datos + cambio de contraseña) |
 | `/leads` | Listado, búsqueda, filtros (fecha, campaña, anuncio, formulario), detalle |
 | `/dashboard` | KPI: total, hoy, semana, mes (**día calendario en `America/Lima`**). Charts: por día, campaña, anuncio. Filtros: fecha, campaña, ad set, anuncio |
-| `/settings` | Datos de org (Fase 6b). Conexión Meta a partir de Fase 7 |
+| `/settings` | Datos de org + conexión Meta (credenciales por org, OAuth, página, cuenta ads) |
 
 Sin pipeline, tareas ni oportunidades.
 
@@ -881,7 +887,7 @@ La Fase 5 dejó el **API** de plataforma; la Fase 6 dejó login + shell. Faltaba
 | Ruta | Quién | Contenido |
 |------|-------|-----------|
 | `/profile` | Cualquier usuario logueado | Editar `nombre`, `apellido`, `telefono`. Email de solo lectura. Cambiar contraseña |
-| `/settings` | PROPIETARIO, ADMINISTRADOR | Formulario de org (`PATCH /organizations/current`). Meta queda para Fase 7 |
+| `/settings` | PROPIETARIO, ADMINISTRADOR | Formulario de org + conexión Meta (credenciales por org, OAuth, página, cuenta ads) |
 
 **Plataforma** (`es_admin_plataforma = 1`)
 
@@ -899,33 +905,35 @@ Login de admin de plataforma redirige a `/admin/organizations`. Un cliente que e
 
 Feedback UX (complemento): **TanStack Query** para lecturas/mutaciones, **React Hook Form + Zod** para validar, **Zustand** para recordar email de login, toasts con **Sonner**, spinner overlay (`ActionLoader`) y loading en cada botón.
 
-### Fase 7 — OAuth Meta + conexión
+### Fase 7 — OAuth Meta + conexión ✅
 
-`meta/connections`: URL OAuth, callback, cifrado de token, selección de **página** (`page_id`) + cuenta publicitaria, persistencia. Requiere URL HTTPS alcanzable (túnel o deploy).
+`meta/connections`: credenciales **por org** (`app_id` + `app_secret_cifrado` vía `POST /meta/connections/app-credentials`), URL OAuth, callback, cifrado de token, selección de **página** (`page_id`) + cuenta publicitaria, desconexión (limpia sesión OAuth, conserva credenciales de app). Requiere URL HTTPS alcanzable (túnel o deploy).
 
 **Done cuando:** una org de desarrollo queda con `meta_conexiones` activa (`estado = 1`, `page_id` y `ad_account_id` llenos) y `token_cifrado` no es legible en Prisma Studio.
 
-### Fase 8 — Modelo Meta (tablas + lectura)
+### Fase 8 — Modelo Meta (tablas + lectura) ✅
 
 Schema `campanas`, `conjuntos_anuncios`, `anuncios` (con auditoría). Endpoints de lectura mínimos (para filtros). Poblado inicial **desde el webhook / lead**, no un sync masivo.
 
 **Done cuando:** las FKs existen y un lead puede colgarse de campaña / conjunto / anuncio.
 
-### Fase 9 — Webhook de leads
+### Fase 9 — Webhook de leads ✅
 
 Verify + firma + fetch Graph + resolver org por `page_id` → upsert `leads`. Sin Redis. Misma URL HTTPS pública que OAuth.
 
 **Done cuando:** un lead de prueba (o del test tool de Meta) aparece en Neon con `datos_crudos`, `id_externo` y `organizacion_id` correcto.
 
-### Fase 10 — Pantalla `/leads`
+> **Nota post-implementación:** webhook multi-org — HMAC con `app_secret_cifrado` por org y verify token por `webhook_verify_token` en DB (§15 P0 ✅).
+
+### Fase 10 — Pantalla `/leads` ✅
 
 Listado, búsqueda, filtros, detalle. API paginada.
 
 **Done cuando:** un `USUARIO` de la org ve solo sus leads; org B no aparece.
 
-### Fase 11 — Dashboard KPI
+### Fase 11 — Dashboard KPI ✅
 
-KPIs + 3 gráficos + filtros. Copiar charts de `free-nextjs-admin-dashboard-main` a `src/components/charts/`. Rangos “hoy/semana/mes” y buckets diarios calculados en `America/Lima`.
+KPIs + 3 gráficos + filtros. Charts en `src/components/charts/` (ApexCharts, copiados de TailAdmin). Rangos “hoy/semana/mes” y buckets diarios calculados en `America/Lima`.
 
 **Done cuando:** los números coinciden con el listado de leads para el mismo rango/filtro (misma zona Lima).
 
@@ -991,25 +999,76 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Admin crea empresas y usuarios
 - [x] Request context: `usuarioId`, `organizacionId`, `rol`
 - [x] Aislamiento: org A no ve datos de org B
-- [ ] Soft delete: listados con `estado = 1`
+- [x] Soft delete: listados admin con `estado = 1` (leads/dashboard sí filtran)
 - [x] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
 - [x] Guards de membresía, rol y módulo
 - [x] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
 - [x] UI perfil, settings org y panel `/admin` (Fase 6b)
-- [ ] OAuth Meta + `page_id` + ad account + `token_cifrado`
-- [ ] Webhook enruta por `page_id` y guarda `leads` con origen
-- [ ] `/leads` con listado, búsqueda, filtros y detalle
-- [ ] `/dashboard` con 4 KPIs y 3 gráficos + filtros
-- [ ] `npm run build` en backend y frontend
+- [x] OAuth Meta + credenciales por org + `page_id` + ad account + `token_cifrado`
+- [x] Webhook enruta por `page_id`, firma HMAC multi-org y guarda `leads` con origen
+- [x] `/leads` con listado, búsqueda, filtros (incl. formulario) y detalle
+- [x] `/dashboard` con 4 KPIs y 3 gráficos + filtros
+- [x] Guards de ruta por módulo en `/dashboard`, `/leads` y bloqueo `/settings` para `USUARIO`
+- [x] Redirect post-login según módulos habilitados
+- [x] `npm run build` en backend y frontend
 - [ ] Rotar `SEED_ADMIN_PASSWORD` (tras primer login real)
+- [ ] Smoke test Meta E2E en HTTPS (credenciales → OAuth → webhook → lead en Neon)
+
+---
+
+## 15. Huecos conocidos (auditoría post-MVP)
+
+Auditoría cruzada backend + frontend (fases 0–11). Deuda **cerrada en código** salvo ítems operativos.
+
+### P0 — Meta / webhook (backend) ✅
+
+| # | Hueco | Estado |
+|---|--------|--------|
+| 1 | Webhook HMAC con `app_secret_cifrado` por org (lookup por `page_id`) | ✅ `VerificarWebhookMetaUseCase` |
+| 2 | Verify token GET con `webhook_verify_token` por org (+ fallback `META_VERIFY_TOKEN`) | ✅ mismo use case |
+| 3 | Smoke test E2E con Meta real (HTTPS) | ⏳ operativo — pendiente deploy |
+
+### P1 — Correctness / PLAN ✅
+
+| # | Hueco | Estado |
+|---|--------|--------|
+| 4 | Admin `listar()` filtra `estado = 1` | ✅ repos admin + catálogo módulos |
+| 5 | Suscripción automática webhook de página tras seleccionar `page_id` | ✅ `suscribirPaginaLeadgen` |
+| 6 | Índice parcial único `page_id WHERE estado = 1` | ✅ migración SQL |
+| 7 | Lead duplicado actualiza en lugar de ignorar | ✅ `prisma-leads.repository.ts` |
+| 8 | `page_id` desconocido → log ERROR explícito (`PageSinConexionError`) | ✅ controller + use case |
+| 9 | Filtro **formulario** en `/leads` | ✅ frontend |
+| 10 | Redirect post-login según módulos | ✅ frontend |
+| 11 | Guards de ruta en `/dashboard` y `/leads` | ✅ frontend |
+| 12 | `/settings` bloqueado para rol `USUARIO` | ✅ frontend |
+
+### P2 — Calidad / ops
+
+| # | Hueco | Estado |
+|---|--------|--------|
+| 13 | Nombres campaña/anuncio en ingest vía Graph | ✅ `obtenerNombreRecurso` |
+| 14 | Disconnect no pone `meta_conexiones.estado = 0` | ✅ **aceptado** — conserva credenciales App |
+| 15 | Tests e2e obsoletos | ✅ placeholder documentado |
+| 16 | Buscador del header sin funcionalidad | ✅ removido |
+| 17 | Checkbox login “Recordar email” | ✅ frontend |
+| 18 | Empty states en tablas admin | ✅ frontend |
+| 19 | `app/error.tsx` / `loading.tsx` a nivel shell | ✅ frontend `(app)/` |
+| 20 | `cookie-parser` en deps sin usar | ⏳ bajo impacto — refresh por body |
+
+### Desviaciones aceptadas (documentadas)
+
+- **Meta App por org** (no env global): producto decidió `POST /meta/connections/app-credentials`; `META_APP_SECRET` / `META_VERIFY_TOKEN` quedan como fallback legacy opcional.
+- **Disconnect** limpia OAuth pero mantiene fila activa con credenciales App (`estado = 1`).
+- **Rutas Meta** renombradas vs §7 (`/current`, `/page`, `/disconnect`) — frontend alineado.
+- **Seed** crea org de prueba además del admin (útil en dev).
 
 ---
 
 ## 14. Cómo usar este plan
 
-1. Implementar **solo la fase en curso**.
-2. No mezclar Meta (fase 7+) con el kernel (fases 0–5).
-3. Cada fase termina con `npm run build` en el repo tocado.
-4. Si una fase crece, se parte; no se salta el criterio de “done”.
+1. Las fases 0–11 están **cerradas**; usar §15 para priorizar hardening y producción.
+2. No mezclar features post-MVP (§11) con deuda de §15 sin ticket explícito.
+3. Cada cambio termina con `npm run build` en el repo tocado.
+4. Meta en producción exige HTTPS + smoke test §13.
 
-**Siguiente paso concreto:** Fase 7 (OAuth Meta + conexión). Requiere HTTPS público.
+**Siguiente paso concreto:** deploy HTTPS → aplicar migración `page_id` unique → smoke test Meta → rotar `SEED_ADMIN_PASSWORD`.

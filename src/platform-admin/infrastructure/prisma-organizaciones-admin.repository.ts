@@ -14,7 +14,7 @@ export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminR
   constructor(private readonly prisma: PrismaService) {}
 
   listar() {
-    return this.prisma.organizacion.findMany({ orderBy: { fechaCreacion: 'desc' } });
+    return this.prisma.organizacion.findMany({ where: { estado: 1 }, orderBy: { fechaCreacion: 'desc' } });
   }
 
   obtenerPorId(id: string) {

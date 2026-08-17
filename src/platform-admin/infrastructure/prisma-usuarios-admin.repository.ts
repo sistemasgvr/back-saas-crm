@@ -12,7 +12,7 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   listar() {
-    return this.prisma.usuario.findMany({ orderBy: { fechaCreacion: 'desc' } });
+    return this.prisma.usuario.findMany({ where: { estado: 1 }, orderBy: { fechaCreacion: 'desc' } });
   }
 
   async obtenerPorId(id: string): Promise<UsuarioConMembresias | null> {

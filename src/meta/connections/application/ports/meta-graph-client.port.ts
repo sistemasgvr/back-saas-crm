@@ -53,4 +53,7 @@ export interface MetaGraphClient {
   listarPaginas(accessToken: string): Promise<MetaPagina[]>;
   listarCuentasPublicitarias(accessToken: string): Promise<MetaCuentaPublicitaria[]>;
   obtenerLead(leadgenId: string, accessToken: string): Promise<MetaLeadGraph>;
+  obtenerAccessTokenPagina(pageId: string, userAccessToken: string): Promise<string | null>;
+  suscribirPaginaLeadgen(pageId: string, pageAccessToken: string): Promise<void>;
+  obtenerNombreRecurso(metaId: string, accessToken: string): Promise<string | null>;
 }

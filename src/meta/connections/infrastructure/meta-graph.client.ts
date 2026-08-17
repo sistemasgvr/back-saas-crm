@@ -72,6 +72,32 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return data.data.map((pagina) => ({ id: pagina.id, nombre: pagina.name }));
   }
 
+  async obtenerAccessTokenPagina(pageId: string, userAccessToken: string): Promise<string | null> {
+    const data = await this.get<
+      GraphListResponse<{ id: string; access_token?: string }>
+    >('/me/accounts', {
+      fields: 'id,access_token',
+      access_token: userAccessToken,
+    });
+    const pagina = data.data.find((item) => item.id === pageId);
+    return pagina?.access_token ?? null;
+  }
+
+  async suscribirPaginaLeadgen(pageId: string, pageAccessToken: string): Promise<void> {
+    await this.post(`/${pageId}/subscribed_apps`, {
+      subscribed_fields: 'leadgen',
+      access_token: pageAccessToken,
+    });
+  }
+
+  async obtenerNombreRecurso(metaId: string, accessToken: string): Promise<string | null> {
+    const data = await this.get<{ name?: string }>(`/${metaId}`, {
+      fields: 'name',
+      access_token: accessToken,
+    });
+    return data.name ?? null;
+  }
+
   async listarCuentasPublicitarias(accessToken: string): Promise<MetaCuentaPublicitaria[]> {
     const data = await this.get<GraphListResponse<{ id: string; name: string }>>('/me/adaccounts', {
       fields: 'id,name',
@@ -112,6 +138,19 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         this.http.get<T>(`${GRAPH_BASE_URL}${path}`, { params }),
       );
       return response.data;
+    } catch (error) {
+      const mensaje =
+        error instanceof AxiosError
+          ? ((error.response?.data as { error?: { message?: string } })?.error?.message ??
+            error.message)
+          : 'Error desconocido al llamar a Meta Graph API';
+      throw new BadGatewayException(`Meta Graph API: ${mensaje}`);
+    }
+  }
+
+  private async post(path: string, params: Record<string, string>): Promise<void> {
+    try {
+      await firstValueFrom(this.http.post(`${GRAPH_BASE_URL}${path}`, null, { params }));
     } catch (error) {
       const mensaje =
         error instanceof AxiosError

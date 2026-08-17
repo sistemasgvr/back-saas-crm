@@ -3,9 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { ProcesarLeadEntranteUseCase } from '../../leads/application/use-cases/procesar-lead-entrante.use-case';
+import { PageSinConexionError } from '../../leads/application/errors/page-sin-conexion.error';
 import { extraerEventosLeadgen } from '../domain/leadgen-webhook-payload.interface';
 import type { LeadgenWebhookPayload } from '../domain/leadgen-webhook-payload.interface';
-import { verificarFirmaWebhook } from '../infrastructure/verificar-firma-webhook';
+import { VerificarWebhookMetaUseCase } from '../application/use-cases/verificar-webhook-meta.use-case';
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
@@ -15,20 +16,20 @@ export class MetaWebhooksController {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly verificarWebhook: VerificarWebhookMetaUseCase,
     private readonly procesarLead: ProcesarLeadEntranteUseCase,
   ) {}
 
   @Get()
-  verify(
+  async verify(
     @Query('token') token: string,
     @Query('hub.mode') mode: string,
     @Query('hub.verify_token') verifyToken: string,
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     const urlTokenValido = token === this.config.getOrThrow<string>('META_WEBHOOK_URL_TOKEN');
-    const verifyTokenValido =
-      mode === 'subscribe' && verifyToken === this.config.getOrThrow<string>('META_VERIFY_TOKEN');
+    const verifyTokenValido = await this.verificarWebhook.esSuscripcionValida(mode, verifyToken);
 
     if (urlTokenValido && verifyTokenValido) {
       res.status(200).send(challenge);
@@ -50,19 +51,43 @@ export class MetaWebhooksController {
       return;
     }
 
-    const appSecret = this.config.getOrThrow<string>('META_APP_SECRET');
-    if (!req.rawBody || !verificarFirmaWebhook(req.rawBody, signature, appSecret)) {
+    const payload = req.body as LeadgenWebhookPayload;
+    if (
+      !req.rawBody ||
+      !(await this.verificarWebhook.verificarFirma(req.rawBody, signature, payload))
+    ) {
       this.logger.warn('Firma de webhook inválida');
       res.status(403).send();
       return;
     }
 
-    const eventos = extraerEventosLeadgen(req.body as LeadgenWebhookPayload);
+    const eventos = extraerEventosLeadgen(payload);
+    let procesados = 0;
+    let rechazadosPageId = 0;
 
     try {
       for (const evento of eventos) {
-        await this.procesarLead.execute(evento.pageId, evento.leadgenId);
+        try {
+          await this.procesarLead.execute(evento.pageId, evento.leadgenId);
+          procesados += 1;
+        } catch (error) {
+          if (error instanceof PageSinConexionError) {
+            rechazadosPageId += 1;
+            this.logger.error(
+              `Webhook leadgen rechazado: page_id ${error.pageId} sin conexión activa (leadgen ${evento.leadgenId})`,
+            );
+            continue;
+          }
+          throw error;
+        }
       }
+
+      if (eventos.length > 0 && procesados === 0 && rechazadosPageId === eventos.length) {
+        this.logger.error(
+          `Webhook leadgen: ${rechazadosPageId} evento(s) rechazados — ningún page_id tiene conexión activa`,
+        );
+      }
+
       res.status(200).send('OK');
     } catch (error) {
       // Graph API falló u otro error transitorio: 5xx para que Meta reintente (PLAN.md §8.2).

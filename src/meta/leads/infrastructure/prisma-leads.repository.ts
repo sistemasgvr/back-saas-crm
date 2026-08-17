@@ -13,7 +13,21 @@ export class PrismaLeadsRepository implements LeadsRepository {
     });
 
     if (existente) {
-      return { id: existente.id, creado: false };
+      const lead = await this.prisma.lead.update({
+        where: { id: existente.id },
+        data: {
+          campanaId: input.campanaId,
+          conjuntoAnuncioId: input.conjuntoAnuncioId,
+          anuncioId: input.anuncioId,
+          formularioId: input.formularioId,
+          nombre: input.nombre,
+          email: input.email,
+          telefono: input.telefono,
+          datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+          fechaLead: input.fechaLead,
+        },
+      });
+      return { id: lead.id, creado: false };
     }
 
     const lead = await this.prisma.lead.create({
