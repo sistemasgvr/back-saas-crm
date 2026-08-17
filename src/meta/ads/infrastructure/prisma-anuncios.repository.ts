@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
-import type { AnuncioFiltro, AnunciosRepository } from '../application/ports/anuncios.repository.port';
+import type {
+  AnuncioFiltro,
+  AnunciosRepository,
+  UpsertAnuncioInput,
+} from '../application/ports/anuncios.repository.port';
 
 @Injectable()
 export class PrismaAnunciosRepository implements AnunciosRepository {
@@ -20,5 +25,26 @@ export class PrismaAnunciosRepository implements AnunciosRepository {
       nombre: a.nombre,
       estadoMeta: a.estadoMeta,
     }));
+  }
+
+  async upsertPorMetaId(input: UpsertAnuncioInput): Promise<{ id: string }> {
+    const anuncio = await this.prisma.anuncio.upsert({
+      where: {
+        organizacionId_metaAnuncioId: {
+          organizacionId: input.organizacionId,
+          metaAnuncioId: input.metaAnuncioId,
+        },
+      },
+      update: {},
+      create: {
+        organizacionId: input.organizacionId,
+        conjuntoAnuncioId: input.conjuntoAnuncioId,
+        metaAnuncioId: input.metaAnuncioId,
+        nombre: input.nombre,
+        estadoMeta: input.estadoMeta,
+        datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+      },
+    });
+    return { id: anuncio.id };
   }
 }

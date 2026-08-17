@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import type {
   MetaCuentaPublicitaria,
   MetaGraphClient,
+  MetaLeadGraph,
   MetaPagina,
   MetaUsuario,
   TokenIntercambiado,
@@ -72,6 +73,32 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       access_token: accessToken,
     });
     return data.data.map((cuenta) => ({ id: cuenta.id, nombre: cuenta.name }));
+  }
+
+  async obtenerLead(leadgenId: string, accessToken: string): Promise<MetaLeadGraph> {
+    const data = await this.get<{
+      id: string;
+      form_id?: string;
+      ad_id?: string;
+      adset_id?: string;
+      campaign_id?: string;
+      created_time?: string;
+      field_data?: { name: string; values: string[] }[];
+    }>(`/${leadgenId}`, {
+      fields: 'field_data,ad_id,adset_id,campaign_id,form_id,created_time',
+      access_token: accessToken,
+    });
+
+    return {
+      leadgenId: data.id,
+      formId: data.form_id,
+      adId: data.ad_id,
+      adsetId: data.adset_id,
+      campaignId: data.campaign_id,
+      createdTime: data.created_time ? new Date(data.created_time) : undefined,
+      fieldData: (data.field_data ?? []).map((f) => ({ name: f.name, values: f.values })),
+      raw: data,
+    };
   }
 
   private async get<T>(path: string, params: Record<string, string>): Promise<T> {

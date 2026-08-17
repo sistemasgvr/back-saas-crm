@@ -10,5 +10,6 @@ import { PrismaConjuntosAnunciosRepository } from './infrastructure/prisma-conju
     ListarConjuntosAnunciosUseCase,
     { provide: CONJUNTOS_ANUNCIOS_REPOSITORY, useClass: PrismaConjuntosAnunciosRepository },
   ],
+  exports: [CONJUNTOS_ANUNCIOS_REPOSITORY],
 })
 export class AdsetsModule {}

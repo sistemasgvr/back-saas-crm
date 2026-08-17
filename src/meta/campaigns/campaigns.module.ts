@@ -10,5 +10,6 @@ import { PrismaCampanasRepository } from './infrastructure/prisma-campanas.repos
     ListarCampanasUseCase,
     { provide: CAMPANAS_REPOSITORY, useClass: PrismaCampanasRepository },
   ],
+  exports: [CAMPANAS_REPOSITORY],
 })
 export class CampaignsModule {}

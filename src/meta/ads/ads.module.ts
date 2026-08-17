@@ -10,5 +10,6 @@ import { PrismaAnunciosRepository } from './infrastructure/prisma-anuncios.repos
     ListarAnunciosUseCase,
     { provide: ANUNCIOS_REPOSITORY, useClass: PrismaAnunciosRepository },
   ],
+  exports: [ANUNCIOS_REPOSITORY],
 })
 export class AdsModule {}

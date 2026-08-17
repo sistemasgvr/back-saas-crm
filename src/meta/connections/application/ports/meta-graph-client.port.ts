@@ -20,10 +20,27 @@ export interface MetaCuentaPublicitaria {
   nombre: string;
 }
 
+export interface MetaCampoLead {
+  name: string;
+  values: string[];
+}
+
+export interface MetaLeadGraph {
+  leadgenId: string;
+  formId?: string;
+  adId?: string;
+  adsetId?: string;
+  campaignId?: string;
+  createdTime?: Date;
+  fieldData: MetaCampoLead[];
+  raw: unknown;
+}
+
 export interface MetaGraphClient {
   intercambiarCodigoPorToken(code: string, redirectUri: string): Promise<TokenIntercambiado>;
   intercambiarPorTokenLargaDuracion(shortLivedToken: string): Promise<TokenIntercambiado>;
   obtenerUsuario(accessToken: string): Promise<MetaUsuario>;
   listarPaginas(accessToken: string): Promise<MetaPagina[]>;
   listarCuentasPublicitarias(accessToken: string): Promise<MetaCuentaPublicitaria[]>;
+  obtenerLead(leadgenId: string, accessToken: string): Promise<MetaLeadGraph>;
 }

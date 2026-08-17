@@ -6,6 +6,16 @@ export interface CampanaFiltro {
   estadoMeta: string | null;
 }
 
+export interface UpsertCampanaInput {
+  organizacionId: string;
+  metaCampanaId: string;
+  nombre: string;
+  estadoMeta?: string;
+  datosCrudos?: unknown;
+}
+
 export interface CampanasRepository {
   listarPorOrganizacion(organizacionId: string): Promise<CampanaFiltro[]>;
+  /** Idempotente por (organizacionId, metaCampanaId) — usado por la ingestión del webhook (Fase 9). */
+  upsertPorMetaId(input: UpsertCampanaInput): Promise<{ id: string }>;
 }

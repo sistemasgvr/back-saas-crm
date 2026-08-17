@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
-import type { CampanaFiltro, CampanasRepository } from '../application/ports/campanas.repository.port';
+import type {
+  CampanaFiltro,
+  CampanasRepository,
+  UpsertCampanaInput,
+} from '../application/ports/campanas.repository.port';
 
 @Injectable()
 export class PrismaCampanasRepository implements CampanasRepository {
@@ -12,5 +17,25 @@ export class PrismaCampanasRepository implements CampanasRepository {
       orderBy: { nombre: 'asc' },
     });
     return campanas.map((c) => ({ id: c.id, nombre: c.nombre, estadoMeta: c.estadoMeta }));
+  }
+
+  async upsertPorMetaId(input: UpsertCampanaInput): Promise<{ id: string }> {
+    const campana = await this.prisma.campana.upsert({
+      where: {
+        organizacionId_metaCampanaId: {
+          organizacionId: input.organizacionId,
+          metaCampanaId: input.metaCampanaId,
+        },
+      },
+      update: {},
+      create: {
+        organizacionId: input.organizacionId,
+        metaCampanaId: input.metaCampanaId,
+        nombre: input.nombre,
+        estadoMeta: input.estadoMeta,
+        datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+      },
+    });
+    return { id: campana.id };
   }
 }

@@ -34,5 +34,6 @@ import { JwtMetaOAuthStateService } from './infrastructure/jwt-meta-oauth-state.
     { provide: META_GRAPH_CLIENT, useClass: AxiosMetaGraphClient },
     { provide: META_OAUTH_STATE_SERVICE, useClass: JwtMetaOAuthStateService },
   ],
+  exports: [META_CONEXIONES_REPOSITORY, META_GRAPH_CLIENT],
 })
 export class MetaConnectionsModule {}
