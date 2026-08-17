@@ -11,6 +11,7 @@ import { ListarCuentasPublicitariasUseCase } from './application/use-cases/lista
 import { SeleccionarPaginaUseCase } from './application/use-cases/seleccionar-pagina.use-case';
 import { SeleccionarCuentaPublicitariaUseCase } from './application/use-cases/seleccionar-cuenta-publicitaria.use-case';
 import { DesconectarUseCase } from './application/use-cases/desconectar.use-case';
+import { GuardarCredencialesAppUseCase } from './application/use-cases/guardar-credenciales-app.use-case';
 import { META_CONEXIONES_REPOSITORY } from './application/ports/meta-conexiones.repository.port';
 import { PrismaMetaConexionesRepository } from './infrastructure/prisma-meta-conexiones.repository';
 import { META_GRAPH_CLIENT } from './application/ports/meta-graph-client.port';
@@ -25,6 +26,7 @@ import { JwtMetaOAuthStateService } from './infrastructure/jwt-meta-oauth-state.
     ObtenerUrlOAuthUseCase,
     ProcesarCallbackOAuthUseCase,
     ObtenerConexionActualUseCase,
+    GuardarCredencialesAppUseCase,
     ListarPaginasUseCase,
     ListarCuentasPublicitariasUseCase,
     SeleccionarPaginaUseCase,

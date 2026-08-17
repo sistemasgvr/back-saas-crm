@@ -37,8 +37,18 @@ export interface MetaLeadGraph {
 }
 
 export interface MetaGraphClient {
-  intercambiarCodigoPorToken(code: string, redirectUri: string): Promise<TokenIntercambiado>;
-  intercambiarPorTokenLargaDuracion(shortLivedToken: string): Promise<TokenIntercambiado>;
+  /** appId/appSecret son de la Meta App propia de la organización, no de la plataforma. */
+  intercambiarCodigoPorToken(
+    code: string,
+    redirectUri: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<TokenIntercambiado>;
+  intercambiarPorTokenLargaDuracion(
+    shortLivedToken: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<TokenIntercambiado>;
   obtenerUsuario(accessToken: string): Promise<MetaUsuario>;
   listarPaginas(accessToken: string): Promise<MetaPagina[]>;
   listarCuentasPublicitarias(accessToken: string): Promise<MetaCuentaPublicitaria[]>;

@@ -199,18 +199,26 @@ model Lead {
 }
 
 model MetaConexion {
-  id                 String    @id @default(uuid()) @db.Uuid
-  organizacionId     String    @map("organizacion_id") @db.Uuid
-  metaUserId         String    @map("meta_user_id") @db.VarChar(64)
-  metaUserNombre     String?   @map("meta_user_nombre") @db.VarChar(200)
-  adAccountId        String?   @map("ad_account_id") @db.VarChar(64)
-  adAccountNombre    String?   @map("ad_account_nombre") @db.VarChar(200)
-  pageId             String?   @map("page_id") @db.VarChar(64)
-  pageNombre         String?   @map("page_nombre") @db.VarChar(200)
-  tokenCifrado       String    @map("token_cifrado")
-  tokenExpiraEn      DateTime? @map("token_expira_en") @db.Timestamptz
-  scopes             String?
-  webhookVerifyToken String    @map("webhook_verify_token") @db.VarChar(128)
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+
+  // Meta App propia de la organización (cada cliente registra la suya) — se
+  // guarda antes de iniciar el OAuth; sin esto no se puede generar la URL.
+  appId            String? @map("app_id") @db.VarChar(64)
+  appSecretCifrado String? @map("app_secret_cifrado")
+
+  // Se completan recién cuando el OAuth de esa app termina con éxito.
+  metaUserId      String?   @map("meta_user_id") @db.VarChar(64)
+  metaUserNombre  String?   @map("meta_user_nombre") @db.VarChar(200)
+  adAccountId     String?   @map("ad_account_id") @db.VarChar(64)
+  adAccountNombre String?   @map("ad_account_nombre") @db.VarChar(200)
+  pageId          String?   @map("page_id") @db.VarChar(64)
+  pageNombre      String?   @map("page_nombre") @db.VarChar(200)
+  tokenCifrado    String?   @map("token_cifrado")
+  tokenExpiraEn   DateTime? @map("token_expira_en") @db.Timestamptz
+  scopes          String?
+
+  webhookVerifyToken String @map("webhook_verify_token") @db.VarChar(128)
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid

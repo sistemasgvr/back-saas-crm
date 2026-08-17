@@ -1,7 +1,9 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { META_OAUTH_STATE_SERVICE } from '../ports/meta-oauth-state.port';
 import type { MetaOAuthStateService } from '../ports/meta-oauth-state.port';
+import { META_CONEXIONES_REPOSITORY } from '../ports/meta-conexiones.repository.port';
+import type { MetaConexionesRepository } from '../ports/meta-conexiones.repository.port';
 
 const GRAPH_VERSION = 'v21.0';
 // Lead Ads + lectura de anuncios/páginas (PLAN.md §8.1).
@@ -12,13 +14,21 @@ export class ObtenerUrlOAuthUseCase {
   constructor(
     private readonly config: ConfigService,
     @Inject(META_OAUTH_STATE_SERVICE) private readonly oauthState: MetaOAuthStateService,
+    @Inject(META_CONEXIONES_REPOSITORY) private readonly conexiones: MetaConexionesRepository,
   ) {}
 
-  execute(organizacionId: string, usuarioId: string): { url: string } {
+  async execute(organizacionId: string, usuarioId: string): Promise<{ url: string }> {
+    const conexion = await this.conexiones.findActivaPorOrganizacion(organizacionId);
+    if (!conexion?.appId) {
+      throw new BadRequestException(
+        'Registra tu Meta App (App ID y App Secret) antes de conectar',
+      );
+    }
+
     const state = this.oauthState.firmar({ organizacionId, usuarioId });
 
     const params = new URLSearchParams({
-      client_id: this.config.getOrThrow<string>('META_APP_ID'),
+      client_id: conexion.appId,
       redirect_uri: this.config.getOrThrow<string>('META_OAUTH_REDIRECT_URI'),
       state,
       scope: SCOPES,

@@ -36,7 +36,7 @@ export class ProcesarLeadEntranteUseCase {
 
   async execute(pageId: string, leadgenId: string): Promise<ResultadoProcesarLead> {
     const conexion = await this.conexiones.findActivaPorPageId(pageId);
-    if (!conexion) {
+    if (!conexion?.tokenCifrado) {
       this.logger.warn(`Webhook de leadgen para page_id sin conexión activa: ${pageId}`);
       return { procesado: false, motivo: 'page_id sin conexión activa' };
     }

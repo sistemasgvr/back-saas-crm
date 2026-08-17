@@ -15,7 +15,7 @@ export class ListarCuentasPublicitariasUseCase {
 
   async execute(organizacionId: string) {
     const conexion = await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion) {
+    if (!conexion?.tokenCifrado) {
       throw new BadRequestException('No hay una conexión Meta activa. Conecta Meta primero.');
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);

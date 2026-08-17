@@ -1,4 +1,5 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { META_OAUTH_STATE_SERVICE } from '../ports/meta-oauth-state.port';
 import type { MetaOAuthStateService } from '../ports/meta-oauth-state.port';
 import { META_GRAPH_CLIENT } from '../ports/meta-graph-client.port';
@@ -6,7 +7,6 @@ import type { MetaGraphClient } from '../ports/meta-graph-client.port';
 import { META_CONEXIONES_REPOSITORY } from '../ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../ports/meta-conexiones.repository.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
-import { ConfigService } from '@nestjs/config';
 
 export interface ProcesarCallbackInput {
   code: string;
@@ -29,16 +29,31 @@ export class ProcesarCallbackOAuthUseCase {
       throw new UnauthorizedException('state de OAuth inválido o expirado');
     }
 
+    const conexion = await this.conexiones.findActivaPorOrganizacion(state.organizacionId);
+    if (!conexion?.appId || !conexion.appSecretCifrado) {
+      throw new UnauthorizedException('No hay credenciales de Meta App guardadas para esta organización');
+    }
+    const appSecret = this.tokenEncryption.decrypt(conexion.appSecretCifrado);
+
     const redirectUri = this.config.getOrThrow<string>('META_OAUTH_REDIRECT_URI');
-    const corto = await this.graph.intercambiarCodigoPorToken(input.code, redirectUri);
-    const largo = await this.graph.intercambiarPorTokenLargaDuracion(corto.accessToken);
+    const corto = await this.graph.intercambiarCodigoPorToken(
+      input.code,
+      redirectUri,
+      conexion.appId,
+      appSecret,
+    );
+    const largo = await this.graph.intercambiarPorTokenLargaDuracion(
+      corto.accessToken,
+      conexion.appId,
+      appSecret,
+    );
     const usuarioMeta = await this.graph.obtenerUsuario(largo.accessToken);
 
     const tokenExpiraEn = largo.expiraEnSegundos
       ? new Date(Date.now() + largo.expiraEnSegundos * 1000)
       : undefined;
 
-    await this.conexiones.upsertPorOrganizacion({
+    await this.conexiones.actualizarTokenOAuth({
       organizacionId: state.organizacionId,
       metaUserId: usuarioMeta.id,
       metaUserNombre: usuarioMeta.nombre,

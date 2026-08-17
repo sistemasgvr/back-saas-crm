@@ -13,8 +13,10 @@ import { ListarCuentasPublicitariasUseCase } from '../application/use-cases/list
 import { SeleccionarPaginaUseCase } from '../application/use-cases/seleccionar-pagina.use-case';
 import { SeleccionarCuentaPublicitariaUseCase } from '../application/use-cases/seleccionar-cuenta-publicitaria.use-case';
 import { DesconectarUseCase } from '../application/use-cases/desconectar.use-case';
+import { GuardarCredencialesAppUseCase } from '../application/use-cases/guardar-credenciales-app.use-case';
 import { SeleccionarPaginaDto } from './dto/seleccionar-pagina.dto';
 import { SeleccionarCuentaDto } from './dto/seleccionar-cuenta.dto';
+import { GuardarCredencialesDto } from './dto/guardar-credenciales.dto';
 
 @Controller('meta/connections')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
@@ -23,6 +25,7 @@ import { SeleccionarCuentaDto } from './dto/seleccionar-cuenta.dto';
 export class MetaConnectionsController {
   constructor(
     private readonly obtenerConexionActual: ObtenerConexionActualUseCase,
+    private readonly guardarCredencialesApp: GuardarCredencialesAppUseCase,
     private readonly listarPaginas: ListarPaginasUseCase,
     private readonly listarCuentasPublicitarias: ListarCuentasPublicitariasUseCase,
     private readonly seleccionarPagina: SeleccionarPaginaUseCase,
@@ -33,6 +36,16 @@ export class MetaConnectionsController {
   @Get('current')
   getCurrent(@CurrentUser() ctx: RequestContext) {
     return this.obtenerConexionActual.execute(ctx.organizacionId!);
+  }
+
+  @Post('app-credentials')
+  saveAppCredentials(@CurrentUser() ctx: RequestContext, @Body() dto: GuardarCredencialesDto) {
+    return this.guardarCredencialesApp.execute(
+      ctx.organizacionId!,
+      dto.appId,
+      dto.appSecret,
+      ctx.usuarioId,
+    );
   }
 
   @Get('pages')

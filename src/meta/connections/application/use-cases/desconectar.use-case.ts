@@ -11,8 +11,8 @@ export class DesconectarUseCase {
   async execute(organizacionId: string, usuarioEdicion: string): Promise<void> {
     const conexion = await this.conexiones.findActivaPorOrganizacion(organizacionId);
     if (!conexion) {
-      throw new NotFoundException('No hay una conexión Meta activa');
+      throw new NotFoundException('No hay una conexión Meta configurada');
     }
-    await this.conexiones.desactivar(conexion.id, usuarioEdicion);
+    await this.conexiones.limpiarConexionOAuth(conexion.id, usuarioEdicion);
   }
 }

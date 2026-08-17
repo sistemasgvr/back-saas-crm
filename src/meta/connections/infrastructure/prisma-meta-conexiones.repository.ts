@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
+  ActualizarTokenInput,
+  GuardarCredencialesInput,
   MetaConexionesRepository,
-  UpsertConexionInput,
 } from '../application/ports/meta-conexiones.repository.port';
 
 @Injectable()
@@ -18,18 +19,15 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     return this.prisma.metaConexion.findFirst({ where: { pageId, estado: 1 } });
   }
 
-  async upsertPorOrganizacion(input: UpsertConexionInput) {
+  async guardarCredencialesApp(input: GuardarCredencialesInput) {
     const existente = await this.findActivaPorOrganizacion(input.organizacionId);
 
     if (existente) {
       return this.prisma.metaConexion.update({
         where: { id: existente.id },
         data: {
-          metaUserId: input.metaUserId,
-          metaUserNombre: input.metaUserNombre,
-          tokenCifrado: input.tokenCifrado,
-          tokenExpiraEn: input.tokenExpiraEn,
-          scopes: input.scopes,
+          appId: input.appId,
+          appSecretCifrado: input.appSecretCifrado,
           usuarioEdicion: input.usuarioEdicion,
         },
       });
@@ -38,13 +36,28 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     return this.prisma.metaConexion.create({
       data: {
         organizacionId: input.organizacionId,
+        appId: input.appId,
+        appSecretCifrado: input.appSecretCifrado,
+        webhookVerifyToken: randomBytes(32).toString('hex'),
+        usuarioCreacion: input.usuarioEdicion,
+      },
+    });
+  }
+
+  async actualizarTokenOAuth(input: ActualizarTokenInput) {
+    const existente = await this.findActivaPorOrganizacion(input.organizacionId);
+    if (!existente) {
+      throw new NotFoundException('No hay credenciales de Meta App guardadas para esta organización');
+    }
+    return this.prisma.metaConexion.update({
+      where: { id: existente.id },
+      data: {
         metaUserId: input.metaUserId,
         metaUserNombre: input.metaUserNombre,
         tokenCifrado: input.tokenCifrado,
         tokenExpiraEn: input.tokenExpiraEn,
         scopes: input.scopes,
-        webhookVerifyToken: randomBytes(32).toString('hex'),
-        usuarioCreacion: input.usuarioEdicion,
+        usuarioEdicion: input.usuarioEdicion,
       },
     });
   }
@@ -68,10 +81,21 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     });
   }
 
-  async desactivar(id: string, usuarioEdicion: string): Promise<void> {
+  async limpiarConexionOAuth(id: string, usuarioEdicion: string): Promise<void> {
     await this.prisma.metaConexion.update({
       where: { id },
-      data: { estado: 0, usuarioEdicion },
+      data: {
+        metaUserId: null,
+        metaUserNombre: null,
+        tokenCifrado: null,
+        tokenExpiraEn: null,
+        scopes: null,
+        pageId: null,
+        pageNombre: null,
+        adAccountId: null,
+        adAccountNombre: null,
+        usuarioEdicion,
+      },
     });
   }
 }

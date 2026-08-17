@@ -1,5 +1,4 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
@@ -26,26 +25,32 @@ interface GraphListResponse<T> {
 
 @Injectable()
 export class AxiosMetaGraphClient implements MetaGraphClient {
-  constructor(
-    private readonly http: HttpService,
-    private readonly config: ConfigService,
-  ) {}
+  constructor(private readonly http: HttpService) {}
 
-  async intercambiarCodigoPorToken(code: string, redirectUri: string): Promise<TokenIntercambiado> {
+  async intercambiarCodigoPorToken(
+    code: string,
+    redirectUri: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<TokenIntercambiado> {
     const data = await this.get<GraphTokenResponse>('/oauth/access_token', {
-      client_id: this.config.getOrThrow<string>('META_APP_ID'),
-      client_secret: this.config.getOrThrow<string>('META_APP_SECRET'),
+      client_id: appId,
+      client_secret: appSecret,
       redirect_uri: redirectUri,
       code,
     });
     return { accessToken: data.access_token, expiraEnSegundos: data.expires_in };
   }
 
-  async intercambiarPorTokenLargaDuracion(shortLivedToken: string): Promise<TokenIntercambiado> {
+  async intercambiarPorTokenLargaDuracion(
+    shortLivedToken: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<TokenIntercambiado> {
     const data = await this.get<GraphTokenResponse>('/oauth/access_token', {
       grant_type: 'fb_exchange_token',
-      client_id: this.config.getOrThrow<string>('META_APP_ID'),
-      client_secret: this.config.getOrThrow<string>('META_APP_SECRET'),
+      client_id: appId,
+      client_secret: appSecret,
       fb_exchange_token: shortLivedToken,
     });
     return { accessToken: data.access_token, expiraEnSegundos: data.expires_in };
