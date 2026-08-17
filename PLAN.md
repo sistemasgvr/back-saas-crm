@@ -868,7 +868,7 @@ Backend `platform-admin` + pantallas `/admin/*`. Empresas, usuarios, módulos, m
 
 Login, sesión (cookie httpOnly + refresh), layout protegido, menú según módulos. Sin `/register`.
 
-**UI TailAdmin (ajuste post-fase):** login a dos columnas, sidebar/header con logos, **selector de tema claro/oscuro** (`ThemeProvider` + `ThemeToggleButton` / `ThemeTogglerTwo` vía Iconify). Sin Google/X/signup (no hay registro público).
+**UI TailAdmin (ajuste post-fase):** login a dos columnas, sidebar/header con logos, **selector de tema claro/oscuro** (`ThemeProvider` + `ThemeToggleButton` / `ThemeTogglerTwo` vía Iconify). Datos y mutaciones con **TanStack Query**. Formularios con **React Hook Form + Zod**. Email recordado del login con **Zustand**. Feedback con **Sonner** y **spinner overlay** en cada acción (`ActionLoader` + loading en botones). Inputs reutilizables copiados del template (`Input`, `Select`, `Checkbox`, `Switch`, `TextArea`, `PasswordInput`, etc.). Sin Google/X/signup (no hay registro público).
 
 **Done cuando:** el flujo login (usuario creado por admin) → dashboard vacío funciona en el navegador.
 
@@ -896,6 +896,8 @@ La Fase 5 dejó el **API** de plataforma; la Fase 6 dejó login + shell. Faltaba
 Login de admin de plataforma redirige a `/admin/organizations`. Un cliente que entre a `/admin/*` → `/dashboard`.
 
 **Done cuando:** desde UI puedes crear Empresa B + su usuario, asignar módulos, editar tu perfil y la org.
+
+Feedback UX (complemento): **TanStack Query** para lecturas/mutaciones, **React Hook Form + Zod** para validar, **Zustand** para recordar email de login, toasts con **Sonner**, spinner overlay (`ActionLoader`) y loading en cada botón.
 
 ### Fase 7 — OAuth Meta + conexión
 
