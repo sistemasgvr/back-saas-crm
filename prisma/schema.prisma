@@ -10,7 +10,8 @@ datasource db {
 // Fase 1 — núcleo SaaS / multi-tenant (PLAN.md §4.2-4.6).
 // Fase 2 — auth (§4.13): tokens_refresco.
 // Fase 7 — Meta OAuth (§4.8): meta_conexiones.
-// campanas, conjuntos_anuncios, anuncios, leads se agregan en Fase 8-9 (Meta).
+// Fase 8 — modelo Meta (§4.9-4.12): campanas, conjuntos_anuncios, anuncios, leads.
+// La ingestión real (poblar estas tablas desde el webhook) es Fase 9.
 
 model Usuario {
   id                String    @id @default(uuid()) @db.Uuid
@@ -83,9 +84,118 @@ model Organizacion {
   organizacionUsuarios OrganizacionUsuario[]
   organizacionModulos  OrganizacionModulo[]
   metaConexiones       MetaConexion[]
+  campanas             Campana[]
+  leads                Lead[]
 
   @@index([estado])
   @@map("organizaciones")
+}
+
+model Campana {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizacionId String  @map("organizacion_id") @db.Uuid
+  metaCampanaId  String  @map("meta_campana_id") @db.VarChar(64)
+  nombre         String  @db.VarChar(255)
+  estadoMeta     String? @map("estado_meta") @db.VarChar(40)
+  datosCrudos    Json?   @map("datos_crudos")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion      Organizacion      @relation(fields: [organizacionId], references: [id])
+  conjuntosAnuncios ConjuntoAnuncio[]
+  leads             Lead[]
+
+  @@unique([organizacionId, metaCampanaId])
+  @@index([estado])
+  @@map("campanas")
+}
+
+model ConjuntoAnuncio {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizacionId String  @map("organizacion_id") @db.Uuid
+  campanaId      String  @map("campana_id") @db.Uuid
+  metaConjuntoId String  @map("meta_conjunto_id") @db.VarChar(64)
+  nombre         String  @db.VarChar(255)
+  estadoMeta     String? @map("estado_meta") @db.VarChar(40)
+  datosCrudos    Json?   @map("datos_crudos")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  campana  Campana   @relation(fields: [campanaId], references: [id])
+  anuncios Anuncio[]
+  leads    Lead[]
+
+  @@unique([organizacionId, metaConjuntoId])
+  @@index([campanaId])
+  @@index([estado])
+  @@map("conjuntos_anuncios")
+}
+
+model Anuncio {
+  id                String  @id @default(uuid()) @db.Uuid
+  organizacionId    String  @map("organizacion_id") @db.Uuid
+  conjuntoAnuncioId String  @map("conjunto_anuncio_id") @db.Uuid
+  metaAnuncioId     String  @map("meta_anuncio_id") @db.VarChar(64)
+  nombre            String  @db.VarChar(255)
+  estadoMeta        String? @map("estado_meta") @db.VarChar(40)
+  datosCrudos       Json?   @map("datos_crudos")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  conjuntoAnuncio ConjuntoAnuncio @relation(fields: [conjuntoAnuncioId], references: [id])
+  leads           Lead[]
+
+  @@unique([organizacionId, metaAnuncioId])
+  @@index([conjuntoAnuncioId])
+  @@index([estado])
+  @@map("anuncios")
+}
+
+model Lead {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizacionId    String    @map("organizacion_id") @db.Uuid
+  campanaId         String?   @map("campana_id") @db.Uuid
+  conjuntoAnuncioId String?   @map("conjunto_anuncio_id") @db.Uuid
+  anuncioId         String?   @map("anuncio_id") @db.Uuid
+  formularioId      String?   @map("formulario_id") @db.VarChar(64)
+  idExterno         String    @map("id_externo") @db.VarChar(64)
+  nombre            String?   @db.VarChar(200)
+  email             String?   @db.VarChar(255)
+  telefono          String?   @db.VarChar(40)
+  datosCrudos       Json      @map("datos_crudos")
+  fechaLead         DateTime? @map("fecha_lead") @db.Timestamptz
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion    Organizacion     @relation(fields: [organizacionId], references: [id])
+  campana         Campana?         @relation(fields: [campanaId], references: [id])
+  conjuntoAnuncio ConjuntoAnuncio? @relation(fields: [conjuntoAnuncioId], references: [id])
+  anuncio         Anuncio?         @relation(fields: [anuncioId], references: [id])
+
+  @@unique([organizacionId, idExterno])
+  @@index([email])
+  @@index([telefono])
+  @@index([campanaId])
+  @@index([anuncioId])
+  @@index([fechaLead])
+  @@index([estado])
+  @@map("leads")
 }
 
 model MetaConexion {

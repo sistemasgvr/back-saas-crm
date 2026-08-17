@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common';
 import { MetaConnectionsModule } from './connections/meta-connections.module';
+import { CampaignsModule } from './campaigns/campaigns.module';
+import { AdsetsModule } from './adsets/adsets.module';
+import { AdsModule } from './ads/ads.module';
 
-// webhooks/campaigns/adsets/ads/leads se agregan en Fase 8-9.
+// webhooks/leads (ingestión) se agregan en Fase 9.
 @Module({
-  imports: [MetaConnectionsModule],
+  imports: [MetaConnectionsModule, CampaignsModule, AdsetsModule, AdsModule],
 })
 export class MetaModule {}
