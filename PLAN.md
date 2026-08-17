@@ -108,9 +108,10 @@ DATABASE_URL="postgresql://neondb_owner:<secret>@ep-delicate-darkness-axsciins-p
 6. **Tokens de Meta se cifran en reposo** (AES-256-GCM). Nunca se loguean ni se devuelven en claro al frontend.
 7. **Sin Redis / BullMQ / pipeline CRM / billing** en el MVP.
 8. **UI desde TailAdmin por copia.** Primero buscar en `free-nextjs-admin-dashboard-main`; copiar el componente a nuestra estructura y reutilizarlo. Solo crear UI nueva si la plantilla no lo cubre.
-9. **BD en español + snake_case.** Tablas y columnas en español (`usuarios`, `fecha_creacion`). Toda tabla incluye auditoría y eliminación lógica (`estado`).
-10. **No hard-delete de negocio.** Borrar = `estado = 0`. Los listados filtran `estado = 1` por defecto.
-11. **Zona horaria Lima (Perú).** Producto y reportes en `America/Lima` (UTC−5, sin DST). Timestamps en BD en UTC; “hoy / semana / mes” y UI se interpretan en Lima.
+9. **Iconos con Iconify.** No embeber SVGs sueltos. Usar el componente reutilizable `Icon` (`name`, `size`, `color`, etc.). Los iconos de TailAdmin se sustituyen por nombres Iconify al copiar UI.
+10. **BD en español + snake_case.** Tablas y columnas en español (`usuarios`, `fecha_creacion`). Toda tabla incluye auditoría y eliminación lógica (`estado`).
+11. **No hard-delete de negocio.** Borrar = `estado = 0`. Los listados filtran `estado = 1` por defecto.
+12. **Zona horaria Lima (Perú).** Producto y reportes en `America/Lima` (UTC−5, sin DST). Timestamps en BD en UTC; “hoy / semana / mes” y UI se interpretan en Lima.
 
 ---
 
@@ -239,7 +240,7 @@ Catálogo de funcionalidades del SaaS.
 | `codigo` | VARCHAR(50) NOT NULL | UNIQUE. Ej: `META_LEADS` |
 | `nombre` | VARCHAR(120) NOT NULL | |
 | `descripcion` | TEXT NULL | |
-| `icono` | VARCHAR(80) NULL | clave de icono UI |
+| `icono` | VARCHAR(80) NULL | Nombre Iconify, ej. `mdi:view-dashboard` |
 | `orden` | INT NOT NULL DEFAULT 0 | Orden en menú/admin |
 | `estado` | SMALLINT NOT NULL DEFAULT 1 | `0` = módulo retirado del catálogo |
 | `usuario_creacion` | UUID NULL | |
@@ -576,6 +577,7 @@ front-saas-crm/
     │   └── admin/
     ├── components/                     # destino de lo copiado de la plantilla
     │   ├── ui/
+    │   │   └── Icon.tsx              # Iconify: name, size, color, …
     │   ├── form/
     │   ├── tables/
     │   ├── charts/
@@ -591,9 +593,31 @@ front-saas-crm/
 | Tabla | `.../components/.../tables` o pages de tables | `src/components/tables/` |
 | Chart línea/barra | `.../components/charts/` | `src/components/charts/` |
 | Sidebar / Header | `.../layout/` | `src/components/layout/` |
-| Login / Register | `.../components/auth/` + pages auth | Solo **Sign In** → `src/modules/auth/` + `app/(auth)/login` |
+| Login | `.../components/auth/` + pages auth | Solo **Sign In** → `src/modules/auth/` + `app/(auth)/login` |
+| Iconos SVG de la plantilla | `.../icons/*.svg` | **No copiar.** Reemplazar por `<Icon name="prefix:icon" />` (Iconify) |
 
-Tras copiar: arreglar paths de imports, dependencias (`apexcharts`, iconos, etc.) y tokens de tema. No reescribir el componente desde cero.
+### Iconos — Iconify
+
+Paquete: `@iconify/react`. Componente propio: `src/components/ui/Icon.tsx`.
+
+```tsx
+import { Icon } from '@/src/components/ui/Icon'
+
+<Icon name="mdi:home" size={20} color="currentColor" />
+<Icon name="mdi:account-group" size={24} className="text-brand-500" />
+```
+
+| Prop | Tipo | Descripción |
+|------|------|-------------|
+| `name` | `string` | Obligatorio. Ej. `mdi:view-dashboard`, `solar:chart-bold` |
+| `size` | `number \| string` | Atajo para width/height (default `20`) |
+| `width` / `height` | `number \| string` | Sobrescriben `size` si se pasan |
+| `color` | `string` | Color CSS; por defecto hereda (`currentColor`) |
+| `className` | `string` | Clases Tailwind |
+| `rotate` / `hFlip` / `vFlip` | — | Transformaciones Iconify |
+
+**Regla:** al adaptar TailAdmin, no importar SVGs de `icons/`; mapear a un nombre Iconify equivalente. `modulos.icono` guarda ese mismo string.
+
 
 El menú del cliente se construye con los módulos activos de `GET /me` (`META_LEADS` → Leads, `DASHBOARD` → Dashboard).
 
@@ -763,10 +787,10 @@ Sin pipeline, tareas ni oportunidades.
 
 Trabajar **una fase a la vez**. No abrir Meta hasta que auth + módulos + admin cierren.
 
-### Fase 0 — Cimientos
+### Fase 0 — Cimientos ✅
 
 **Backend:** ConfigModule, CORS, prefijo `/api`, puerto `4000`, `.env` con Neon (`DATABASE_URL`), Prisma, `PrismaService` en `shared/infrastructure`. Sin Docker Postgres.  
-**Frontend:** app router de producto; copiar bajo demanda desde `free-nextjs-admin-dashboard-main` los primeros bloques (layout + auth UI) hacia `src/components` / `src/modules`.
+**Frontend:** app router de producto; estructura modular; **Iconify** + componente `Icon` reutilizable (sin SVGs sueltos).
 
 **Done cuando:** `npm run build` pasa en ambos repos y Prisma conecta a Neon (`prisma db pull` o migrate de prueba).
 
@@ -879,6 +903,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Webhooks | Síncronos, idempotentes por (`organizacion_id`, `id_externo`) |
 | Puerto API | `4000` (Next en `3000`) |
 | UI | Copiar componentes de `free-nextjs-admin-dashboard-main` a `src/components` / módulos |
+| Iconos | Iconify (`@iconify/react`) vía componente `Icon` (`name`, `size`, `color`). Sin SVGs sueltos |
 
 ---
 
@@ -908,4 +933,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 0 (Prisma + Neon vía `.env` + estructura clean architecture + copiar layout/auth desde TailAdmin).
+**Siguiente paso concreto:** Fase 1 (schema Prisma multi-tenant según §4 + migrate + seed).
