@@ -861,9 +861,11 @@ Backend `platform-admin` + pantallas `/admin/*`. Empresas, usuarios, módulos, m
 
 **Done cuando:** desde UI (o API) puedes crear Empresa B, activarle solo `META_LEADS`, y un user de B no ve Dashboard.
 
-### Fase 6 — Auth UI cliente
+### Fase 6 — Auth UI cliente ✅
 
-Login, sesión (cookie httpOnly o memoria + refresh), layout protegido, menú según módulos. Sin `/register`.
+Login, sesión (cookie httpOnly + refresh), layout protegido, menú según módulos. Sin `/register`.
+
+**UI TailAdmin (ajuste post-fase):** login a dos columnas, sidebar/header con logos, **selector de tema claro/oscuro** (`ThemeProvider` + `ThemeToggleButton` / `ThemeTogglerTwo` vía Iconify). Sin Google/X/signup (no hay registro público).
 
 **Done cuando:** el flujo login (usuario creado por admin) → dashboard vacío funciona en el navegador.
 
@@ -979,4 +981,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 6 (Auth UI cliente: login + sesión + layout protegido + menú por módulos).
+**Siguiente paso concreto:** Fase 7 (OAuth Meta + conexión: página + cuenta publicitaria + token cifrado). Requiere HTTPS público.
