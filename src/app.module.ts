@@ -9,6 +9,7 @@ import { ModulesModule } from './modules/modules.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { MetaModule } from './meta/meta.module';
+import { LeadsModule } from './leads/leads.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { MetaModule } from './meta/meta.module';
     DashboardModule,
     PlatformAdminModule,
     MetaModule,
+    LeadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
