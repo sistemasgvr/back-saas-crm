@@ -654,6 +654,8 @@ Prefijo: `/api`. Auth: `Bearer` access token.
 | GET | `/dashboard/kpis` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
 | GET | `/dashboard/series` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
 
+PATCH `/organizations/current` solo: `nombre`, `razonSocial`, `documentoFiscal`, `emailContacto`, `telefonoContacto`, `logoUrl`, `pais`, `zonaHoraria`. No `slug` / `notas` / `estado`.
+
 Webhook Meta: `GET/POST /meta/webhooks` — **público**, validado por signature / verify token. No usa JWT.
 
 ### Plataforma (`es_admin_plataforma = 1`)
@@ -826,9 +828,17 @@ Login, logout, refresh. JWT con `usuario_id` + `organizacion_id` + `rol` (si apl
 
 **Done cuando:** Postman/HTTP: login (usuario seedeado) → `/me` → refresh → logout. Password nunca se persiste en claro.
 
-### Fase 3 — Organizaciones (cliente)
+### Fase 3 — Organizaciones (cliente) ✅
 
 `GET/PATCH /organizations/current`. Regla: un user solo ve su org. Org desactivada → 403.
+
+**PATCH — campos editables (cliente):**
+
+| Permitido | Excluido (motivo) |
+|-----------|-------------------|
+| `nombre`, `razonSocial`, `documentoFiscal`, `emailContacto`, `telefonoContacto`, `logoUrl`, `pais`, `zonaHoraria` | `slug` — identidad estable |
+| | `notas` — uso interno plataforma (§4.3); solo `/admin` |
+| | `estado` — alta/baja solo `/admin` (Fase 5) |
 
 **Done cuando:** un user de la org A no puede leer ni mutar la org B (prueba manual o e2e).
 
@@ -921,6 +931,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Password hash | bcrypt |
 | Org activa | Claim `organizacion_id` en el JWT |
 | Multi-org login | Primera membresía activa por `fecha_creacion` (sin selector aún) |
+| PATCH org cliente | Solo perfil comercial (nombre, contacto, logo, país, zona…). No `slug` / `notas` / `estado` |
 | Admin plataforma | `usuarios.es_admin_plataforma = 1` |
 | Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` (rotar tras Fase 2) |
 | Roles empresa | `PROPIETARIO` \| `ADMINISTRADOR` \| `USUARIO` |
@@ -938,7 +949,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Login / logout / refresh (sin register público)
 - [ ] Admin crea empresas y usuarios
 - [x] Request context: `usuarioId`, `organizacionId`, `rol`
-- [ ] Aislamiento: org A no ve datos de org B
+- [x] Aislamiento: org A no ve datos de org B
 - [ ] Soft delete: listados con `estado = 1`
 - [ ] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
 - [ ] Guards de membresía, rol y módulo
@@ -959,4 +970,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 3 (organizaciones cliente: `GET/PATCH /organizations/current` + aislamiento por org).
+**Siguiente paso concreto:** Fase 4 (sistema de módulos + `ModuleGuard` + `modulos` en `GET /me`).
