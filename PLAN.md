@@ -637,6 +637,8 @@ Prefijo: `/api`. Auth: `Bearer` access token.
 | POST | `/auth/refresh` | Cookie o body con refresh |
 | POST | `/auth/logout` | Revoca refresh |
 | GET | `/me` | user + org activa + role + modules[] |
+| PATCH | `/me` | Perfil propio: `nombre`, `apellido`, `telefono` |
+| PATCH | `/me/password` | Cambio de contraseña (`passwordActual`, `passwordNueva`) |
 
 > No hay `/auth/register` público. Altas de org/usuario solo vía `/admin/*`.
 
@@ -770,9 +772,10 @@ FRONTEND_URL=https://{dominio-app}
 | Ruta | Contenido |
 |------|-----------|
 | `/login` | Auth (sin registro público) |
+| `/profile` | Perfil del usuario logueado (datos + cambio de contraseña) |
 | `/leads` | Listado, búsqueda, filtros (fecha, campaña, anuncio, formulario), detalle |
 | `/dashboard` | KPI: total, hoy, semana, mes (**día calendario en `America/Lima`**). Charts: por día, campaña, anuncio. Filtros: fecha, campaña, ad set, anuncio |
-| `/settings` | Datos de org + conexión Meta (conectar / página / cuenta / estado) |
+| `/settings` | Datos de org (Fase 6b). Conexión Meta a partir de Fase 7 |
 
 Sin pipeline, tareas ni oportunidades.
 
@@ -868,6 +871,31 @@ Login, sesión (cookie httpOnly + refresh), layout protegido, menú según módu
 **UI TailAdmin (ajuste post-fase):** login a dos columnas, sidebar/header con logos, **selector de tema claro/oscuro** (`ThemeProvider` + `ThemeToggleButton` / `ThemeTogglerTwo` vía Iconify). Sin Google/X/signup (no hay registro público).
 
 **Done cuando:** el flujo login (usuario creado por admin) → dashboard vacío funciona en el navegador.
+
+### Fase 6b — Pantallas de operación (antes de Meta) ✅
+
+La Fase 5 dejó el **API** de plataforma; la Fase 6 dejó login + shell. Faltaba la UI para operar el SaaS.
+
+**Cliente**
+
+| Ruta | Quién | Contenido |
+|------|-------|-----------|
+| `/profile` | Cualquier usuario logueado | Editar `nombre`, `apellido`, `telefono`. Email de solo lectura. Cambiar contraseña |
+| `/settings` | PROPIETARIO, ADMINISTRADOR | Formulario de org (`PATCH /organizations/current`). Meta queda para Fase 7 |
+
+**Plataforma** (`es_admin_plataforma = 1`)
+
+| Ruta | Contenido |
+|------|-----------|
+| `/admin/organizations` | Listar, crear, ver/editar, desactivar |
+| `/admin/organizations/[id]` | Detalle + matriz de módulos |
+| `/admin/users` | Listar, crear (cliente o admin), ver, activar/desactivar, asignar org+rol |
+| `/admin/modules` | Catálogo: crear, editar, activar/desactivar |
+| `/admin/profile` | Mismo perfil que el cliente |
+
+Login de admin de plataforma redirige a `/admin/organizations`. Un cliente que entre a `/admin/*` → `/dashboard`.
+
+**Done cuando:** desde UI puedes crear Empresa B + su usuario, asignar módulos, editar tu perfil y la org.
 
 ### Fase 7 — OAuth Meta + conexión
 
@@ -965,6 +993,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
 - [x] Guards de membresía, rol y módulo
 - [x] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
+- [x] UI perfil, settings org y panel `/admin` (Fase 6b)
 - [ ] OAuth Meta + `page_id` + ad account + `token_cifrado`
 - [ ] Webhook enruta por `page_id` y guarda `leads` con origen
 - [ ] `/leads` con listado, búsqueda, filtros y detalle
@@ -981,4 +1010,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 7 (OAuth Meta + conexión: página + cuenta publicitaria + token cifrado). Requiere HTTPS público.
+**Siguiente paso concreto:** Fase 7 (OAuth Meta + conexión). Requiere HTTPS público.

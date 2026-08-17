@@ -17,4 +17,22 @@ export class PrismaUsuariosRepository implements UsuariosRepository {
   async actualizarUltimoLogin(id: string): Promise<void> {
     await this.prisma.usuario.update({ where: { id }, data: { ultimoLogin: new Date() } });
   }
+
+  actualizarPerfil(
+    id: string,
+    data: { nombre?: string; apellido?: string | null; telefono?: string | null },
+    usuarioEdicion: string,
+  ) {
+    return this.prisma.usuario.update({
+      where: { id },
+      data: { ...data, usuarioEdicion },
+    });
+  }
+
+  async actualizarPasswordHash(id: string, passwordHash: string, usuarioEdicion: string): Promise<void> {
+    await this.prisma.usuario.update({
+      where: { id },
+      data: { passwordHash, usuarioEdicion },
+    });
+  }
 }

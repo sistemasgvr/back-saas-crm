@@ -6,6 +6,8 @@ import { LoginUseCase } from './application/use-cases/login.use-case';
 import { RefreshUseCase } from './application/use-cases/refresh.use-case';
 import { LogoutUseCase } from './application/use-cases/logout.use-case';
 import { MeUseCase } from './application/use-cases/me.use-case';
+import { UpdateMeUseCase } from './application/use-cases/update-me.use-case';
+import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case';
 import { USUARIOS_REPOSITORY } from './application/ports/usuarios.repository.port';
 import { ORGANIZACION_USUARIOS_REPOSITORY } from './application/ports/organizacion-usuarios.repository.port';
 import { MODULOS_REPOSITORY } from './application/ports/modulos.repository.port';
@@ -28,6 +30,8 @@ import { JwtAccessStrategy } from './infrastructure/jwt-access.strategy';
     RefreshUseCase,
     LogoutUseCase,
     MeUseCase,
+    UpdateMeUseCase,
+    ChangePasswordUseCase,
     JwtAccessStrategy,
     { provide: USUARIOS_REPOSITORY, useClass: PrismaUsuariosRepository },
     { provide: ORGANIZACION_USUARIOS_REPOSITORY, useClass: PrismaOrganizacionUsuariosRepository },

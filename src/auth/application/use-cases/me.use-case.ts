@@ -48,6 +48,7 @@ export class MeUseCase {
         email: usuario.email,
         nombre: usuario.nombre,
         apellido: usuario.apellido,
+        telefono: usuario.telefono,
         esAdminPlataforma: usuario.esAdminPlataforma === 1,
       },
       organizacion,

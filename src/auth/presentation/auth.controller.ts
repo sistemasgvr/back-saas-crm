@@ -1,11 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
 import { LoginUseCase } from '../application/use-cases/login.use-case';
 import { RefreshUseCase } from '../application/use-cases/refresh.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
 import { MeUseCase } from '../application/use-cases/me.use-case';
+import { UpdateMeUseCase } from '../application/use-cases/update-me.use-case';
+import { ChangePasswordUseCase } from '../application/use-cases/change-password.use-case';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { UpdateMeDto } from './dto/update-me.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import type { RequestContext } from '../domain/request-context.interface';
@@ -17,6 +21,8 @@ export class AuthController {
     private readonly refreshUseCase: RefreshUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly meUseCase: MeUseCase,
+    private readonly updateMeUseCase: UpdateMeUseCase,
+    private readonly changePasswordUseCase: ChangePasswordUseCase,
   ) {}
 
   @Post('auth/login')
@@ -48,5 +54,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   me(@CurrentUser() context: RequestContext) {
     return this.meUseCase.execute(context);
+  }
+
+  @Patch('me')
+  @UseGuards(JwtAuthGuard)
+  updateMe(@CurrentUser() context: RequestContext, @Body() dto: UpdateMeDto) {
+    return this.updateMeUseCase.execute(context.usuarioId, dto);
+  }
+
+  @Patch('me/password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard)
+  async changePassword(@CurrentUser() context: RequestContext, @Body() dto: ChangePasswordDto) {
+    await this.changePasswordUseCase.execute(context.usuarioId, dto.passwordActual, dto.passwordNueva);
   }
 }
