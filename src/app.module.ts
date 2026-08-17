@@ -8,6 +8,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { ModulesModule } from './modules/modules.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
+import { MetaModule } from './meta/meta.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
     ModulesModule,
     DashboardModule,
     PlatformAdminModule,
+    MetaModule,
   ],
   controllers: [AppController],
   providers: [AppService],

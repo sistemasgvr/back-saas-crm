@@ -9,7 +9,8 @@ datasource db {
 
 // Fase 1 — núcleo SaaS / multi-tenant (PLAN.md §4.2-4.6).
 // Fase 2 — auth (§4.13): tokens_refresco.
-// meta_conexiones, campanas, conjuntos_anuncios, anuncios, leads se agregan en Fase 7-9 (Meta).
+// Fase 7 — Meta OAuth (§4.8): meta_conexiones.
+// campanas, conjuntos_anuncios, anuncios, leads se agregan en Fase 8-9 (Meta).
 
 model Usuario {
   id                String    @id @default(uuid()) @db.Uuid
@@ -81,9 +82,41 @@ model Organizacion {
 
   organizacionUsuarios OrganizacionUsuario[]
   organizacionModulos  OrganizacionModulo[]
+  metaConexiones       MetaConexion[]
 
   @@index([estado])
   @@map("organizaciones")
+}
+
+model MetaConexion {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizacionId     String    @map("organizacion_id") @db.Uuid
+  metaUserId         String    @map("meta_user_id") @db.VarChar(64)
+  metaUserNombre     String?   @map("meta_user_nombre") @db.VarChar(200)
+  adAccountId        String?   @map("ad_account_id") @db.VarChar(64)
+  adAccountNombre    String?   @map("ad_account_nombre") @db.VarChar(200)
+  pageId             String?   @map("page_id") @db.VarChar(64)
+  pageNombre         String?   @map("page_nombre") @db.VarChar(200)
+  tokenCifrado       String    @map("token_cifrado")
+  tokenExpiraEn      DateTime? @map("token_expira_en") @db.Timestamptz
+  scopes             String?
+  webhookVerifyToken String    @map("webhook_verify_token") @db.VarChar(128)
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+
+  // page_id único entre conexiones activas se aplica a nivel de aplicación
+  // (Prisma no soporta unique índices parciales/filtrados en el schema DSL).
+  @@index([organizacionId])
+  @@index([pageId])
+  @@index([adAccountId])
+  @@index([estado])
+  @@map("meta_conexiones")
 }
 
 model OrganizacionUsuario {
