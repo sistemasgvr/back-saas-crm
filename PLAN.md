@@ -662,8 +662,8 @@ Webhook Meta: `GET/POST /meta/webhooks` — **público**, validado por signature
 
 | Recurso | Acciones |
 |---------|----------|
-| `/admin/organizations` | Crear, listar, ver, editar, desactivar |
-| `/admin/users` | Listar, ver, activar/desactivar, asignar a org |
+| `/admin/organizations` | Crear, listar, ver, editar, **desactivar** (sin reactivar en MVP) |
+| `/admin/users` | Listar, ver, **activar/desactivar**, asignar a org |
 | `/admin/modules` | Crear, editar, activar/desactivar en catálogo |
 | `/admin/organizations/:id/modules` | Ver y toggle por empresa |
 
@@ -848,11 +848,18 @@ CRUD interno de catálogo (usado luego por admin). `ModuleGuard`. `GET /me` incl
 
 **Done cuando:** apagar `DASHBOARD` en DB (`habilitado = 0`) → `GET /dashboard/kpis` (aunque el endpoint aún stubee) responde 403.
 
-### Fase 5 — Panel admin SaaS
+### Fase 5 — Panel admin SaaS ✅
 
 Backend `platform-admin` + pantallas `/admin/*`. Empresas, usuarios, módulos, matriz org × módulo.
 
-**Done cuando:** desde UI puedes crear Empresa B, activarle solo `META_LEADS`, y un user de B no ve Dashboard.
+**Decisión cerrada (alineada a §7):**
+
+| Recurso | Ciclo de vida |
+|---------|----------------|
+| `/admin/organizations` | Solo **desactivar** (`estado = 0`). Sin endpoint “activar” en MVP |
+| `/admin/users` | Toggle completo **activar / desactivar** |
+
+**Done cuando:** desde UI (o API) puedes crear Empresa B, activarle solo `META_LEADS`, y un user de B no ve Dashboard.
 
 ### Fase 6 — Auth UI cliente
 
@@ -932,6 +939,8 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Org activa | Claim `organizacion_id` en el JWT |
 | Multi-org login | Primera membresía activa por `fecha_creacion` (sin selector aún) |
 | PATCH org cliente | Solo perfil comercial (nombre, contacto, logo, país, zona…). No `slug` / `notas` / `estado` |
+| Admin org ciclo de vida | Solo desactivar (sin activar en MVP) |
+| Admin user ciclo de vida | Toggle activar / desactivar |
 | Admin plataforma | `usuarios.es_admin_plataforma = 1` |
 | Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` (rotar tras Fase 2) |
 | Roles empresa | `PROPIETARIO` \| `ADMINISTRADOR` \| `USUARIO` |
@@ -947,13 +956,13 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 
 - [x] Neon + Prisma migrado y seedeado (tablas §4 + auditoría)
 - [x] Login / logout / refresh (sin register público)
-- [ ] Admin crea empresas y usuarios
+- [x] Admin crea empresas y usuarios
 - [x] Request context: `usuarioId`, `organizacionId`, `rol`
 - [x] Aislamiento: org A no ve datos de org B
 - [ ] Soft delete: listados con `estado = 1`
 - [x] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
 - [x] Guards de membresía, rol y módulo
-- [ ] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
+- [x] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
 - [ ] OAuth Meta + `page_id` + ad account + `token_cifrado`
 - [ ] Webhook enruta por `page_id` y guarda `leads` con origen
 - [ ] `/leads` con listado, búsqueda, filtros y detalle
@@ -970,4 +979,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 5 (panel admin SaaS: empresas, usuarios, módulos, matriz org × módulo).
+**Siguiente paso concreto:** Fase 6 (Auth UI cliente: login + sesión + layout protegido + menú por módulos).

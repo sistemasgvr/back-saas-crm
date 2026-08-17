@@ -1,0 +1,41 @@
+import type { Organizacion } from '@prisma/client';
+
+export const ORGANIZACIONES_ADMIN_REPOSITORY = Symbol('ORGANIZACIONES_ADMIN_REPOSITORY');
+
+export interface CrearOrganizacionInput {
+  nombre: string;
+  slug: string;
+  razonSocial?: string;
+  documentoFiscal?: string;
+  emailContacto?: string;
+  telefonoContacto?: string;
+  logoUrl?: string;
+  pais?: string;
+  zonaHoraria?: string;
+}
+
+export interface ActualizarOrganizacionAdminInput {
+  nombre?: string;
+  slug?: string;
+  razonSocial?: string;
+  documentoFiscal?: string;
+  emailContacto?: string;
+  telefonoContacto?: string;
+  logoUrl?: string;
+  pais?: string;
+  zonaHoraria?: string;
+  notas?: string;
+}
+
+export interface OrganizacionesAdminRepository {
+  listar(): Promise<Organizacion[]>;
+  obtenerPorId(id: string): Promise<Organizacion | null>;
+  /** Crea la organización y sus organizacion_modulos por defecto (META_LEADS y DASHBOARD habilitados) — PLAN.md §5.1. */
+  crearConModulosPorDefecto(input: CrearOrganizacionInput, usuarioCreacion: string): Promise<Organizacion>;
+  actualizar(
+    id: string,
+    input: ActualizarOrganizacionAdminInput,
+    usuarioEdicion: string,
+  ): Promise<Organizacion>;
+  desactivar(id: string, usuarioEdicion: string): Promise<Organizacion>;
+}

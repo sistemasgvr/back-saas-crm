@@ -36,5 +36,6 @@ import { JwtAccessStrategy } from './infrastructure/jwt-access.strategy';
     { provide: PASSWORD_HASHER, useClass: BcryptPasswordHasher },
     { provide: TOKEN_SERVICE, useClass: JwtTokenService },
   ],
+  exports: [PASSWORD_HASHER],
 })
 export class AuthModule {}

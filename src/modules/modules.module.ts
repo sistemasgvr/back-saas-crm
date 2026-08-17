@@ -16,6 +16,12 @@ import { PrismaModulosCatalogoRepository } from './infrastructure/prisma-modulos
     CambiarEstadoModuloUseCase,
     { provide: MODULOS_CATALOGO_REPOSITORY, useClass: PrismaModulosCatalogoRepository },
   ],
-  exports: [ListarModulosUseCase, CrearModuloUseCase, ActualizarModuloUseCase, CambiarEstadoModuloUseCase],
+  exports: [
+    ListarModulosUseCase,
+    CrearModuloUseCase,
+    ActualizarModuloUseCase,
+    CambiarEstadoModuloUseCase,
+    MODULOS_CATALOGO_REPOSITORY,
+  ],
 })
 export class ModulesModule {}

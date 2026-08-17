@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ModulesModule } from './modules/modules.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     OrganizationsModule,
     ModulesModule,
     DashboardModule,
+    PlatformAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
