@@ -174,7 +174,7 @@ Identidad global (un email = un usuario).
 |---------|------|--------|
 | `id` | UUID PK | |
 | `email` | VARCHAR(255) NOT NULL | UNIQUE (entre `estado = 1`) |
-| `password_hash` | VARCHAR(255) NOT NULL | bcrypt/argon2 |
+| `password_hash` | VARCHAR(255) NOT NULL | bcrypt |
 | `nombre` | VARCHAR(120) NOT NULL | |
 | `apellido` | VARCHAR(120) NULL | |
 | `telefono` | VARCHAR(40) NULL | |
@@ -456,7 +456,7 @@ Access token corto (JWT) + refresh rotativo. JWT cliente: `usuario_id`, `organiz
 |-------|-------------------|
 | **Alta de empresa** | Solo `es_admin_plataforma = 1` desde `/admin`: crea `organizaciones` + `organizacion_modulos` (`META_LEADS` y `DASHBOARD` con `habilitado = 1`) + opcionalmente el primer usuario `PROPIETARIO` |
 | **Alta de usuario** | Solo admin de plataforma (o más adelante el PROPIETARIO). Crea `usuarios` + `organizacion_usuarios` con un rol. **No** existe auto-registro público |
-| **Login** | Email/password → access + refresh. Si tiene una sola org, esa queda activa. Si tiene varias, elige org |
+| **Login** | Email/password → access + refresh. Org activa = **primera membresía activa** (`estado = 1`) ordenada por `fecha_creacion`. Admin de plataforma sin org: JWT solo con `es_admin_plataforma`. Selector multi-org = endpoint futuro, no parte de este flujo |
 | **Logout** | Revoca fila en `tokens_refresco` (`revocado_en` + `estado = 0`) |
 | **Refresh** | Rota refresh; emite nuevo access con el mismo `organizacion_id` activo |
 
@@ -812,9 +812,17 @@ No crea organizaciones de cliente: las altas van por `/admin`.
 
 **Done cuando:** el seed deja logueable a `sistemas@proyectosgvr.com` y los 5 módulos en catálogo.
 
-### Fase 2 — Auth
+### Fase 2 — Auth ✅
 
-Login, logout, refresh. JWT con `usuario_id` + `organizacion_id` + `rol`. Guards base. `GET /me`. Tabla `tokens_refresco`. Sin registro público.
+Login, logout, refresh. JWT con `usuario_id` + `organizacion_id` + `rol` (si aplica). Guards base. `GET /me`. Tabla `tokens_refresco`. Sin registro público.
+
+**Decisiones cerradas en implementación:**
+
+| Tema | Decisión |
+|------|----------|
+| JWT secrets | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` en `.env` (valores aleatorios fuertes; no commit) |
+| Multi-org en login | Sin endpoint de “elegir org”. Se activa la **primera** `organizacion_usuarios` activa por `fecha_creacion`. Selector real = endpoint nuevo después |
+| Password | bcrypt; nunca en claro |
 
 **Done cuando:** Postman/HTTP: login (usuario seedeado) → `/me` → refresh → logout. Password nunca se persiste en claro.
 
@@ -877,6 +885,7 @@ KPIs + 3 gráficos + filtros. Copiar charts de `free-nextjs-admin-dashboard-main
 ## 11. Fuera de alcance (post-MVP)
 
 - Invitaciones self-serve / registro público
+- Selector multi-organización (cambiar org activa) — hoy: primera membresía en login
 - Billing / `subscriptions/`
 - CRM, WhatsApp, Automatizaciones (solo filas en catálogo)
 - Redis, BullMQ, workers
@@ -908,8 +917,10 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Zona horaria | `America/Lima` (persistencia UTC; UI y KPIs en hora Perú) |
 | Flags | SMALLINT `0`/`1` (`habilitado`, `es_admin_plataforma`) |
 | IDs | UUID |
-| Auth | JWT access corto + `tokens_refresco` (hash) |
+| Auth | JWT access corto + `tokens_refresco` (hash) · secrets en `.env` |
+| Password hash | bcrypt |
 | Org activa | Claim `organizacion_id` en el JWT |
+| Multi-org login | Primera membresía activa por `fecha_creacion` (sin selector aún) |
 | Admin plataforma | `usuarios.es_admin_plataforma = 1` |
 | Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` (rotar tras Fase 2) |
 | Roles empresa | `PROPIETARIO` \| `ADMINISTRADOR` \| `USUARIO` |
@@ -923,10 +934,10 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 
 ## 13. Checklist de cierre del MVP
 
-- [ ] Neon + Prisma migrado y seedeado (tablas §4 + auditoría)
-- [ ] Login / logout / refresh (sin register público)
+- [x] Neon + Prisma migrado y seedeado (tablas §4 + auditoría)
+- [x] Login / logout / refresh (sin register público)
 - [ ] Admin crea empresas y usuarios
-- [ ] Request context: `usuarioId`, `organizacionId`, `rol`
+- [x] Request context: `usuarioId`, `organizacionId`, `rol`
 - [ ] Aislamiento: org A no ve datos de org B
 - [ ] Soft delete: listados con `estado = 1`
 - [ ] Módulos `META_LEADS` y `DASHBOARD` activos por defecto
@@ -937,6 +948,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [ ] `/leads` con listado, búsqueda, filtros y detalle
 - [ ] `/dashboard` con 4 KPIs y 3 gráficos + filtros
 - [ ] `npm run build` en backend y frontend
+- [ ] Rotar `SEED_ADMIN_PASSWORD` (tras primer login real)
 
 ---
 
@@ -947,4 +959,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 2 (login / logout / refresh + JWT + guards base + `GET /me`). Rotar `SEED_ADMIN_PASSWORD` cuando el login funcione.
+**Siguiente paso concreto:** Fase 3 (organizaciones cliente: `GET/PATCH /organizations/current` + aislamiento por org).
