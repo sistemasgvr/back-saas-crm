@@ -1,0 +1,12 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Modelos: Fase 1 del PLAN.md (usuarios, organizaciones, organizacion_usuarios,
+// modulos, organizacion_modulos, tokens_refresco, meta_conexiones, campanas,
+// conjuntos_anuncios, anuncios, leads).
