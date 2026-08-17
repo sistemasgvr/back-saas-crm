@@ -136,12 +136,14 @@ DATABASE_URL="postgresql://neondb_owner:<secret>@ep-delicate-darkness-axsciins-p
 | Columna | Tipo | Descripción |
 |---------|------|-------------|
 | `estado` | `SMALLINT NOT NULL DEFAULT 1` | `1` activo · `0` eliminado lógico |
-| `usuario_creacion` | `UUID NULL` | FK → `usuarios.id` (null = sistema / seed / webhook) |
-| `usuario_edicion` | `UUID NULL` | FK → `usuarios.id` |
+| `usuario_creacion` | `UUID NULL` | UUID del usuario (null = sistema / seed / webhook). **Sin FK Prisma** |
+| `usuario_edicion` | `UUID NULL` | UUID del usuario. **Sin FK Prisma** |
 | `fecha_creacion` | `TIMESTAMPTZ NOT NULL DEFAULT now()` | Alta del registro |
 | `fecha_modificacion` | `TIMESTAMPTZ NOT NULL DEFAULT now()` | Última modificación (actualizar en cada UPDATE) |
 
 En Prisma/Nest: middleware o helper que setea `usuario_creacion` / `usuario_edicion` / `fecha_modificacion` desde el request context.
+
+**Auditoría — decisión cerrada:** `usuario_creacion` y `usuario_edicion` son columnas UUID sueltas (sin `@relation` / FK en Prisma). Evita el ruido de 2 relaciones nombradas por tabla + auto-relación en `Usuario`. Siguen siendo el id de `usuarios`; si más adelante hace falta navegar “quién creó/editó” vía Prisma include, se agregan las relaciones.
 
 **Zona horaria (`America/Lima`):**
 
@@ -794,7 +796,7 @@ Trabajar **una fase a la vez**. No abrir Meta hasta que auth + módulos + admin 
 
 **Done cuando:** `npm run build` pasa en ambos repos y Prisma conecta a Neon (`prisma db pull` o migrate de prueba).
 
-### Fase 1 — Modelo SaaS / multi-tenant
+### Fase 1 — Modelo SaaS / multi-tenant ✅
 
 Schema + migrate + seed según §4: `usuarios`, `organizaciones`, `organizacion_usuarios`, `modulos`, `organizacion_modulos` (+ auditoría en todas).
 
@@ -803,7 +805,7 @@ Schema + migrate + seed según §4: `usuarios`, `organizaciones`, `organizacion_
 | Qué | Valor |
 |-----|--------|
 | Admin plataforma | email `sistemas@proyectosgvr.com`, `es_admin_plataforma = 1` |
-| Password | `SEED_ADMIN_PASSWORD` en `.env` (nunca en el repo) |
+| Password | `SEED_ADMIN_PASSWORD` en `.env` (temporal fuerte; **rotar al tener login en Fase 2**) |
 | Módulos | `META_LEADS`, `DASHBOARD`, `CRM`, `WHATSAPP`, `AUTOMATIZACIONES` |
 
 No crea organizaciones de cliente: las altas van por `/admin`.
@@ -901,6 +903,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Base de datos | Neon PostgreSQL (pooler + SSL). Credenciales en `.env` |
 | Naming BD | Español + snake_case; Prisma `@@map` / `@map` |
 | Auditoría | `estado`, `usuario_creacion`, `usuario_edicion`, `fecha_creacion`, `fecha_modificacion` en todas las tablas |
+| Auditoría FK | `usuario_creacion` / `usuario_edicion` = UUID sin relación Prisma (sin include). Se puede añadir FK después |
 | Soft delete | `estado`: `1` activo · `0` eliminado |
 | Zona horaria | `America/Lima` (persistencia UTC; UI y KPIs en hora Perú) |
 | Flags | SMALLINT `0`/`1` (`habilitado`, `es_admin_plataforma`) |
@@ -908,7 +911,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Auth | JWT access corto + `tokens_refresco` (hash) |
 | Org activa | Claim `organizacion_id` en el JWT |
 | Admin plataforma | `usuarios.es_admin_plataforma = 1` |
-| Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` |
+| Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` (rotar tras Fase 2) |
 | Roles empresa | `PROPIETARIO` \| `ADMINISTRADOR` \| `USUARIO` |
 | Meta tokens | AES-256-GCM → `meta_conexiones.token_cifrado` |
 | Webhooks | Síncronos, idempotentes por (`organizacion_id`, `id_externo`) |
@@ -944,4 +947,4 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada fase termina con `npm run build` en el repo tocado.
 4. Si una fase crece, se parte; no se salta el criterio de “done”.
 
-**Siguiente paso concreto:** Fase 1 (schema Prisma multi-tenant según §4 + migrate + seed).
+**Siguiente paso concreto:** Fase 2 (login / logout / refresh + JWT + guards base + `GET /me`). Rotar `SEED_ADMIN_PASSWORD` cuando el login funcione.

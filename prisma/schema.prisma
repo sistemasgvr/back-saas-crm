@@ -7,6 +7,119 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Modelos: Fase 1 del PLAN.md (usuarios, organizaciones, organizacion_usuarios,
-// modulos, organizacion_modulos, tokens_refresco, meta_conexiones, campanas,
-// conjuntos_anuncios, anuncios, leads).
+// Fase 1 — núcleo SaaS / multi-tenant (PLAN.md §4.2-4.6).
+// meta_conexiones, campanas, conjuntos_anuncios, anuncios, leads y tokens_refresco
+// se agregan en Fase 2 (auth) y Fase 7-9 (Meta).
+
+model Usuario {
+  id                String    @id @default(uuid()) @db.Uuid
+  email             String    @unique @db.VarChar(255)
+  passwordHash      String    @map("password_hash") @db.VarChar(255)
+  nombre            String    @db.VarChar(120)
+  apellido          String?   @db.VarChar(120)
+  telefono          String?   @db.VarChar(40)
+  avatarUrl         String?   @map("avatar_url")
+  esAdminPlataforma Int       @default(0) @map("es_admin_plataforma") @db.SmallInt
+  ultimoLogin       DateTime? @map("ultimo_login") @db.Timestamptz
+
+  estado            Int       @default(1) @db.SmallInt
+  usuarioCreacion   String?   @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?   @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime  @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacionUsuarios OrganizacionUsuario[]
+
+  @@index([esAdminPlataforma])
+  @@index([estado])
+  @@map("usuarios")
+}
+
+model Organizacion {
+  id               String  @id @default(uuid()) @db.Uuid
+  nombre           String  @db.VarChar(200)
+  slug             String  @unique @db.VarChar(120)
+  razonSocial      String? @map("razon_social") @db.VarChar(255)
+  documentoFiscal  String? @map("documento_fiscal") @db.VarChar(50)
+  emailContacto    String? @map("email_contacto") @db.VarChar(255)
+  telefonoContacto String? @map("telefono_contacto") @db.VarChar(40)
+  logoUrl          String? @map("logo_url")
+  pais             String? @db.VarChar(2)
+  zonaHoraria      String  @default("America/Lima") @map("zona_horaria") @db.VarChar(64)
+  notas            String?
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacionUsuarios OrganizacionUsuario[]
+  organizacionModulos  OrganizacionModulo[]
+
+  @@index([estado])
+  @@map("organizaciones")
+}
+
+model OrganizacionUsuario {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  usuarioId      String @map("usuario_id") @db.Uuid
+  rol            String @db.VarChar(30) // PROPIETARIO | ADMINISTRADOR | USUARIO
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@unique([organizacionId, usuarioId])
+  @@index([usuarioId])
+  @@index([rol])
+  @@index([estado])
+  @@map("organizacion_usuarios")
+}
+
+model Modulo {
+  id          String  @id @default(uuid()) @db.Uuid
+  codigo      String  @unique @db.VarChar(50) // ej. META_LEADS
+  nombre      String  @db.VarChar(120)
+  descripcion String?
+  icono       String? @db.VarChar(80) // nombre Iconify, ej. mdi:view-dashboard
+  orden       Int     @default(0)
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacionModulos OrganizacionModulo[]
+
+  @@map("modulos")
+}
+
+model OrganizacionModulo {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizacionId  String    @map("organizacion_id") @db.Uuid
+  moduloId        String    @map("modulo_id") @db.Uuid
+  habilitado      Int       @default(0) @db.SmallInt
+  fechaActivacion DateTime? @map("fecha_activacion") @db.Timestamptz
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  modulo       Modulo       @relation(fields: [moduloId], references: [id])
+
+  @@unique([organizacionId, moduloId])
+  @@index([habilitado])
+  @@index([estado])
+  @@map("organizacion_modulos")
+}
