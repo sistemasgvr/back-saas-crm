@@ -796,9 +796,19 @@ Trabajar **una fase a la vez**. No abrir Meta hasta que auth + módulos + admin 
 
 ### Fase 1 — Modelo SaaS / multi-tenant
 
-Schema + migrate + seed según §4: `usuarios`, `organizaciones`, `organizacion_usuarios`, `modulos`, `organizacion_modulos` (+ auditoría en todas). Seed: 5 módulos + un usuario con `es_admin_plataforma = 1`.
+Schema + migrate + seed según §4: `usuarios`, `organizaciones`, `organizacion_usuarios`, `modulos`, `organizacion_modulos` (+ auditoría en todas).
 
-**Done cuando:** el seed crea 1 org de prueba con META_LEADS + DASHBOARD (`habilitado = 1`).
+**Seed:**
+
+| Qué | Valor |
+|-----|--------|
+| Admin plataforma | email `sistemas@proyectosgvr.com`, `es_admin_plataforma = 1` |
+| Password | `SEED_ADMIN_PASSWORD` en `.env` (nunca en el repo) |
+| Módulos | `META_LEADS`, `DASHBOARD`, `CRM`, `WHATSAPP`, `AUTOMATIZACIONES` |
+
+No crea organizaciones de cliente: las altas van por `/admin`.
+
+**Done cuando:** el seed deja logueable a `sistemas@proyectosgvr.com` y los 5 módulos en catálogo.
 
 ### Fase 2 — Auth
 
@@ -898,6 +908,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Auth | JWT access corto + `tokens_refresco` (hash) |
 | Org activa | Claim `organizacion_id` en el JWT |
 | Admin plataforma | `usuarios.es_admin_plataforma = 1` |
+| Seed admin | email `sistemas@proyectosgvr.com` · password en `SEED_ADMIN_PASSWORD` |
 | Roles empresa | `PROPIETARIO` \| `ADMINISTRADOR` \| `USUARIO` |
 | Meta tokens | AES-256-GCM → `meta_conexiones.token_cifrado` |
 | Webhooks | Síncronos, idempotentes por (`organizacion_id`, `id_externo`) |
