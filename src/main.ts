@@ -14,12 +14,10 @@ async function bootstrap() {
   app.enableCors({ origin: config.get<string>('FRONTEND_URL'), credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // Hostinger/Passenger inyecta PORT — no usar fallback 4000 (provoca 503).
-  const port = Number(process.env.PORT);
-  if (!Number.isFinite(port)) {
-    console.error(
-      '[bootstrap] PORT no está definido. En Hostinger NO fijes PORT en hPanel; Passenger lo inyecta al arrancar.',
-    );
+  // Hostinger inyecta PORT. En local cae a 4000. Nunca fijes PORT en hPanel.
+  const port = Number(process.env.PORT ?? 4000);
+  if (!Number.isFinite(port) || port <= 0) {
+    console.error('[bootstrap] PORT inválido:', process.env.PORT);
     process.exit(1);
   }
 
