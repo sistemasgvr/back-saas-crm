@@ -9,7 +9,7 @@ export class ListarOrganizacionesUseCase {
     private readonly organizaciones: OrganizacionesAdminRepository,
   ) {}
 
-  execute() {
-    return this.organizaciones.listar();
+  execute(page: number, pageSize: number) {
+    return this.organizaciones.listar(page, pageSize);
   }
 }

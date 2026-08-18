@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type { RolOrganizacion } from '../../auth/domain/request-context.interface';
 import type {
   CrearUsuarioInput,
@@ -11,8 +12,18 @@ import type {
 export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  listar() {
-    return this.prisma.usuario.findMany({ where: { estado: 1 }, orderBy: { fechaCreacion: 'desc' } });
+  async listar(page: number, pageSize: number) {
+    const where = { estado: 1 };
+    const [total, usuarios] = await Promise.all([
+      this.prisma.usuario.count({ where }),
+      this.prisma.usuario.findMany({
+        where,
+        orderBy: { fechaCreacion: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    return construirResultadoPaginado(usuarios, total, page, pageSize);
   }
 
   async obtenerPorId(id: string): Promise<UsuarioConMembresias | null> {

@@ -1,5 +1,6 @@
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
 import type { Usuario } from '@prisma/client';
+import type { ResultadoPaginado } from '../../../shared/application/paginacion';
 
 export const USUARIOS_ADMIN_REPOSITORY = Symbol('USUARIOS_ADMIN_REPOSITORY');
 
@@ -23,7 +24,7 @@ export interface UsuarioConMembresias extends Usuario {
 }
 
 export interface UsuariosAdminRepository {
-  listar(): Promise<Usuario[]>;
+  listar(page: number, pageSize: number): Promise<ResultadoPaginado<Usuario>>;
   obtenerPorId(id: string): Promise<UsuarioConMembresias | null>;
   buscarActivoPorEmail(email: string): Promise<Usuario | null>;
   crear(input: CrearUsuarioInput, passwordHash: string, usuarioCreacion: string): Promise<Usuario>;

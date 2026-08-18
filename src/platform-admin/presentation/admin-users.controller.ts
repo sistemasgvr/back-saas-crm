@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
+import { PaginacionQueryDto } from '../../shared/presentation/dto/paginacion.query.dto';
 import { PlatformAdminGuard } from '../../shared/presentation/guards/platform-admin.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
@@ -29,8 +30,8 @@ export class AdminUsersController {
   }
 
   @Get()
-  findAll() {
-    return this.listarUsuarios.execute();
+  findAll(@Query() query: PaginacionQueryDto) {
+    return this.listarUsuarios.execute(query.page, query.pageSize);
   }
 
   @Get(':id')

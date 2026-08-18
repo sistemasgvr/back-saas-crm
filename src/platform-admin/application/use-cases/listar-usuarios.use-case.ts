@@ -7,8 +7,8 @@ import { toUsuarioAdminResponse } from '../usuario-admin-response.mapper';
 export class ListarUsuariosUseCase {
   constructor(@Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository) {}
 
-  async execute() {
-    const usuarios = await this.usuarios.listar();
-    return usuarios.map(toUsuarioAdminResponse);
+  async execute(page: number, pageSize: number) {
+    const resultado = await this.usuarios.listar(page, pageSize);
+    return { ...resultado, data: resultado.data.map(toUsuarioAdminResponse) };
   }
 }

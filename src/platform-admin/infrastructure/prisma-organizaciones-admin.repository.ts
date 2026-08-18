@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type {
   ActualizarOrganizacionAdminInput,
   CrearOrganizacionInput,
@@ -13,8 +14,18 @@ const MODULOS_ENCENDIDOS_POR_DEFECTO = ['META_LEADS', 'DASHBOARD'];
 export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  listar() {
-    return this.prisma.organizacion.findMany({ where: { estado: 1 }, orderBy: { fechaCreacion: 'desc' } });
+  async listar(page: number, pageSize: number) {
+    const where = { estado: 1 };
+    const [total, organizaciones] = await Promise.all([
+      this.prisma.organizacion.count({ where }),
+      this.prisma.organizacion.findMany({
+        where,
+        orderBy: { fechaCreacion: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    return construirResultadoPaginado(organizaciones, total, page, pageSize);
   }
 
   obtenerPorId(id: string) {

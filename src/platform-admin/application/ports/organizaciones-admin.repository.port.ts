@@ -1,4 +1,5 @@
 import type { Organizacion } from '@prisma/client';
+import type { ResultadoPaginado } from '../../../shared/application/paginacion';
 
 export const ORGANIZACIONES_ADMIN_REPOSITORY = Symbol('ORGANIZACIONES_ADMIN_REPOSITORY');
 
@@ -28,7 +29,7 @@ export interface ActualizarOrganizacionAdminInput {
 }
 
 export interface OrganizacionesAdminRepository {
-  listar(): Promise<Organizacion[]>;
+  listar(page: number, pageSize: number): Promise<ResultadoPaginado<Organizacion>>;
   obtenerPorId(id: string): Promise<Organizacion | null>;
   /** Crea la organización y sus organizacion_modulos por defecto (META_LEADS y DASHBOARD habilitados) — PLAN.md §5.1. */
   crearConModulosPorDefecto(input: CrearOrganizacionInput, usuarioCreacion: string): Promise<Organizacion>;
