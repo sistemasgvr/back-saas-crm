@@ -12,6 +12,7 @@ datasource db {
 // Fase 7 — Meta OAuth (§4.8): meta_conexiones.
 // Fase 8 — modelo Meta (§4.9-4.12): campanas, conjuntos_anuncios, anuncios, leads.
 // La ingestión real (poblar estas tablas desde el webhook) es Fase 9.
+// Fase 12 — Notificaciones in-app por WebSocket (sin push del navegador por ahora): notificaciones, notificaciones_usuario.
 
 model Usuario {
   id                String    @id @default(uuid()) @db.Uuid
@@ -30,8 +31,9 @@ model Usuario {
   fechaCreacion     DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime  @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacionUsuarios OrganizacionUsuario[]
-  tokensRefresco       TokenRefresco[]
+  organizacionUsuarios  OrganizacionUsuario[]
+  tokensRefresco        TokenRefresco[]
+  notificacionesUsuario NotificacionUsuario[]
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -81,11 +83,13 @@ model Organizacion {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacionUsuarios OrganizacionUsuario[]
-  organizacionModulos  OrganizacionModulo[]
-  metaConexiones       MetaConexion[]
-  campanas             Campana[]
-  leads                Lead[]
+  organizacionUsuarios  OrganizacionUsuario[]
+  organizacionModulos   OrganizacionModulo[]
+  metaConexiones        MetaConexion[]
+  campanas              Campana[]
+  leads                 Lead[]
+  notificaciones        Notificacion[]
+  notificacionesUsuario NotificacionUsuario[]
 
   @@index([estado])
   @@map("organizaciones")
@@ -298,4 +302,53 @@ model OrganizacionModulo {
   @@index([habilitado])
   @@index([estado])
   @@map("organizacion_modulos")
+}
+
+model Notificacion {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  tipo           String @db.VarChar(50) // discriminador, ej. "LEAD_NUEVO" — nuevos tipos no requieren migración
+  titulo         String @db.VarChar(200)
+  mensaje        String @db.VarChar(500)
+  payload        Json? // datos específicos del tipo, ej. { leadId }
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion  Organizacion          @relation(fields: [organizacionId], references: [id])
+  destinatarios NotificacionUsuario[]
+
+  @@index([organizacionId])
+  @@index([tipo])
+  @@index([estado])
+  @@map("notificaciones")
+}
+
+model NotificacionUsuario {
+  id             String    @id @default(uuid()) @db.Uuid
+  notificacionId String    @map("notificacion_id") @db.Uuid
+  organizacionId String    @map("organizacion_id") @db.Uuid // denormalizado (misma convención que Lead/Campana) — evita join en conteo/listado
+  usuarioId      String    @map("usuario_id") @db.Uuid
+  leida          Int       @default(0) @db.SmallInt
+  fechaLectura   DateTime? @map("fecha_lectura") @db.Timestamptz
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  notificacion Notificacion @relation(fields: [notificacionId], references: [id])
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+
+  @@unique([notificacionId, usuarioId])
+  @@index([usuarioId, leida])
+  @@index([organizacionId, usuarioId])
+  @@index([notificacionId])
+  @@index([estado])
+  @@map("notificaciones_usuario")
 }

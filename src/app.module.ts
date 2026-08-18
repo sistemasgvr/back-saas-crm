@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { envValidationOptions, envValidationSchema } from './shared/infrastructure/env.validation';
+import {
+  envValidationOptions,
+  envValidationSchema,
+} from './shared/infrastructure/env.validation';
 import { PrismaModule } from './shared/infrastructure/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -11,6 +14,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { MetaModule } from './meta/meta.module';
 import { LeadsModule } from './leads/leads.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -31,6 +35,7 @@ import { LeadsModule } from './leads/leads.module';
     PlatformAdminModule,
     MetaModule,
     LeadsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

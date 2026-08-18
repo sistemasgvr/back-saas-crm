@@ -19,21 +19,27 @@ export interface ResultadoProcesarLead {
   procesado: boolean;
   motivo?: string;
   leadId?: string;
+  organizacionId?: string;
 }
 
 @Injectable()
 export class ProcesarLeadEntranteUseCase {
   constructor(
-    @Inject(META_CONEXIONES_REPOSITORY) private readonly conexiones: MetaConexionesRepository,
+    @Inject(META_CONEXIONES_REPOSITORY)
+    private readonly conexiones: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
     @Inject(CAMPANAS_REPOSITORY) private readonly campanas: CampanasRepository,
-    @Inject(CONJUNTOS_ANUNCIOS_REPOSITORY) private readonly conjuntos: ConjuntosAnunciosRepository,
+    @Inject(CONJUNTOS_ANUNCIOS_REPOSITORY)
+    private readonly conjuntos: ConjuntosAnunciosRepository,
     @Inject(ANUNCIOS_REPOSITORY) private readonly anuncios: AnunciosRepository,
     @Inject(LEADS_REPOSITORY) private readonly leads: LeadsRepository,
   ) {}
 
-  async execute(pageId: string, leadgenId: string): Promise<ResultadoProcesarLead> {
+  async execute(
+    pageId: string,
+    leadgenId: string,
+  ): Promise<ResultadoProcesarLead> {
     const conexion = await this.conexiones.findActivaPorPageId(pageId);
     if (!conexion?.tokenCifrado) {
       throw new PageSinConexionError(pageId);
@@ -49,7 +55,8 @@ export class ProcesarLeadEntranteUseCase {
 
     if (lead.campaignId) {
       const nombreCampana =
-        (await this.graph.obtenerNombreRecurso(lead.campaignId, accessToken)) ?? lead.campaignId;
+        (await this.graph.obtenerNombreRecurso(lead.campaignId, accessToken)) ??
+        lead.campaignId;
       const campana = await this.campanas.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         metaCampanaId: lead.campaignId,
@@ -60,7 +67,8 @@ export class ProcesarLeadEntranteUseCase {
 
     if (lead.adsetId && campanaId) {
       const nombreConjunto =
-        (await this.graph.obtenerNombreRecurso(lead.adsetId, accessToken)) ?? lead.adsetId;
+        (await this.graph.obtenerNombreRecurso(lead.adsetId, accessToken)) ??
+        lead.adsetId;
       const conjunto = await this.conjuntos.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         campanaId,
@@ -72,7 +80,8 @@ export class ProcesarLeadEntranteUseCase {
 
     if (lead.adId && conjuntoAnuncioId) {
       const nombreAnuncio =
-        (await this.graph.obtenerNombreRecurso(lead.adId, accessToken)) ?? lead.adId;
+        (await this.graph.obtenerNombreRecurso(lead.adId, accessToken)) ??
+        lead.adId;
       const anuncio = await this.anuncios.upsertPorMetaId({
         organizacionId: conexion.organizacionId,
         conjuntoAnuncioId,
@@ -98,6 +107,10 @@ export class ProcesarLeadEntranteUseCase {
       fechaLead: lead.createdTime,
     });
 
-    return { procesado: true, leadId: resultado.id };
+    return {
+      procesado: true,
+      leadId: resultado.id,
+      organizacionId: conexion.organizacionId,
+    };
   }
 }

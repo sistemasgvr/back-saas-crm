@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { ConfigIoAdapter } from './shared/infrastructure/config-io.adapter';
 
 async function bootstrap() {
   // rawBody: true — el webhook de Meta necesita los bytes exactos del body
@@ -11,8 +12,12 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
-  app.enableCors({ origin: config.get<string>('FRONTEND_URL'), credentials: true });
+  app.enableCors({
+    origin: config.get<string>('FRONTEND_URL'),
+    credentials: true,
+  });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useWebSocketAdapter(new ConfigIoAdapter(app));
 
   // Hostinger inyecta PORT. En local cae a 4000. Nunca fijes PORT en hPanel.
   const port = Number(process.env.PORT ?? 4000);
@@ -22,7 +27,9 @@ async function bootstrap() {
   }
 
   await app.listen(port, '0.0.0.0');
-  console.log(`[bootstrap] NestJS OK — 0.0.0.0:${port} (NODE_ENV=${config.get('NODE_ENV')})`);
+  console.log(
+    `[bootstrap] NestJS OK — 0.0.0.0:${port} (NODE_ENV=${config.get('NODE_ENV')})`,
+  );
 }
 
 void bootstrap().catch((error) => {

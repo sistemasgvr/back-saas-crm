@@ -19,12 +19,17 @@ function metaEncryptionKeyValidator(value: string, helpers: Joi.CustomHelpers) {
  * NOTA: no definas PORT en hPanel — Hostinger lo inyecta vía Passenger.
  */
 export const envValidationSchema = Joi.object({
-  NODE_ENV: Joi.string().valid('development', 'production', 'test').default('production'),
+  NODE_ENV: Joi.string()
+    .valid('development', 'production', 'test')
+    .default('production'),
 
   DATABASE_URL: Joi.string()
     .pattern(/^postgresql:\/\/.+/i)
     .required()
-    .messages({ 'string.pattern.base': 'DATABASE_URL debe ser una URL postgresql:// válida' }),
+    .messages({
+      'string.pattern.base':
+        'DATABASE_URL debe ser una URL postgresql:// válida',
+    }),
 
   /** Solo Hostinger/Passenger — no fijar manualmente en hPanel. */
   PORT: Joi.number().port().optional(),
