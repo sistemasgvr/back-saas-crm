@@ -24,6 +24,8 @@ if (!entry) {
   process.exit(1);
 }
 
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+
 if (!process.env.PORT) {
   console.error('[server.js] PORT no definido — Hostinger debe inyectarlo. No fijes PORT=4000 en hPanel.');
   process.exit(1);
