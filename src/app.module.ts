@@ -16,6 +16,10 @@ import { LeadsModule } from './leads/leads.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      // El primer archivo encontrado gana por variable; NODE_ENV lo fija cada
+      // script de package.json (cross-env) — local usa .env.development, Hostinger
+      // usa .env.production si existe o las variables ya inyectadas por hPanel.
+      envFilePath: [`.env.${process.env.NODE_ENV ?? 'development'}`, '.env'],
       validationSchema: envValidationSchema,
       validationOptions: envValidationOptions,
     }),
