@@ -14,7 +14,15 @@ async function bootstrap() {
   app.enableCors({ origin: config.get<string>('FRONTEND_URL'), credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  const port = config.get<number>('PORT') ?? 4000;
+  // Hostinger/Passenger inyecta PORT — no usar fallback 4000 (provoca 503).
+  const port = Number(process.env.PORT);
+  if (!Number.isFinite(port)) {
+    console.error(
+      '[bootstrap] PORT no está definido. En Hostinger NO fijes PORT en hPanel; Passenger lo inyecta al arrancar.',
+    );
+    process.exit(1);
+  }
+
   await app.listen(port, '0.0.0.0');
   console.log(`[bootstrap] NestJS OK — 0.0.0.0:${port} (NODE_ENV=${config.get('NODE_ENV')})`);
 }

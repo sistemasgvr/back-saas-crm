@@ -24,7 +24,12 @@ if (!entry) {
   process.exit(1);
 }
 
-console.error(`[server.js] Iniciando Nest desde ${entry} (PORT=${process.env.PORT ?? 'no definido'})`);
+if (!process.env.PORT) {
+  console.error('[server.js] PORT no definido — Hostinger debe inyectarlo. No fijes PORT=4000 en hPanel.');
+  process.exit(1);
+}
+
+console.error(`[server.js] Iniciando Nest desde ${entry} (PORT=${process.env.PORT})`);
 
 try {
   require(path.join(__dirname, entry));
