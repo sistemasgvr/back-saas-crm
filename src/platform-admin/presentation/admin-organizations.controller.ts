@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
-import { PaginacionQueryDto } from '../../shared/presentation/dto/paginacion.query.dto';
+import { ListarOrganizacionesQueryDto } from './dto/listar-organizaciones.query.dto';
 import { PlatformAdminGuard } from '../../shared/presentation/guards/platform-admin.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
@@ -29,8 +29,13 @@ export class AdminOrganizationsController {
   }
 
   @Get()
-  findAll(@Query() query: PaginacionQueryDto) {
-    return this.listarOrganizaciones.execute(query.page, query.pageSize);
+  findAll(@Query() query: ListarOrganizacionesQueryDto) {
+    return this.listarOrganizaciones.execute({
+      page: query.page,
+      pageSize: query.pageSize,
+      q: query.q,
+      estado: query.estado,
+    });
   }
 
   @Get(':id')

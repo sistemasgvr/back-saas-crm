@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ORGANIZACIONES_ADMIN_REPOSITORY } from '../ports/organizaciones-admin.repository.port';
-import type { OrganizacionesAdminRepository } from '../ports/organizaciones-admin.repository.port';
+import {
+  ORGANIZACIONES_ADMIN_REPOSITORY,
+  type FiltroListadoOrganizaciones,
+  type OrganizacionesAdminRepository,
+} from '../ports/organizaciones-admin.repository.port';
 
 @Injectable()
 export class ListarOrganizacionesUseCase {
@@ -9,7 +12,7 @@ export class ListarOrganizacionesUseCase {
     private readonly organizaciones: OrganizacionesAdminRepository,
   ) {}
 
-  execute(page: number, pageSize: number) {
-    return this.organizaciones.listar(page, pageSize);
+  execute(filtro: FiltroListadoOrganizaciones) {
+    return this.organizaciones.listar(filtro);
   }
 }

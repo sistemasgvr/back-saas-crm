@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type { RolOrganizacion } from '../../auth/domain/request-context.interface';
 import type {
   CrearUsuarioInput,
+  FiltroListadoUsuarios,
   UsuarioConMembresias,
   UsuariosAdminRepository,
 } from '../application/ports/usuarios-admin.repository.port';
@@ -12,18 +14,32 @@ import type {
 export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listar(page: number, pageSize: number) {
-    const where = { estado: 1 };
+  async listar(filtro: FiltroListadoUsuarios) {
+    const q = filtro.q?.trim();
+    const where: Prisma.UsuarioWhereInput = {
+      ...(filtro.estado !== undefined ? { estado: filtro.estado } : {}),
+      ...(filtro.esAdminPlataforma !== undefined ? { esAdminPlataforma: filtro.esAdminPlataforma } : {}),
+      ...(q
+        ? {
+            OR: [
+              { nombre: { contains: q, mode: 'insensitive' } },
+              { apellido: { contains: q, mode: 'insensitive' } },
+              { email: { contains: q, mode: 'insensitive' } },
+              { telefono: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
     const [total, usuarios] = await Promise.all([
       this.prisma.usuario.count({ where }),
       this.prisma.usuario.findMany({
         where,
         orderBy: { fechaCreacion: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (filtro.page - 1) * filtro.pageSize,
+        take: filtro.pageSize,
       }),
     ]);
-    return construirResultadoPaginado(usuarios, total, page, pageSize);
+    return construirResultadoPaginado(usuarios, total, filtro.page, filtro.pageSize);
   }
 
   async obtenerPorId(id: string): Promise<UsuarioConMembresias | null> {

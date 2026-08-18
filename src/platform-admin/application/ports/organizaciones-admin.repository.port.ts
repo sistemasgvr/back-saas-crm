@@ -28,8 +28,15 @@ export interface ActualizarOrganizacionAdminInput {
   notas?: string;
 }
 
+export interface FiltroListadoOrganizaciones {
+  page: number;
+  pageSize: number;
+  q?: string;
+  estado?: 0 | 1;
+}
+
 export interface OrganizacionesAdminRepository {
-  listar(page: number, pageSize: number): Promise<ResultadoPaginado<Organizacion>>;
+  listar(filtro: FiltroListadoOrganizaciones): Promise<ResultadoPaginado<Organizacion>>;
   obtenerPorId(id: string): Promise<Organizacion | null>;
   /** Crea la organización y sus organizacion_modulos por defecto (META_LEADS y DASHBOARD habilitados) — PLAN.md §5.1. */
   crearConModulosPorDefecto(input: CrearOrganizacionInput, usuarioCreacion: string): Promise<Organizacion>;

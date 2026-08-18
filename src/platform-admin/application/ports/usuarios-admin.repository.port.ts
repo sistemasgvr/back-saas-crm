@@ -23,8 +23,16 @@ export interface UsuarioConMembresias extends Usuario {
   organizacionUsuarios: MembresiaUsuario[];
 }
 
+export interface FiltroListadoUsuarios {
+  page: number;
+  pageSize: number;
+  q?: string;
+  estado?: 0 | 1;
+  esAdminPlataforma?: 0 | 1;
+}
+
 export interface UsuariosAdminRepository {
-  listar(page: number, pageSize: number): Promise<ResultadoPaginado<Usuario>>;
+  listar(filtro: FiltroListadoUsuarios): Promise<ResultadoPaginado<Usuario>>;
   obtenerPorId(id: string): Promise<UsuarioConMembresias | null>;
   buscarActivoPorEmail(email: string): Promise<Usuario | null>;
   crear(input: CrearUsuarioInput, passwordHash: string, usuarioCreacion: string): Promise<Usuario>;

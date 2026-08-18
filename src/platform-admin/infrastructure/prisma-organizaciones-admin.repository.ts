@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type {
   ActualizarOrganizacionAdminInput,
   CrearOrganizacionInput,
+  FiltroListadoOrganizaciones,
   OrganizacionesAdminRepository,
 } from '../application/ports/organizaciones-admin.repository.port';
 
@@ -14,18 +16,32 @@ const MODULOS_ENCENDIDOS_POR_DEFECTO = ['META_LEADS', 'DASHBOARD'];
 export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listar(page: number, pageSize: number) {
-    const where = { estado: 1 };
+  async listar(filtro: FiltroListadoOrganizaciones) {
+    const q = filtro.q?.trim();
+    const where: Prisma.OrganizacionWhereInput = {
+      ...(filtro.estado !== undefined ? { estado: filtro.estado } : {}),
+      ...(q
+        ? {
+            OR: [
+              { nombre: { contains: q, mode: 'insensitive' } },
+              { slug: { contains: q, mode: 'insensitive' } },
+              { razonSocial: { contains: q, mode: 'insensitive' } },
+              { emailContacto: { contains: q, mode: 'insensitive' } },
+              { documentoFiscal: { contains: q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
     const [total, organizaciones] = await Promise.all([
       this.prisma.organizacion.count({ where }),
       this.prisma.organizacion.findMany({
         where,
         orderBy: { fechaCreacion: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
+        skip: (filtro.page - 1) * filtro.pageSize,
+        take: filtro.pageSize,
       }),
     ]);
-    return construirResultadoPaginado(organizaciones, total, page, pageSize);
+    return construirResultadoPaginado(organizaciones, total, filtro.page, filtro.pageSize);
   }
 
   obtenerPorId(id: string) {
