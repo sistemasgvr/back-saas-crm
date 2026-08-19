@@ -5,7 +5,8 @@ import type { LeadsLecturaRepository } from '../ports/leads-lectura.repository.p
 @Injectable()
 export class ObtenerLeadUseCase {
   constructor(
-    @Inject(LEADS_LECTURA_REPOSITORY) private readonly leads: LeadsLecturaRepository,
+    @Inject(LEADS_LECTURA_REPOSITORY)
+    private readonly leads: LeadsLecturaRepository,
   ) {}
 
   async execute(organizacionId: string, id: string) {

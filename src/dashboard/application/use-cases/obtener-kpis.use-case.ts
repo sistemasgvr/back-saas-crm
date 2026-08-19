@@ -1,6 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DASHBOARD_REPOSITORY } from '../ports/dashboard.repository.port';
-import type { DashboardRepository, FiltroDashboard } from '../ports/dashboard.repository.port';
+import type {
+  DashboardRepository,
+  FiltroDashboard,
+} from '../ports/dashboard.repository.port';
 import {
   finDiaLimaUtc,
   finMesLima,
@@ -14,7 +17,8 @@ import {
 @Injectable()
 export class ObtenerKpisUseCase {
   constructor(
-    @Inject(DASHBOARD_REPOSITORY) private readonly dashboard: DashboardRepository,
+    @Inject(DASHBOARD_REPOSITORY)
+    private readonly dashboard: DashboardRepository,
   ) {}
 
   async execute(organizacionId: string, filtro: FiltroDashboard) {

@@ -10,7 +10,10 @@ import { PrismaLeadsLecturaRepository } from './infrastructure/prisma-leads-lect
   providers: [
     ListarLeadsUseCase,
     ObtenerLeadUseCase,
-    { provide: LEADS_LECTURA_REPOSITORY, useClass: PrismaLeadsLecturaRepository },
+    {
+      provide: LEADS_LECTURA_REPOSITORY,
+      useClass: PrismaLeadsLecturaRepository,
+    },
   ],
 })
 export class LeadsModule {}

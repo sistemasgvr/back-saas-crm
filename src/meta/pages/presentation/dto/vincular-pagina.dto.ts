@@ -1,11 +1,11 @@
 import { IsString, MaxLength } from 'class-validator';
 
-export class SeleccionarCuentaDto {
+export class VincularPaginaDto {
   @IsString()
   @MaxLength(64)
-  adAccountId: string;
+  pageId: string;
 
   @IsString()
   @MaxLength(200)
-  adAccountNombre: string;
+  pageNombre: string;
 }

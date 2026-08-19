@@ -10,14 +10,23 @@ export interface MetaUsuario {
   nombre: string;
 }
 
-export interface MetaPagina {
+/** DTOs con sufijo "Graph" a propósito: no confundir con los modelos Prisma MetaPagina/MetaCuentaPublicitaria (Fase 13). */
+export interface MetaPaginaGraph {
   id: string;
   nombre: string;
 }
 
-export interface MetaCuentaPublicitaria {
+export interface MetaCuentaPublicitariaGraph {
   id: string;
   nombre: string;
+}
+
+export interface MetaCuentaPublicitariaDetalleGraph {
+  id: string;
+  nombre: string;
+  moneda?: string;
+  estadoCuenta?: string;
+  timezone?: string;
 }
 
 export interface MetaCampoLead {
@@ -36,6 +45,26 @@ export interface MetaLeadGraph {
   raw: unknown;
 }
 
+export interface MetaCampanaGraph {
+  id: string;
+  nombre: string;
+  estado?: string;
+}
+
+export interface MetaConjuntoAnuncioGraph {
+  id: string;
+  nombre: string;
+  campanaId: string;
+  estado?: string;
+}
+
+export interface MetaAnuncioGraph {
+  id: string;
+  nombre: string;
+  conjuntoAnuncioId: string;
+  estado?: string;
+}
+
 export interface MetaGraphClient {
   /** appId/appSecret son de la Meta App propia de la organización, no de la plataforma. */
   intercambiarCodigoPorToken(
@@ -50,10 +79,41 @@ export interface MetaGraphClient {
     appSecret: string,
   ): Promise<TokenIntercambiado>;
   obtenerUsuario(accessToken: string): Promise<MetaUsuario>;
-  listarPaginas(accessToken: string): Promise<MetaPagina[]>;
-  listarCuentasPublicitarias(accessToken: string): Promise<MetaCuentaPublicitaria[]>;
+  listarPaginas(accessToken: string): Promise<MetaPaginaGraph[]>;
+  listarCuentasPublicitarias(
+    accessToken: string,
+  ): Promise<MetaCuentaPublicitariaGraph[]>;
+  obtenerCuentaPublicitaria(
+    adAccountId: string,
+    accessToken: string,
+  ): Promise<MetaCuentaPublicitariaDetalleGraph | null>;
   obtenerLead(leadgenId: string, accessToken: string): Promise<MetaLeadGraph>;
-  obtenerAccessTokenPagina(pageId: string, userAccessToken: string): Promise<string | null>;
-  suscribirPaginaLeadgen(pageId: string, pageAccessToken: string): Promise<void>;
-  obtenerNombreRecurso(metaId: string, accessToken: string): Promise<string | null>;
+  obtenerAccessTokenPagina(
+    pageId: string,
+    userAccessToken: string,
+  ): Promise<string | null>;
+  suscribirPaginaLeadgen(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<void>;
+  desuscribirPaginaLeadgen(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<void>;
+  obtenerNombreRecurso(
+    metaId: string,
+    accessToken: string,
+  ): Promise<string | null>;
+  listarCampanasDeCuenta(
+    adAccountId: string,
+    accessToken: string,
+  ): Promise<MetaCampanaGraph[]>;
+  listarConjuntosDeCampana(
+    campanaId: string,
+    accessToken: string,
+  ): Promise<MetaConjuntoAnuncioGraph[]>;
+  listarAnunciosDeConjunto(
+    conjuntoId: string,
+    accessToken: string,
+  ): Promise<MetaAnuncioGraph[]>;
 }

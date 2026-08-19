@@ -4,6 +4,7 @@ export interface FiltroDashboard {
   campanaId?: string;
   conjuntoAnuncioId?: string;
   anuncioId?: string;
+  metaCuentaId?: string;
 }
 
 export interface RangoFechas {
@@ -36,7 +37,11 @@ export interface DashboardSeries {
 }
 
 export interface DashboardRepository {
-  contarLeads(organizacionId: string, filtro: FiltroDashboard, rango?: RangoFechas): Promise<number>;
+  contarLeads(
+    organizacionId: string,
+    filtro: FiltroDashboard,
+    rango?: RangoFechas,
+  ): Promise<number>;
   serieDiaria(
     organizacionId: string,
     filtro: FiltroDashboard,

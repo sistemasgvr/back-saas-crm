@@ -12,7 +12,9 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
   constructor(private readonly prisma: PrismaService) {}
 
   findActivaPorOrganizacion(organizacionId: string) {
-    return this.prisma.metaConexion.findFirst({ where: { organizacionId, estado: 1 } });
+    return this.prisma.metaConexion.findFirst({
+      where: { organizacionId, estado: 1 },
+    });
   }
 
   findActivaPorPageId(pageId: string) {
@@ -20,7 +22,9 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
   }
 
   findActivaPorWebhookVerifyToken(token: string) {
-    return this.prisma.metaConexion.findFirst({ where: { webhookVerifyToken: token, estado: 1 } });
+    return this.prisma.metaConexion.findFirst({
+      where: { webhookVerifyToken: token, estado: 1 },
+    });
   }
 
   listActivasConAppSecret() {
@@ -30,7 +34,9 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
   }
 
   async guardarCredencialesApp(input: GuardarCredencialesInput) {
-    const existente = await this.findActivaPorOrganizacion(input.organizacionId);
+    const existente = await this.findActivaPorOrganizacion(
+      input.organizacionId,
+    );
 
     if (existente) {
       return this.prisma.metaConexion.update({
@@ -55,9 +61,13 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
   }
 
   async actualizarTokenOAuth(input: ActualizarTokenInput) {
-    const existente = await this.findActivaPorOrganizacion(input.organizacionId);
+    const existente = await this.findActivaPorOrganizacion(
+      input.organizacionId,
+    );
     if (!existente) {
-      throw new NotFoundException('No hay credenciales de Meta App guardadas para esta organización');
+      throw new NotFoundException(
+        'No hay credenciales de Meta App guardadas para esta organización',
+      );
     }
     return this.prisma.metaConexion.update({
       where: { id: existente.id },
@@ -72,26 +82,10 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     });
   }
 
-  actualizarPagina(id: string, pageId: string, pageNombre: string, usuarioEdicion: string) {
-    return this.prisma.metaConexion.update({
-      where: { id },
-      data: { pageId, pageNombre, usuarioEdicion },
-    });
-  }
-
-  actualizarCuentaPublicitaria(
+  async limpiarConexionOAuth(
     id: string,
-    adAccountId: string,
-    adAccountNombre: string,
     usuarioEdicion: string,
-  ) {
-    return this.prisma.metaConexion.update({
-      where: { id },
-      data: { adAccountId, adAccountNombre, usuarioEdicion },
-    });
-  }
-
-  async limpiarConexionOAuth(id: string, usuarioEdicion: string): Promise<void> {
+  ): Promise<void> {
     await this.prisma.metaConexion.update({
       where: { id },
       data: {

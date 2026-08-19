@@ -12,4 +12,8 @@ export class FiltroDashboardQueryDto {
   @IsOptional()
   @IsUUID()
   anuncioId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  metaCuentaId?: string;
 }

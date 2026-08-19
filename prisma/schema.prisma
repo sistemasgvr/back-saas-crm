@@ -13,6 +13,7 @@ datasource db {
 // Fase 8 — modelo Meta (§4.9-4.12): campanas, conjuntos_anuncios, anuncios, leads.
 // La ingestión real (poblar estas tablas desde el webhook) es Fase 9.
 // Fase 12 — Notificaciones in-app por WebSocket (sin push del navegador por ahora): notificaciones, notificaciones_usuario.
+// Fase 13 — Meta multi-origen (PLAN-FASE-13-META-MULTI.md): meta_paginas, meta_cuentas_publicitarias (N por org).
 
 model Usuario {
   id                String    @id @default(uuid()) @db.Uuid
@@ -83,25 +84,28 @@ model Organizacion {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacionUsuarios  OrganizacionUsuario[]
-  organizacionModulos   OrganizacionModulo[]
-  metaConexiones        MetaConexion[]
-  campanas              Campana[]
-  leads                 Lead[]
-  notificaciones        Notificacion[]
-  notificacionesUsuario NotificacionUsuario[]
+  organizacionUsuarios     OrganizacionUsuario[]
+  organizacionModulos      OrganizacionModulo[]
+  metaConexiones           MetaConexion[]
+  metaPaginas              MetaPagina[]
+  metaCuentasPublicitarias MetaCuentaPublicitaria[]
+  campanas                 Campana[]
+  leads                    Lead[]
+  notificaciones           Notificacion[]
+  notificacionesUsuario    NotificacionUsuario[]
 
   @@index([estado])
   @@map("organizaciones")
 }
 
 model Campana {
-  id             String  @id @default(uuid()) @db.Uuid
-  organizacionId String  @map("organizacion_id") @db.Uuid
-  metaCampanaId  String  @map("meta_campana_id") @db.VarChar(64)
-  nombre         String  @db.VarChar(255)
-  estadoMeta     String? @map("estado_meta") @db.VarChar(40)
-  datosCrudos    Json?   @map("datos_crudos")
+  id                       String  @id @default(uuid()) @db.Uuid
+  organizacionId           String  @map("organizacion_id") @db.Uuid
+  metaCuentaPublicitariaId String? @map("meta_cuenta_publicitaria_id") @db.Uuid
+  metaCampanaId            String  @map("meta_campana_id") @db.VarChar(64)
+  nombre                   String  @db.VarChar(255)
+  estadoMeta               String? @map("estado_meta") @db.VarChar(40)
+  datosCrudos              Json?   @map("datos_crudos")
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
@@ -109,11 +113,13 @@ model Campana {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion      Organizacion      @relation(fields: [organizacionId], references: [id])
-  conjuntosAnuncios ConjuntoAnuncio[]
-  leads             Lead[]
+  organizacion           Organizacion            @relation(fields: [organizacionId], references: [id])
+  metaCuentaPublicitaria MetaCuentaPublicitaria? @relation(fields: [metaCuentaPublicitariaId], references: [id])
+  conjuntosAnuncios      ConjuntoAnuncio[]
+  leads                  Lead[]
 
   @@unique([organizacionId, metaCampanaId])
+  @@index([metaCuentaPublicitariaId])
   @@index([estado])
   @@map("campanas")
 }
@@ -170,6 +176,7 @@ model Anuncio {
 model Lead {
   id                String    @id @default(uuid()) @db.Uuid
   organizacionId    String    @map("organizacion_id") @db.Uuid
+  metaPaginaId      String?   @map("meta_pagina_id") @db.Uuid
   campanaId         String?   @map("campana_id") @db.Uuid
   conjuntoAnuncioId String?   @map("conjunto_anuncio_id") @db.Uuid
   anuncioId         String?   @map("anuncio_id") @db.Uuid
@@ -188,6 +195,7 @@ model Lead {
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacion    Organizacion     @relation(fields: [organizacionId], references: [id])
+  metaPagina      MetaPagina?      @relation(fields: [metaPaginaId], references: [id])
   campana         Campana?         @relation(fields: [campanaId], references: [id])
   conjuntoAnuncio ConjuntoAnuncio? @relation(fields: [conjuntoAnuncioId], references: [id])
   anuncio         Anuncio?         @relation(fields: [anuncioId], references: [id])
@@ -195,6 +203,7 @@ model Lead {
   @@unique([organizacionId, idExterno])
   @@index([email])
   @@index([telefono])
+  @@index([metaPaginaId])
   @@index([campanaId])
   @@index([anuncioId])
   @@index([fechaLead])
@@ -230,15 +239,82 @@ model MetaConexion {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  organizacion             Organizacion             @relation(fields: [organizacionId], references: [id])
+  paginas                  MetaPagina[]
+  cuentasPublicitarias     MetaCuentaPublicitaria[]
 
   // page_id único entre conexiones activas: índice parcial en migración
   // 20260817223000_meta_conexiones_page_id_unique (Prisma DSL no soporta partial unique).
+  // pageId/pageNombre/adAccountId/adAccountNombre arriba: deprecados desde Fase 13
+  // (PLAN-FASE-13-META-MULTI.md §3.3) — el runtime ya no los escribe, ver meta_paginas
+  // y meta_cuentas_publicitarias. Se mantienen por ahora para no perder el historial MVP.
   @@index([organizacionId])
   @@index([pageId])
   @@index([adAccountId])
   @@index([estado])
   @@map("meta_conexiones")
+}
+
+model MetaPagina {
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizacionId     String    @map("organizacion_id") @db.Uuid
+  metaConexionId     String    @map("meta_conexion_id") @db.Uuid
+  pageId             String    @map("page_id") @db.VarChar(64)
+  nombre             String    @db.VarChar(200)
+  tokenPaginaCifrado String?   @map("token_pagina_cifrado")
+  webhookSuscrito    Int       @default(0) @map("webhook_suscrito") @db.SmallInt
+  webhookSuscritoEn  DateTime? @map("webhook_suscrito_en") @db.Timestamptz
+  fotoUrl            String?   @map("foto_url")
+  categoria          String?   @db.VarChar(120)
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
+  leads        Lead[]
+
+  // page_id único entre páginas activas de CUALQUIER org (misma regla MVP que
+  // meta_conexiones) + único dentro de la propia org: índices parciales en
+  // migración fase13_1_meta_multi_origen (Prisma DSL no soporta partial unique).
+  @@index([organizacionId])
+  @@index([metaConexionId])
+  @@index([pageId])
+  @@index([estado])
+  @@map("meta_paginas")
+}
+
+model MetaCuentaPublicitaria {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizacionId String    @map("organizacion_id") @db.Uuid
+  metaConexionId String    @map("meta_conexion_id") @db.Uuid
+  adAccountId    String    @map("ad_account_id") @db.VarChar(64)
+  nombre         String    @db.VarChar(200)
+  moneda         String?   @db.VarChar(8)
+  estadoCuenta   String?   @map("estado_cuenta") @db.VarChar(40)
+  timezone       String?   @db.VarChar(64)
+  ultimoSyncEn   DateTime? @map("ultimo_sync_en") @db.Timestamptz
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
+  campanas     Campana[]
+
+  // (organizacion_id, ad_account_id) único solo entre cuentas ACTIVAS: índice parcial
+  // en la misma migración de meta_paginas_page_id_unique (Prisma DSL no soporta partial
+  // unique) — evita bloquear re-vincular una cuenta luego de desvincularla (soft-delete).
+  @@index([organizacionId, adAccountId])
+  @@index([metaConexionId])
+  @@index([estado])
+  @@map("meta_cuentas_publicitarias")
 }
 
 model OrganizacionUsuario {

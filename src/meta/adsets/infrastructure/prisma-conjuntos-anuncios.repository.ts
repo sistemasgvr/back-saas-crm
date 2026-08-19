@@ -27,7 +27,9 @@ export class PrismaConjuntosAnunciosRepository implements ConjuntosAnunciosRepos
     }));
   }
 
-  async upsertPorMetaId(input: UpsertConjuntoAnuncioInput): Promise<{ id: string }> {
+  async upsertPorMetaId(
+    input: UpsertConjuntoAnuncioInput,
+  ): Promise<{ id: string }> {
     const conjunto = await this.prisma.conjuntoAnuncio.upsert({
       where: {
         organizacionId_metaConjuntoId: {
@@ -35,7 +37,11 @@ export class PrismaConjuntosAnunciosRepository implements ConjuntosAnunciosRepos
           metaConjuntoId: input.metaConjuntoId,
         },
       },
-      update: {},
+      update: {
+        nombre: input.nombre,
+        estadoMeta: input.estadoMeta,
+        datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+      },
       create: {
         organizacionId: input.organizacionId,
         campanaId: input.campanaId,

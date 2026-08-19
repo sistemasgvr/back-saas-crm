@@ -42,9 +42,9 @@ export class MetaOAuthController {
         throw new Error('Faltan parámetros code/state');
       }
       await this.procesarCallbackOAuth.execute({ code, state });
-      res.redirect(`${frontendUrl}/settings?meta=connected`);
+      res.redirect(`${frontendUrl}/settings/meta?meta=connected`);
     } catch {
-      res.redirect(`${frontendUrl}/settings?meta=error`);
+      res.redirect(`${frontendUrl}/settings/meta?meta=error`);
     }
   }
 }

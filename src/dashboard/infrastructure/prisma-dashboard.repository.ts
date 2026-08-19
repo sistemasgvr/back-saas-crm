@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
-import { fechaLima, siguienteDiaLima } from '../../shared/application/lima-time';
+import {
+  fechaLima,
+  siguienteDiaLima,
+} from '../../shared/application/lima-time';
 import type {
   DashboardRepository,
   FiltroDashboard,
@@ -19,8 +22,13 @@ function whereFiltro(
     organizacionId,
     estado: 1,
     ...(filtro.campanaId ? { campanaId: filtro.campanaId } : {}),
-    ...(filtro.conjuntoAnuncioId ? { conjuntoAnuncioId: filtro.conjuntoAnuncioId } : {}),
+    ...(filtro.conjuntoAnuncioId
+      ? { conjuntoAnuncioId: filtro.conjuntoAnuncioId }
+      : {}),
     ...(filtro.anuncioId ? { anuncioId: filtro.anuncioId } : {}),
+    ...(filtro.metaCuentaId
+      ? { campana: { metaCuentaPublicitariaId: filtro.metaCuentaId } }
+      : {}),
     ...(rango ? { fechaLead: { gte: rango.desde, lte: rango.hasta } } : {}),
   };
 }
@@ -29,8 +37,14 @@ function whereFiltro(
 export class PrismaDashboardRepository implements DashboardRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  contarLeads(organizacionId: string, filtro: FiltroDashboard, rango?: RangoFechas): Promise<number> {
-    return this.prisma.lead.count({ where: whereFiltro(organizacionId, filtro, rango) });
+  contarLeads(
+    organizacionId: string,
+    filtro: FiltroDashboard,
+    rango?: RangoFechas,
+  ): Promise<number> {
+    return this.prisma.lead.count({
+      where: whereFiltro(organizacionId, filtro, rango),
+    });
   }
 
   async serieDiaria(
@@ -68,12 +82,19 @@ export class PrismaDashboardRepository implements DashboardRepository {
   ): Promise<PuntoSerieNombrado[]> {
     const grupos = await this.prisma.lead.groupBy({
       by: ['campanaId'],
-      where: { ...whereFiltro(organizacionId, filtro, rango), campanaId: { not: null } },
+      where: {
+        ...whereFiltro(organizacionId, filtro, rango),
+        campanaId: { not: null },
+      },
       _count: { _all: true },
     });
 
-    const ids = grupos.map((g) => g.campanaId).filter((id): id is string => id !== null);
-    const campanas = await this.prisma.campana.findMany({ where: { id: { in: ids }, estado: 1 } });
+    const ids = grupos
+      .map((g) => g.campanaId)
+      .filter((id): id is string => id !== null);
+    const campanas = await this.prisma.campana.findMany({
+      where: { id: { in: ids }, estado: 1 },
+    });
     const nombrePorId = new Map(campanas.map((c) => [c.id, c.nombre]));
 
     return grupos
@@ -93,12 +114,19 @@ export class PrismaDashboardRepository implements DashboardRepository {
   ): Promise<PuntoSerieNombrado[]> {
     const grupos = await this.prisma.lead.groupBy({
       by: ['anuncioId'],
-      where: { ...whereFiltro(organizacionId, filtro, rango), anuncioId: { not: null } },
+      where: {
+        ...whereFiltro(organizacionId, filtro, rango),
+        anuncioId: { not: null },
+      },
       _count: { _all: true },
     });
 
-    const ids = grupos.map((g) => g.anuncioId).filter((id): id is string => id !== null);
-    const anuncios = await this.prisma.anuncio.findMany({ where: { id: { in: ids }, estado: 1 } });
+    const ids = grupos
+      .map((g) => g.anuncioId)
+      .filter((id): id is string => id !== null);
+    const anuncios = await this.prisma.anuncio.findMany({
+      where: { id: { in: ids }, estado: 1 },
+    });
     const nombrePorId = new Map(anuncios.map((a) => [a.id, a.nombre]));
 
     return grupos

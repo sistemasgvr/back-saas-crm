@@ -1,4 +1,11 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
@@ -19,12 +26,18 @@ export class LeadsController {
   ) {}
 
   @Get()
-  findAll(@CurrentUser() ctx: RequestContext, @Query() query: ListarLeadsQueryDto) {
+  findAll(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: ListarLeadsQueryDto,
+  ) {
     return this.listarLeads.execute(ctx.organizacionId!, query);
   }
 
   @Get(':id')
-  findOne(@CurrentUser() ctx: RequestContext, @Param('id', ParseUUIDPipe) id: string) {
+  findOne(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
     return this.obtenerLead.execute(ctx.organizacionId!, id);
   }
 }

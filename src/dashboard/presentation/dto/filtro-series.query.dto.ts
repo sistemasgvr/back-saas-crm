@@ -14,10 +14,18 @@ export class FiltroSeriesQueryDto {
   anuncioId?: string;
 
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fechaDesde debe tener formato YYYY-MM-DD' })
+  @IsUUID()
+  metaCuentaId?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'fechaDesde debe tener formato YYYY-MM-DD',
+  })
   fechaDesde?: string;
 
   @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'fechaHasta debe tener formato YYYY-MM-DD' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, {
+    message: 'fechaHasta debe tener formato YYYY-MM-DD',
+  })
   fechaHasta?: string;
 }

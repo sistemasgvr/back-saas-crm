@@ -2,6 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { META_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../connections/application/ports/meta-conexiones.repository.port';
+import { META_PAGINAS_REPOSITORY } from '../../../pages/application/ports/meta-paginas.repository.port';
+import type { MetaPaginasRepository } from '../../../pages/application/ports/meta-paginas.repository.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import type { LeadgenWebhookPayload } from '../../domain/leadgen-webhook-payload.interface';
 import { verificarFirmaWebhook } from '../../infrastructure/verificar-firma-webhook';
@@ -21,18 +23,25 @@ function extraerPageIds(payload: LeadgenWebhookPayload): string[] {
 @Injectable()
 export class VerificarWebhookMetaUseCase {
   constructor(
-    @Inject(META_CONEXIONES_REPOSITORY) private readonly conexiones: MetaConexionesRepository,
+    @Inject(META_CONEXIONES_REPOSITORY)
+    private readonly conexiones: MetaConexionesRepository,
+    @Inject(META_PAGINAS_REPOSITORY)
+    private readonly paginas: MetaPaginasRepository,
     private readonly config: ConfigService,
     private readonly tokenEncryption: TokenEncryptionService,
   ) {}
 
-  async esSuscripcionValida(mode: string, verifyToken: string): Promise<boolean> {
+  async esSuscripcionValida(
+    mode: string,
+    verifyToken: string,
+  ): Promise<boolean> {
     if (mode !== 'subscribe') return false;
 
     const globalToken = this.config.get<string>('META_VERIFY_TOKEN');
     if (globalToken && verifyToken === globalToken) return true;
 
-    const conexion = await this.conexiones.findActivaPorWebhookVerifyToken(verifyToken);
+    const conexion =
+      await this.conexiones.findActivaPorWebhookVerifyToken(verifyToken);
     return conexion !== null;
   }
 
@@ -45,10 +54,15 @@ export class VerificarWebhookMetaUseCase {
     const probados = new Set<string>();
 
     for (const pageId of pageIds) {
-      const conexion = await this.conexiones.findActivaPorPageId(pageId);
-      if (conexion?.appSecretCifrado && !probados.has(conexion.id)) {
-        probados.add(conexion.id);
-        const secret = this.tokenEncryption.decrypt(conexion.appSecretCifrado);
+      const pagina = await this.paginas.findActivaPorPageId(pageId);
+      if (
+        pagina?.conexionAppSecretCifrado &&
+        !probados.has(pagina.metaConexionId)
+      ) {
+        probados.add(pagina.metaConexionId);
+        const secret = this.tokenEncryption.decrypt(
+          pagina.conexionAppSecretCifrado,
+        );
         if (verificarFirmaWebhook(rawBody, signature, secret)) return true;
       }
     }
@@ -62,7 +76,8 @@ export class VerificarWebhookMetaUseCase {
     }
 
     const legacySecret = this.config.get<string>('META_APP_SECRET');
-    if (legacySecret && verificarFirmaWebhook(rawBody, signature, legacySecret)) return true;
+    if (legacySecret && verificarFirmaWebhook(rawBody, signature, legacySecret))
+      return true;
 
     return false;
   }

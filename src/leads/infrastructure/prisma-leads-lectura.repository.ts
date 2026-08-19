@@ -14,7 +14,9 @@ type LeadConRelaciones = Prisma.LeadGetPayload<{
   include: { campana: true; anuncio: true; conjuntoAnuncio: true };
 }>;
 
-function refOpcional(ref: { id: string; nombre: string } | null): ReferenciaNombrada | null {
+function refOpcional(
+  ref: { id: string; nombre: string } | null,
+): ReferenciaNombrada | null {
   return ref ? { id: ref.id, nombre: ref.nombre } : null;
 }
 
@@ -34,12 +36,16 @@ function toResumen(lead: LeadConRelaciones): LeadResumen {
 export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  private construirWhere(organizacionId: string, filtro: FiltroLeads): Prisma.LeadWhereInput {
+  private construirWhere(
+    organizacionId: string,
+    filtro: FiltroLeads,
+  ): Prisma.LeadWhereInput {
     return {
       organizacionId,
       estado: 1,
       ...(filtro.campanaId ? { campanaId: filtro.campanaId } : {}),
       ...(filtro.anuncioId ? { anuncioId: filtro.anuncioId } : {}),
+      ...(filtro.metaPaginaId ? { metaPaginaId: filtro.metaPaginaId } : {}),
       ...(filtro.formularioId ? { formularioId: filtro.formularioId } : {}),
       ...(filtro.fechaDesde || filtro.fechaHasta
         ? {
@@ -54,14 +60,19 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
             OR: [
               { nombre: { contains: filtro.q, mode: 'insensitive' as const } },
               { email: { contains: filtro.q, mode: 'insensitive' as const } },
-              { telefono: { contains: filtro.q, mode: 'insensitive' as const } },
+              {
+                telefono: { contains: filtro.q, mode: 'insensitive' as const },
+              },
             ],
           }
         : {}),
     };
   }
 
-  async listar(organizacionId: string, filtro: FiltroLeads): Promise<ListaLeadsResultado> {
+  async listar(
+    organizacionId: string,
+    filtro: FiltroLeads,
+  ): Promise<ListaLeadsResultado> {
     const where = this.construirWhere(organizacionId, filtro);
 
     const [total, leads] = await Promise.all([
@@ -84,7 +95,10 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
     };
   }
 
-  async obtenerPorId(organizacionId: string, id: string): Promise<LeadDetalle | null> {
+  async obtenerPorId(
+    organizacionId: string,
+    id: string,
+  ): Promise<LeadDetalle | null> {
     const lead = await this.prisma.lead.findFirst({
       where: { id, organizacionId, estado: 1 },
       include: { campana: true, anuncio: true, conjuntoAnuncio: true },

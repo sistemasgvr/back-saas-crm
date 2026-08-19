@@ -951,6 +951,8 @@ KPIs + 3 gráficos + filtros. Charts en `src/components/charts/` (ApexCharts, co
 - Pipeline, tareas, oportunidades
 - App móvil
 
+**Plan complementario (no reemplaza este documento):** [PLAN-FASE-13-META-MULTI.md](./PLAN-FASE-13-META-MULTI.md) — varias páginas Facebook + varias cuentas publicitarias por org, perfiles de cada origen, filtros en leads/dashboard.
+
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + entrada de menú. **No se toca el kernel** (`usuarios` / `organizaciones` / guards).
 
 ---

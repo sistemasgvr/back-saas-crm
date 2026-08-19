@@ -1,4 +1,13 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  GoneException,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -10,12 +19,8 @@ import { RequireModule } from '../../../shared/presentation/decorators/require-m
 import { ObtenerConexionActualUseCase } from '../application/use-cases/obtener-conexion-actual.use-case';
 import { ListarPaginasUseCase } from '../application/use-cases/listar-paginas.use-case';
 import { ListarCuentasPublicitariasUseCase } from '../application/use-cases/listar-cuentas-publicitarias.use-case';
-import { SeleccionarPaginaUseCase } from '../application/use-cases/seleccionar-pagina.use-case';
-import { SeleccionarCuentaPublicitariaUseCase } from '../application/use-cases/seleccionar-cuenta-publicitaria.use-case';
 import { DesconectarUseCase } from '../application/use-cases/desconectar.use-case';
 import { GuardarCredencialesAppUseCase } from '../application/use-cases/guardar-credenciales-app.use-case';
-import { SeleccionarPaginaDto } from './dto/seleccionar-pagina.dto';
-import { SeleccionarCuentaDto } from './dto/seleccionar-cuenta.dto';
 import { GuardarCredencialesDto } from './dto/guardar-credenciales.dto';
 
 @Controller('meta/connections')
@@ -28,8 +33,6 @@ export class MetaConnectionsController {
     private readonly guardarCredencialesApp: GuardarCredencialesAppUseCase,
     private readonly listarPaginas: ListarPaginasUseCase,
     private readonly listarCuentasPublicitarias: ListarCuentasPublicitariasUseCase,
-    private readonly seleccionarPagina: SeleccionarPaginaUseCase,
-    private readonly seleccionarCuentaPublicitaria: SeleccionarCuentaPublicitariaUseCase,
     private readonly desconectar: DesconectarUseCase,
   ) {}
 
@@ -39,7 +42,10 @@ export class MetaConnectionsController {
   }
 
   @Post('app-credentials')
-  saveAppCredentials(@CurrentUser() ctx: RequestContext, @Body() dto: GuardarCredencialesDto) {
+  saveAppCredentials(
+    @CurrentUser() ctx: RequestContext,
+    @Body() dto: GuardarCredencialesDto,
+  ) {
     return this.guardarCredencialesApp.execute(
       ctx.organizacionId!,
       dto.appId,
@@ -58,23 +64,19 @@ export class MetaConnectionsController {
     return this.listarCuentasPublicitarias.execute(ctx.organizacionId!);
   }
 
+  /** @deprecated Fase 13 — usar POST /meta/pages (soporta N páginas por org). */
   @Post('page')
-  selectPage(@CurrentUser() ctx: RequestContext, @Body() dto: SeleccionarPaginaDto) {
-    return this.seleccionarPagina.execute(
-      ctx.organizacionId!,
-      dto.pageId,
-      dto.pageNombre,
-      ctx.usuarioId,
+  selectPage(): never {
+    throw new GoneException(
+      'Usa POST /meta/pages — esta organización ahora puede vincular varias páginas.',
     );
   }
 
+  /** @deprecated Fase 13 — usar POST /meta/ad-accounts (soporta N cuentas por org). */
   @Post('ad-account')
-  selectAdAccount(@CurrentUser() ctx: RequestContext, @Body() dto: SeleccionarCuentaDto) {
-    return this.seleccionarCuentaPublicitaria.execute(
-      ctx.organizacionId!,
-      dto.adAccountId,
-      dto.adAccountNombre,
-      ctx.usuarioId,
+  selectAdAccount(): never {
+    throw new GoneException(
+      'Usa POST /meta/ad-accounts — esta organización ahora puede vincular varias cuentas.',
     );
   }
 

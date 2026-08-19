@@ -12,6 +12,8 @@ export interface UpsertCampanaInput {
   nombre: string;
   estadoMeta?: string;
   datosCrudos?: unknown;
+  /** NULL hasta que el sync manual de la cuenta (Fase 13.3) la resuelva. */
+  metaCuentaPublicitariaId?: string;
 }
 
 export interface CampanasRepository {

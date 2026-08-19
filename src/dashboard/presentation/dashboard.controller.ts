@@ -20,12 +20,18 @@ export class DashboardController {
   ) {}
 
   @Get('kpis')
-  getKpis(@CurrentUser() ctx: RequestContext, @Query() query: FiltroDashboardQueryDto) {
+  getKpis(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: FiltroDashboardQueryDto,
+  ) {
     return this.obtenerKpis.execute(ctx.organizacionId!, query);
   }
 
   @Get('series')
-  getSeries(@CurrentUser() ctx: RequestContext, @Query() query: FiltroSeriesQueryDto) {
+  getSeries(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: FiltroSeriesQueryDto,
+  ) {
     return this.obtenerSeries.execute(ctx.organizacionId!, query);
   }
 }

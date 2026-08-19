@@ -2,6 +2,7 @@ export const LEADS_REPOSITORY = Symbol('LEADS_REPOSITORY');
 
 export interface UpsertLeadInput {
   organizacionId: string;
+  metaPaginaId?: string;
   campanaId?: string;
   conjuntoAnuncioId?: string;
   anuncioId?: string;
@@ -16,5 +17,7 @@ export interface UpsertLeadInput {
 
 export interface LeadsRepository {
   /** Idempotente por (organizacionId, idExterno) — un mismo leadgen_id nunca duplica fila (PLAN.md §8.2). */
-  upsertPorIdExterno(input: UpsertLeadInput): Promise<{ id: string; creado: boolean }>;
+  upsertPorIdExterno(
+    input: UpsertLeadInput,
+  ): Promise<{ id: string; creado: boolean }>;
 }

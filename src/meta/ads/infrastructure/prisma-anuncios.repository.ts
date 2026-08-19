@@ -16,7 +16,11 @@ export class PrismaAnunciosRepository implements AnunciosRepository {
     conjuntoAnuncioId?: string,
   ): Promise<AnuncioFiltro[]> {
     const anuncios = await this.prisma.anuncio.findMany({
-      where: { organizacionId, estado: 1, ...(conjuntoAnuncioId ? { conjuntoAnuncioId } : {}) },
+      where: {
+        organizacionId,
+        estado: 1,
+        ...(conjuntoAnuncioId ? { conjuntoAnuncioId } : {}),
+      },
       orderBy: { nombre: 'asc' },
     });
     return anuncios.map((a) => ({
@@ -35,7 +39,11 @@ export class PrismaAnunciosRepository implements AnunciosRepository {
           metaAnuncioId: input.metaAnuncioId,
         },
       },
-      update: {},
+      update: {
+        nombre: input.nombre,
+        estadoMeta: input.estadoMeta,
+        datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+      },
       create: {
         organizacionId: input.organizacionId,
         conjuntoAnuncioId: input.conjuntoAnuncioId,

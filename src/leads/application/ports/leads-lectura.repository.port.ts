@@ -4,6 +4,7 @@ export interface FiltroLeads {
   q?: string;
   campanaId?: string;
   anuncioId?: string;
+  metaPaginaId?: string;
   formularioId?: string;
   fechaDesde?: Date;
   fechaHasta?: Date;
@@ -43,6 +44,9 @@ export interface ListaLeadsResultado {
 }
 
 export interface LeadsLecturaRepository {
-  listar(organizacionId: string, filtro: FiltroLeads): Promise<ListaLeadsResultado>;
+  listar(
+    organizacionId: string,
+    filtro: FiltroLeads,
+  ): Promise<ListaLeadsResultado>;
   obtenerPorId(organizacionId: string, id: string): Promise<LeadDetalle | null>;
 }

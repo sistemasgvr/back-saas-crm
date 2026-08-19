@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { META_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/meta-conexiones.repository.port';
-import type { MetaConexionesRepository } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../connections/application/ports/meta-graph-client.port';
+import { META_PAGINAS_REPOSITORY } from '../../../pages/application/ports/meta-paginas.repository.port';
+import type { MetaPaginasRepository } from '../../../pages/application/ports/meta-paginas.repository.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import { CAMPANAS_REPOSITORY } from '../../../campaigns/application/ports/campanas.repository.port';
 import type { CampanasRepository } from '../../../campaigns/application/ports/campanas.repository.port';
@@ -25,8 +25,8 @@ export interface ResultadoProcesarLead {
 @Injectable()
 export class ProcesarLeadEntranteUseCase {
   constructor(
-    @Inject(META_CONEXIONES_REPOSITORY)
-    private readonly conexiones: MetaConexionesRepository,
+    @Inject(META_PAGINAS_REPOSITORY)
+    private readonly paginas: MetaPaginasRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
     @Inject(CAMPANAS_REPOSITORY) private readonly campanas: CampanasRepository,
@@ -40,12 +40,14 @@ export class ProcesarLeadEntranteUseCase {
     pageId: string,
     leadgenId: string,
   ): Promise<ResultadoProcesarLead> {
-    const conexion = await this.conexiones.findActivaPorPageId(pageId);
-    if (!conexion?.tokenCifrado) {
+    const pagina = await this.paginas.findActivaPorPageId(pageId);
+    if (!pagina?.conexionTokenCifrado) {
       throw new PageSinConexionError(pageId);
     }
 
-    const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
+    const accessToken = this.tokenEncryption.decrypt(
+      pagina.conexionTokenCifrado,
+    );
     // Puede lanzar BadGatewayException — el caller (controller) responde 5xx para que Meta reintente.
     const lead = await this.graph.obtenerLead(leadgenId, accessToken);
 
@@ -57,8 +59,10 @@ export class ProcesarLeadEntranteUseCase {
       const nombreCampana =
         (await this.graph.obtenerNombreRecurso(lead.campaignId, accessToken)) ??
         lead.campaignId;
+      // meta_cuenta_publicitaria_id queda NULL acá — se completa con el sync manual de la
+      // cuenta (Fase 13.3, PLAN-FASE-13-META-MULTI.md §3.4) si la campaña ya existía se conserva.
       const campana = await this.campanas.upsertPorMetaId({
-        organizacionId: conexion.organizacionId,
+        organizacionId: pagina.organizacionId,
         metaCampanaId: lead.campaignId,
         nombre: nombreCampana,
       });
@@ -70,7 +74,7 @@ export class ProcesarLeadEntranteUseCase {
         (await this.graph.obtenerNombreRecurso(lead.adsetId, accessToken)) ??
         lead.adsetId;
       const conjunto = await this.conjuntos.upsertPorMetaId({
-        organizacionId: conexion.organizacionId,
+        organizacionId: pagina.organizacionId,
         campanaId,
         metaConjuntoId: lead.adsetId,
         nombre: nombreConjunto,
@@ -83,7 +87,7 @@ export class ProcesarLeadEntranteUseCase {
         (await this.graph.obtenerNombreRecurso(lead.adId, accessToken)) ??
         lead.adId;
       const anuncio = await this.anuncios.upsertPorMetaId({
-        organizacionId: conexion.organizacionId,
+        organizacionId: pagina.organizacionId,
         conjuntoAnuncioId,
         metaAnuncioId: lead.adId,
         nombre: nombreAnuncio,
@@ -94,7 +98,8 @@ export class ProcesarLeadEntranteUseCase {
     const contacto = extraerContactoLead(lead.fieldData);
 
     const resultado = await this.leads.upsertPorIdExterno({
-      organizacionId: conexion.organizacionId,
+      organizacionId: pagina.organizacionId,
+      metaPaginaId: pagina.id,
       campanaId,
       conjuntoAnuncioId,
       anuncioId,
@@ -110,7 +115,7 @@ export class ProcesarLeadEntranteUseCase {
     return {
       procesado: true,
       leadId: resultado.id,
-      organizacionId: conexion.organizacionId,
+      organizacionId: pagina.organizacionId,
     };
   }
 }
