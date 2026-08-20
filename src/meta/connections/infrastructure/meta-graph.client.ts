@@ -1,9 +1,10 @@
-import { BadGatewayException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
+import { excepcionDesdeErrorMeta } from '../application/mapear-error-meta-graph';
 import type {
   AppSuscritaGraph,
   DebugTokenGraph,
@@ -480,14 +481,10 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
           );
           return retry.data;
         } catch (retryError) {
-          throw new BadGatewayException(
-            `Meta Graph API: ${this.mensajeError(retryError)}`,
-          );
+          throw excepcionDesdeErrorMeta(retryError);
         }
       }
-      throw new BadGatewayException(
-        `Meta Graph API: ${this.mensajeError(error)}`,
-      );
+      throw excepcionDesdeErrorMeta(error);
     }
   }
 
@@ -500,9 +497,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         this.http.post(`${this.graphBaseUrl}${path}`, null, { params }),
       );
     } catch (error) {
-      throw new BadGatewayException(
-        `Meta Graph API: ${this.mensajeError(error)}`,
-      );
+      throw excepcionDesdeErrorMeta(error);
     }
   }
 
@@ -515,16 +510,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         this.http.delete(`${this.graphBaseUrl}${path}`, { params }),
       );
     } catch (error) {
-      throw new BadGatewayException(
-        `Meta Graph API: ${this.mensajeError(error)}`,
-      );
+      throw excepcionDesdeErrorMeta(error);
     }
-  }
-
-  private mensajeError(error: unknown): string {
-    return error instanceof AxiosError
-      ? ((error.response?.data as { error?: { message?: string } })?.error
-          ?.message ?? error.message)
-      : 'Error desconocido al llamar a Meta Graph API';
   }
 }

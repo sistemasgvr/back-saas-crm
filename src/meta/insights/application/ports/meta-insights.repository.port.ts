@@ -37,6 +37,12 @@ export interface PuntoSpendDia {
   spend: number;
 }
 
+export interface SerieSpendCuenta {
+  id: string;
+  nombre: string;
+  porDia: PuntoSpendDia[];
+}
+
 export interface MetaInsightsRepository {
   /** Crea o reemplaza el snapshot del día — reintentar un sync nunca duplica filas. */
   upsertDiario(input: UpsertInsightDiarioInput): Promise<void>;
@@ -50,4 +56,11 @@ export interface MetaInsightsRepository {
     fechaDesde: string,
     fechaHasta: string,
   ): Promise<PuntoSpendDia[]>;
+  /** Una serie por cuenta publicitaria (solo filas a nivel cuenta: campanaId null). */
+  serieDiariaSpendPorCuenta(
+    organizacionId: string,
+    filtro: Omit<FiltroInsightsDiarios, 'metaCuentaId' | 'campanaId'>,
+    fechaDesde: string,
+    fechaHasta: string,
+  ): Promise<SerieSpendCuenta[]>;
 }

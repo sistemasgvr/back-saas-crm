@@ -62,6 +62,12 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
 
   // Opt-in — contenido y mensajería de la página.
   {
+    id: 'pages_ads',
+    label: 'Formularios Lead Ads y anuncios de la página',
+    scopesRequeridos: ['pages_manage_ads'],
+    tipo: 'optin',
+  },
+  {
     id: 'pages_engagement',
     label: 'Leer contenido y engagement de la página',
     scopesRequeridos: ['pages_read_engagement'],
@@ -83,12 +89,6 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     id: 'pages_messaging',
     label: 'Mensajería de Messenger de la página',
     scopesRequeridos: ['pages_messaging'],
-    tipo: 'optin',
-  },
-  {
-    id: 'pages_ads',
-    label: 'Anuncios administrados desde la página',
-    scopesRequeridos: ['pages_manage_ads'],
     tipo: 'optin',
   },
 

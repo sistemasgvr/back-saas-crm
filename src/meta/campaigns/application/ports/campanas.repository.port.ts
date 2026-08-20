@@ -4,6 +4,7 @@ export interface CampanaFiltro {
   id: string;
   nombre: string;
   estadoMeta: string | null;
+  metaCuentaPublicitariaId: string | null;
 }
 
 export interface UpsertCampanaInput {

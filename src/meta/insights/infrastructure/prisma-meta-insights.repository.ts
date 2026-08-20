@@ -6,6 +6,7 @@ import type {
   MetaInsightsRepository,
   PuntoSpendDia,
   ResumenSpend,
+  SerieSpendCuenta,
   UpsertInsightDiarioInput,
 } from '../application/ports/meta-insights.repository.port';
 
@@ -128,14 +129,69 @@ export class PrismaMetaInsightsRepository implements MetaInsightsRepository {
       porDia.set(clave, (porDia.get(clave) ?? 0) + Number(fila.spend));
     }
 
-    const puntos: PuntoSpendDia[] = [];
-    let cursor = fechaDesde;
-    while (cursor <= fechaHasta) {
-      puntos.push({ fecha: cursor, spend: porDia.get(cursor) ?? 0 });
-      const [year, month, day] = cursor.split('-').map(Number);
-      const siguiente = new Date(Date.UTC(year, month - 1, day + 1));
-      cursor = formatFechaSolaDia(siguiente);
-    }
-    return puntos;
+    return rellenarRangoDias(fechaDesde, fechaHasta, porDia);
   }
+
+  async serieDiariaSpendPorCuenta(
+    organizacionId: string,
+    filtro: Omit<FiltroInsightsDiarios, 'metaCuentaId' | 'campanaId'>,
+    fechaDesde: string,
+    fechaHasta: string,
+  ): Promise<SerieSpendCuenta[]> {
+    const filas = await this.prisma.metaInsightDiario.findMany({
+      where: whereFiltro(organizacionId, { ...filtro, campanaId: undefined }),
+      select: {
+        fecha: true,
+        spend: true,
+        metaCuentaPublicitariaId: true,
+        metaCuentaPublicitaria: { select: { id: true, nombre: true } },
+      },
+    });
+
+    const porCuenta = new Map<
+      string,
+      { nombre: string; porDia: Map<string, number>; total: number }
+    >();
+
+    for (const fila of filas) {
+      const id = fila.metaCuentaPublicitariaId;
+      let bucket = porCuenta.get(id);
+      if (!bucket) {
+        bucket = {
+          nombre: fila.metaCuentaPublicitaria.nombre,
+          porDia: new Map(),
+          total: 0,
+        };
+        porCuenta.set(id, bucket);
+      }
+      const clave = formatFechaSolaDia(fila.fecha);
+      const spend = Number(fila.spend);
+      bucket.porDia.set(clave, (bucket.porDia.get(clave) ?? 0) + spend);
+      bucket.total += spend;
+    }
+
+    return [...porCuenta.entries()]
+      .sort((a, b) => b[1].total - a[1].total)
+      .map(([id, bucket]) => ({
+        id,
+        nombre: bucket.nombre,
+        porDia: rellenarRangoDias(fechaDesde, fechaHasta, bucket.porDia),
+      }));
+  }
+}
+
+function rellenarRangoDias(
+  fechaDesde: string,
+  fechaHasta: string,
+  porDia: Map<string, number>,
+): PuntoSpendDia[] {
+  const puntos: PuntoSpendDia[] = [];
+  let cursor = fechaDesde;
+  while (cursor <= fechaHasta) {
+    puntos.push({ fecha: cursor, spend: porDia.get(cursor) ?? 0 });
+    const [year, month, day] = cursor.split('-').map(Number);
+    const siguiente = new Date(Date.UTC(year, month - 1, day + 1));
+    cursor = formatFechaSolaDia(siguiente);
+  }
+  return puntos;
 }

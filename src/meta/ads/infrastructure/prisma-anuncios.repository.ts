@@ -21,11 +21,13 @@ export class PrismaAnunciosRepository implements AnunciosRepository {
         estado: 1,
         ...(conjuntoAnuncioId ? { conjuntoAnuncioId } : {}),
       },
+      include: { conjuntoAnuncio: { select: { campanaId: true } } },
       orderBy: { nombre: 'asc' },
     });
     return anuncios.map((a) => ({
       id: a.id,
       conjuntoAnuncioId: a.conjuntoAnuncioId,
+      campanaId: a.conjuntoAnuncio.campanaId,
       nombre: a.nombre,
       estadoMeta: a.estadoMeta,
     }));

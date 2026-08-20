@@ -22,6 +22,7 @@ export class PrismaCampanasRepository implements CampanasRepository {
       id: c.id,
       nombre: c.nombre,
       estadoMeta: c.estadoMeta,
+      metaCuentaPublicitariaId: c.metaCuentaPublicitariaId,
     }));
   }
 
