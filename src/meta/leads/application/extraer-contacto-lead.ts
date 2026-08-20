@@ -6,7 +6,10 @@ const CAMPOS_EMAIL = ['email'];
 const CAMPOS_TELEFONO = ['phone_number', 'phone'];
 const CAMPOS_NOMBRE = ['full_name', 'first_name', 'name'];
 
-function valorDe(fieldData: MetaCampoLead[], nombres: string[]): string | undefined {
+function valorDe(
+  fieldData: MetaCampoLead[],
+  nombres: string[],
+): string | undefined {
   for (const nombre of nombres) {
     const campo = fieldData.find((f) => f.name.toLowerCase() === nombre);
     if (campo?.values?.[0]) return campo.values[0];

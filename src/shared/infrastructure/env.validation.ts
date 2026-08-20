@@ -52,6 +52,8 @@ export const envValidationSchema = Joi.object({
   META_WEBHOOK_URL_TOKEN: Joi.string().min(8).required(),
   META_VERIFY_TOKEN: Joi.string().min(8).required(),
   META_OAUTH_REDIRECT_URI: Joi.string().uri().required(),
+  /** Única fuente de versión Graph — usada por OAuth dialog y AxiosMetaGraphClient (Fase 14.0). */
+  META_GRAPH_VERSION: Joi.string().default('v25.0'),
 
   // Neon / Postgres individuales (opcionales si DATABASE_URL está presente)
   PGHOST: Joi.string().optional(),

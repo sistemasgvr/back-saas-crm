@@ -10,6 +10,8 @@ export interface MetaPaginaRow {
   nombre: string;
   webhookSuscrito: boolean;
   webhookSuscritoEn: Date | null;
+  webhookUltimoCheckEn: Date | null;
+  webhookUltimoError: string | null;
   fotoUrl: string | null;
   categoria: string | null;
   fechaCreacion: Date;
@@ -65,6 +67,13 @@ export interface MetaPaginasRepository {
   actualizarWebhookSuscrito(
     id: string,
     suscrito: boolean,
+    usuarioEdicion: string,
+  ): Promise<void>;
+  /** Health-check contra Graph (Fase 14.4) — no toca webhookSuscritoEn, solo el estado observado. */
+  actualizarSaludWebhook(
+    id: string,
+    suscrito: boolean,
+    error: string | null,
     usuarioEdicion: string,
   ): Promise<void>;
   desvincular(

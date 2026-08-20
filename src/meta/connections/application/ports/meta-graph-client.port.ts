@@ -65,6 +65,30 @@ export interface MetaAnuncioGraph {
   estado?: string;
 }
 
+export interface MetaFormularioGraph {
+  id: string;
+  nombre: string;
+  estado?: string;
+  locale?: string;
+}
+
+export interface FiltroLeadsDeForm {
+  desde?: Date;
+  hasta?: Date;
+  despues?: string;
+  limit?: number;
+}
+
+export interface PaginaLeadsDeForm {
+  leads: MetaLeadGraph[];
+  siguienteCursor?: string;
+}
+
+export interface AppSuscritaGraph {
+  id: string;
+  camposSuscritos: string[];
+}
+
 export interface MetaGraphClient {
   /** appId/appSecret son de la Meta App propia de la organización, no de la plataforma. */
   intercambiarCodigoPorToken(
@@ -116,4 +140,17 @@ export interface MetaGraphClient {
     conjuntoId: string,
     accessToken: string,
   ): Promise<MetaAnuncioGraph[]>;
+  listarLeadgenForms(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<MetaFormularioGraph[]>;
+  listarLeadsDeForm(
+    formId: string,
+    pageAccessToken: string,
+    filtro: FiltroLeadsDeForm,
+  ): Promise<PaginaLeadsDeForm>;
+  obtenerAppsSuscritas(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<AppSuscritaGraph[]>;
 }

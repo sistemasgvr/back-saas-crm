@@ -7,6 +7,7 @@ import { AdsetsModule } from './adsets/adsets.module';
 import { AdsModule } from './ads/ads.module';
 import { MetaLeadsModule } from './leads/meta-leads.module';
 import { MetaWebhooksModule } from './webhooks/meta-webhooks.module';
+import { MetaFormsModule } from './forms/meta-forms.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { MetaWebhooksModule } from './webhooks/meta-webhooks.module';
     AdsModule,
     MetaLeadsModule,
     MetaWebhooksModule,
+    MetaFormsModule,
   ],
 })
 export class MetaModule {}

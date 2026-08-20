@@ -17,6 +17,8 @@ function toRow(pagina: {
   nombre: string;
   webhookSuscrito: number;
   webhookSuscritoEn: Date | null;
+  webhookUltimoCheckEn: Date | null;
+  webhookUltimoError: string | null;
   fotoUrl: string | null;
   categoria: string | null;
   fechaCreacion: Date;
@@ -29,6 +31,8 @@ function toRow(pagina: {
     nombre: pagina.nombre,
     webhookSuscrito: pagina.webhookSuscrito === 1,
     webhookSuscritoEn: pagina.webhookSuscritoEn,
+    webhookUltimoCheckEn: pagina.webhookUltimoCheckEn,
+    webhookUltimoError: pagina.webhookUltimoError,
     fotoUrl: pagina.fotoUrl,
     categoria: pagina.categoria,
     fechaCreacion: pagina.fechaCreacion,
@@ -156,6 +160,23 @@ export class PrismaMetaPaginasRepository implements MetaPaginasRepository {
       data: {
         webhookSuscrito: suscrito ? 1 : 0,
         webhookSuscritoEn: suscrito ? new Date() : null,
+        usuarioEdicion,
+      },
+    });
+  }
+
+  async actualizarSaludWebhook(
+    id: string,
+    suscrito: boolean,
+    error: string | null,
+    usuarioEdicion: string,
+  ): Promise<void> {
+    await this.prisma.metaPagina.update({
+      where: { id },
+      data: {
+        webhookSuscrito: suscrito ? 1 : 0,
+        webhookUltimoCheckEn: new Date(),
+        webhookUltimoError: error,
         usuarioEdicion,
       },
     });

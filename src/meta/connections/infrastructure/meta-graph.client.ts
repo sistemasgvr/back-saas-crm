@@ -1,21 +1,25 @@
 import { BadGatewayException, Injectable } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
+import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
+import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
 import type {
+  AppSuscritaGraph,
+  FiltroLeadsDeForm,
   MetaAnuncioGraph,
   MetaCampanaGraph,
   MetaConjuntoAnuncioGraph,
   MetaCuentaPublicitariaDetalleGraph,
   MetaCuentaPublicitariaGraph,
+  MetaFormularioGraph,
   MetaGraphClient,
   MetaLeadGraph,
   MetaPaginaGraph,
   MetaUsuario,
+  PaginaLeadsDeForm,
   TokenIntercambiado,
 } from '../application/ports/meta-graph-client.port';
-
-const GRAPH_BASE_URL = 'https://graph.facebook.com/v21.0';
 
 // https://developers.facebook.com/docs/marketing-api/reference/ad-account#fields (account_status)
 const ESTADOS_CUENTA: Record<number, string> = {
@@ -41,7 +45,14 @@ interface GraphListResponse<T> {
 
 @Injectable()
 export class AxiosMetaGraphClient implements MetaGraphClient {
-  constructor(private readonly http: HttpService) {}
+  constructor(
+    private readonly http: HttpService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private get graphBaseUrl(): string {
+    return `https://graph.facebook.com/${obtenerVersionGraph(this.config)}`;
+  }
 
   async intercambiarCodigoPorToken(
     code: string,
@@ -266,16 +277,133 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     }));
   }
 
+  async listarLeadgenForms(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<MetaFormularioGraph[]> {
+    const data = await this.get<
+      GraphListResponse<{
+        id: string;
+        name: string;
+        status?: string;
+        locale?: string;
+      }>
+    >(`/${pageId}/leadgen_forms`, {
+      fields: 'id,name,status,locale',
+      access_token: pageAccessToken,
+      limit: '200',
+    });
+    return data.data.map((form) => ({
+      id: form.id,
+      nombre: form.name,
+      estado: form.status,
+      locale: form.locale,
+    }));
+  }
+
+  async listarLeadsDeForm(
+    formId: string,
+    pageAccessToken: string,
+    filtro: FiltroLeadsDeForm,
+  ): Promise<PaginaLeadsDeForm> {
+    const filtering: { field: string; operator: string; value: number }[] = [];
+    if (filtro.desde) {
+      filtering.push({
+        field: 'time_created',
+        operator: 'GREATER_THAN',
+        value: Math.floor(filtro.desde.getTime() / 1000),
+      });
+    }
+    if (filtro.hasta) {
+      filtering.push({
+        field: 'time_created',
+        operator: 'LESS_THAN',
+        value: Math.floor(filtro.hasta.getTime() / 1000),
+      });
+    }
+
+    const params: Record<string, string> = {
+      fields: 'id,form_id,ad_id,adset_id,campaign_id,created_time,field_data',
+      access_token: pageAccessToken,
+      limit: String(filtro.limit ?? 50),
+    };
+    if (filtering.length > 0) params.filtering = JSON.stringify(filtering);
+    if (filtro.despues) params.after = filtro.despues;
+
+    const data = await this.get<{
+      data: {
+        id: string;
+        form_id?: string;
+        ad_id?: string;
+        adset_id?: string;
+        campaign_id?: string;
+        created_time?: string;
+        field_data?: { name: string; values: string[] }[];
+      }[];
+      paging?: { cursors?: { after?: string }; next?: string };
+    }>(`/${formId}/leads`, params);
+
+    return {
+      leads: data.data.map((item) => ({
+        leadgenId: item.id,
+        formId: item.form_id,
+        adId: item.ad_id,
+        adsetId: item.adset_id,
+        campaignId: item.campaign_id,
+        createdTime: item.created_time
+          ? new Date(item.created_time)
+          : undefined,
+        fieldData: (item.field_data ?? []).map((f) => ({
+          name: f.name,
+          values: f.values,
+        })),
+        raw: item,
+      })),
+      siguienteCursor: data.paging?.next
+        ? data.paging.cursors?.after
+        : undefined,
+    };
+  }
+
+  async obtenerAppsSuscritas(
+    pageId: string,
+    pageAccessToken: string,
+  ): Promise<AppSuscritaGraph[]> {
+    const data = await this.get<
+      GraphListResponse<{ id: string; subscribed_fields?: string[] }>
+    >(`/${pageId}/subscribed_apps`, {
+      access_token: pageAccessToken,
+    });
+    return data.data.map((app) => ({
+      id: app.id,
+      camposSuscritos: app.subscribed_fields ?? [],
+    }));
+  }
+
   private async get<T>(
     path: string,
     params: Record<string, string>,
   ): Promise<T> {
     try {
       const response = await firstValueFrom(
-        this.http.get<T>(`${GRAPH_BASE_URL}${path}`, { params }),
+        this.http.get<T>(`${this.graphBaseUrl}${path}`, { params }),
       );
       return response.data;
     } catch (error) {
+      if (error instanceof AxiosError && error.response?.status === 429) {
+        // Backoff simple ante rate limit (PLAN-FASE-14 §4.3) — un solo reintento.
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        try {
+          const retry = await firstValueFrom(
+            this.http.get<T>(`${this.graphBaseUrl}${path}`, { params }),
+          );
+          return retry.data;
+        } catch (retryError) {
+          throw new BadGatewayException(
+            `Meta Graph API: ${this.mensajeError(retryError)}`,
+          );
+        }
+      }
       throw new BadGatewayException(
         `Meta Graph API: ${this.mensajeError(error)}`,
       );
@@ -288,7 +416,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   ): Promise<void> {
     try {
       await firstValueFrom(
-        this.http.post(`${GRAPH_BASE_URL}${path}`, null, { params }),
+        this.http.post(`${this.graphBaseUrl}${path}`, null, { params }),
       );
     } catch (error) {
       throw new BadGatewayException(
@@ -303,7 +431,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   ): Promise<void> {
     try {
       await firstValueFrom(
-        this.http.delete(`${GRAPH_BASE_URL}${path}`, { params }),
+        this.http.delete(`${this.graphBaseUrl}${path}`, { params }),
       );
     } catch (error) {
       throw new BadGatewayException(

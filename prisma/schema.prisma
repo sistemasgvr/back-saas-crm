@@ -89,6 +89,7 @@ model Organizacion {
   metaConexiones           MetaConexion[]
   metaPaginas              MetaPagina[]
   metaCuentasPublicitarias MetaCuentaPublicitaria[]
+  metaFormularios          MetaFormulario[]
   campanas                 Campana[]
   leads                    Lead[]
   notificaciones           Notificacion[]
@@ -264,6 +265,8 @@ model MetaPagina {
   tokenPaginaCifrado String?   @map("token_pagina_cifrado")
   webhookSuscrito    Int       @default(0) @map("webhook_suscrito") @db.SmallInt
   webhookSuscritoEn  DateTime? @map("webhook_suscrito_en") @db.Timestamptz
+  webhookUltimoCheckEn DateTime? @map("webhook_ultimo_check_en") @db.Timestamptz
+  webhookUltimoError   String?   @map("webhook_ultimo_error")
   fotoUrl            String?   @map("foto_url")
   categoria          String?   @db.VarChar(120)
 
@@ -276,6 +279,7 @@ model MetaPagina {
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
   metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
   leads        Lead[]
+  formularios  MetaFormulario[]
 
   // page_id único entre páginas activas de CUALQUIER org (misma regla MVP que
   // meta_conexiones) + único dentro de la propia org: índices parciales en
@@ -315,6 +319,33 @@ model MetaCuentaPublicitaria {
   @@index([metaConexionId])
   @@index([estado])
   @@map("meta_cuentas_publicitarias")
+}
+
+model MetaFormulario {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizacionId String    @map("organizacion_id") @db.Uuid
+  metaPaginaId   String    @map("meta_pagina_id") @db.Uuid
+  formId         String    @map("form_id") @db.VarChar(64)
+  nombre         String    @db.VarChar(200)
+  estadoMeta     String?   @map("estado_meta") @db.VarChar(40)
+  locale         String?   @db.VarChar(20)
+  ultimoSyncEn   DateTime? @map("ultimo_sync_en") @db.Timestamptz
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  metaPagina   MetaPagina   @relation(fields: [metaPaginaId], references: [id])
+
+  // (organizacion_id, form_id) único solo entre forms activos: índice parcial
+  // en migración fase14_1_meta_formularios (Prisma DSL no soporta partial unique).
+  @@index([organizacionId, formId])
+  @@index([metaPaginaId])
+  @@index([estado])
+  @@map("meta_formularios")
 }
 
 model OrganizacionUsuario {

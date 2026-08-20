@@ -23,7 +23,10 @@ export class JwtMetaOAuthStateService implements MetaOAuthStateService {
       const payload = this.jwt.verify<MetaOAuthState>(state, {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
       });
-      return { organizacionId: payload.organizacionId, usuarioId: payload.usuarioId };
+      return {
+        organizacionId: payload.organizacionId,
+        usuarioId: payload.usuarioId,
+      };
     } catch {
       return null;
     }

@@ -8,15 +8,19 @@ import { TokenEncryptionService } from '../../../../shared/infrastructure/token-
 @Injectable()
 export class ListarPaginasUseCase {
   constructor(
-    @Inject(META_CONEXIONES_REPOSITORY) private readonly conexiones: MetaConexionesRepository,
+    @Inject(META_CONEXIONES_REPOSITORY)
+    private readonly conexiones: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
   ) {}
 
   async execute(organizacionId: string) {
-    const conexion = await this.conexiones.findActivaPorOrganizacion(organizacionId);
+    const conexion =
+      await this.conexiones.findActivaPorOrganizacion(organizacionId);
     if (!conexion?.tokenCifrado) {
-      throw new BadRequestException('No hay una conexión Meta activa. Conecta Meta primero.');
+      throw new BadRequestException(
+        'No hay una conexión Meta activa. Conecta Meta primero.',
+      );
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
     return this.graph.listarPaginas(accessToken);

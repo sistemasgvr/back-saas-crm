@@ -51,18 +51,21 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 
 ## 2. Estado actual
 
-**MVP (fases 0–11) implementado** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
+**MVP (fases 0–11) + extensiones Meta (fases 12–14) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
 
 | Área | Estado |
 |------|--------|
-| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, webhook, leads, dashboard KPIs) |
-| Frontend | Next.js 16, login, admin, settings+Meta, `/leads`, `/dashboard`, TanStack Query, RHF+Zod |
-| Datos | Neon PostgreSQL + migraciones + seed |
+| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, leads, dashboard KPIs), notificaciones in-app |
+| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta`, `/leads`, `/dashboard`, notificaciones, TanStack Query, RHF+Zod |
+| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, …) |
 | Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
+| Graph API | Versión única `META_GRAPH_VERSION` (default `v25.0`) |
 
-**Pendiente operativo (no bloquea código):** deploy HTTPS público para Meta OAuth/webhook en producción, rotar `SEED_ADMIN_PASSWORD`, smoke test E2E con Meta real.
+**Pendiente operativo (no bloquea código):** smoke test E2E con Meta real en producción, rotar `SEED_ADMIN_PASSWORD` si aún aplica.
 
-Ver **§15 Huecos conocidos** para deuda técnica priorizada post-MVP.
+Detalle de diseño ya absorbido en este documento. Roadmap futuro: [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+
+Ver **§15 Huecos conocidos** para deuda técnica priorizada.
 
 ### Decisión de frontend — TailAdmin por copia
 
@@ -287,47 +290,69 @@ Qué módulos tiene encendidos cada empresa.
 
 ---
 
-### 4.7 Diagrama Meta + leads
+### 4.7 Diagrama Meta + leads (estado actual)
 
 ```
 organizaciones
      │
-     ├── meta_conexiones
+     ├── meta_conexiones          → 1 sesión OAuth / App por org
+     │      ├── meta_paginas      → N páginas Lead Ads (webhook por page_id)
+     │      │      └── meta_formularios  → N leadgen forms por página
+     │      └── meta_cuentas_publicitarias → N ad accounts
      │
-     ├── campanas
+     ├── campanas (+ meta_cuenta_publicitaria_id)
      │      └── conjuntos_anuncios
      │            └── anuncios
      │
-     └── leads
+     └── leads (+ meta_pagina_id, formulario_id Meta)
 ```
 
 Todos los registros de cliente llevan `organizacion_id`.
 
+> **MVP original (§4.8):** `page_id` / `ad_account_id` vivían en `meta_conexiones`. **Fase 13:** pasaron a tablas N; esas columnas en `meta_conexiones` quedan **legacy** (no se borran; el runtime escribe en `meta_paginas` / `meta_cuentas_publicitarias`).
+
 ### 4.8 `meta_conexiones`
 
-OAuth / cuenta publicitaria por organización.
+OAuth / Meta App por organización (1 sesión activa por org).
 
 | Columna | Tipo | Notas |
 |---------|------|--------|
 | `id` | UUID PK | |
 | `organizacion_id` | UUID NOT NULL | FK → `organizaciones.id` |
-| `meta_user_id` | VARCHAR(64) NOT NULL | ID usuario Meta |
+| `app_id` / `app_secret_cifrado` | | Meta App propia de la org |
+| `meta_user_id` | VARCHAR(64) NULL | Tras OAuth |
 | `meta_user_nombre` | VARCHAR(200) NULL | |
-| `ad_account_id` | VARCHAR(64) NULL | Se completa al elegir cuenta |
-| `ad_account_nombre` | VARCHAR(200) NULL | |
-| `page_id` | VARCHAR(64) NULL | Página Lead Ads; clave para enrutar webhook → org |
-| `page_nombre` | VARCHAR(200) NULL | |
-| `token_cifrado` | TEXT NOT NULL | AES-256-GCM |
+| `token_cifrado` | TEXT NULL | User token AES-256-GCM |
 | `token_expira_en` | TIMESTAMPTZ NULL | |
-| `scopes` | TEXT NULL | Scopes concedidos |
+| `scopes` | TEXT NULL | |
 | `webhook_verify_token` | VARCHAR(128) NOT NULL | Challenge webhook |
-| `estado` | SMALLINT NOT NULL DEFAULT 1 | |
-| `usuario_creacion` | UUID NULL | |
-| `usuario_edicion` | UUID NULL | |
-| `fecha_creacion` | TIMESTAMPTZ NOT NULL | |
-| `fecha_modificacion` | TIMESTAMPTZ NOT NULL | |
+| `page_id` / `page_nombre` / `ad_account_*` | | **Legacy MVP** — no usar en runtime nuevo |
+| Auditoría | | `estado`, `usuario_*`, `fecha_*` |
 
-Índices: INDEX(`organizacion_id`), UNIQUE(`page_id`) donde no null / activo, INDEX(`ad_account_id`), INDEX(`estado`). Una org = 1 conexión activa en el MVP (`estado = 1`).
+### 4.8b `meta_paginas` ✅ Fase 13
+
+| Columna | Notas |
+|---------|--------|
+| `page_id`, `nombre`, `token_pagina_cifrado` | Página FB + page token |
+| `webhook_suscrito`, `webhook_suscrito_en` | Suscripción leadgen |
+| `webhook_ultimo_check_en`, `webhook_ultimo_error` | Salud Graph (Fase 14) |
+| `foto_url`, `categoria` | Opcional |
+| Unique parcial | `page_id` único entre activas (global org) |
+
+### 4.8c `meta_cuentas_publicitarias` ✅ Fase 13
+
+| Columna | Notas |
+|---------|--------|
+| `ad_account_id`, `nombre`, `moneda`, `estado_cuenta`, `timezone` | |
+| `ultimo_sync_en` | Sync manual campañas/ad sets/ads |
+| Unique parcial | `(organizacion_id, ad_account_id)` entre activas |
+
+### 4.8d `meta_formularios` ✅ Fase 14
+
+| Columna | Notas |
+|---------|--------|
+| `meta_pagina_id`, `form_id`, `nombre`, `estado_meta` | Catálogo Graph `leadgen_forms` |
+| `ultimo_sync_en` | Sync on-demand desde perfil de página |
 
 ### 4.9 `campanas`
 
@@ -335,6 +360,7 @@ OAuth / cuenta publicitaria por organización.
 |---------|------|--------|
 | `id` | UUID PK | |
 | `organizacion_id` | UUID NOT NULL | FK |
+| `meta_cuenta_publicitaria_id` | UUID NULL | FK → `meta_cuentas_publicitarias` (Fase 13) |
 | `meta_campana_id` | VARCHAR(64) NOT NULL | ID en Meta |
 | `nombre` | VARCHAR(255) NOT NULL | |
 | `estado_meta` | VARCHAR(40) NULL | ACTIVE, PAUSED, etc. (≠ `estado`) |
@@ -391,10 +417,11 @@ OAuth / cuenta publicitaria por organización.
 |---------|------|--------|
 | `id` | UUID PK | |
 | `organizacion_id` | UUID NOT NULL | FK |
+| `meta_pagina_id` | UUID NULL | FK → `meta_paginas` (Fase 13) |
 | `campana_id` | UUID NULL | FK → `campanas.id` |
 | `conjunto_anuncio_id` | UUID NULL | FK → `conjuntos_anuncios.id` |
 | `anuncio_id` | UUID NULL | FK → `anuncios.id` |
-| `formulario_id` | VARCHAR(64) NULL | Form ID Meta |
+| `formulario_id` | VARCHAR(64) NULL | Form ID Meta (catálogo en `meta_formularios`) |
 | `id_externo` | VARCHAR(64) NOT NULL | Leadgen ID Meta |
 | `nombre` | VARCHAR(200) NULL | |
 | `email` | VARCHAR(255) NULL | |
@@ -679,95 +706,92 @@ Webhook Meta: `GET/POST /meta/webhooks` — **público**, validado por signature
 
 ## 8. Integración Meta (orden interno)
 
-No se pide la Marketing API completa el primer día. Flujo de producto:
+Estado actual del producto (MVP + fases 13–14):
 
 ```
-Conectar Meta → Autorizar permisos → Elegir cuenta publicitaria → Guardar conexión
+Credenciales App por org → OAuth → Vincular N páginas + N cuentas ads
         ↓
-Webhook de leads → Validar → Fetch lead → Upsert Campaign/AdSet/Ad → Guardar Lead
+Webhook leadgen → meta_paginas.page_id → org + meta_pagina_id → upsert lead
+        ↓
+Opcional: sync formularios / backfill histórico / health-check webhook
 ```
 
 ### 8.1 OAuth
 
-1. Backend genera URL OAuth (App ID, redirect, scopes de Lead Ads + ads_read).
-2. Callback intercambia `code` por token.
-3. Token de usuario se **cifra** y se guarda en `meta_conexiones.token_cifrado`.
-4. Frontend lista **páginas** y **ad accounts**; el usuario elige ambas.
-5. Se persisten `page_id` / `page_nombre` y `ad_account_id` / `ad_account_nombre`.
-6. (Recomendado) Suscribir esa página al webhook de la App.
+1. Backend genera URL OAuth (`META_GRAPH_VERSION`, scopes Lead Ads + `ads_read`).
+2. Callback intercambia `code` por token de larga duración.
+3. Token de usuario se **cifra** en `meta_conexiones.token_cifrado`.
+4. Frontend hub `/settings/meta`: vincular **varias** páginas y **varias** cuentas (no reemplazo único).
+5. Al vincular página: page token + suscripción webhook `leadgen`.
+6. Sync manual de jerarquía ads por cuenta vinculada.
 
 ### 8.2 Webhook (sin colas)
 
-**URL pública (cuando haya dominio):**
+**URL pública:**
 
 ```
 https://{dominio}/api/meta/webhooks?token={META_WEBHOOK_URL_TOKEN}
 ```
 
-Ejemplo: `https://midominio.com/api/meta/webhooks?token=...`
-
 | Pieza | Rol |
 |-------|-----|
-| Path `/api/meta/webhooks` | Endpoint Nest (`GET` verify + `POST` eventos) |
-| Query `token` | Candado extra tuyo: si no coincide con env `META_WEBHOOK_URL_TOKEN` → rechazo |
-| `hub.verify_token` (GET de Meta) | Verify token de la App; comparar con `META_VERIFY_TOKEN` |
-| Header `X-Hub-Signature-256` (POST) | Firma HMAC del body con App Secret |
+| Path `/api/meta/webhooks` | `GET` verify + `POST` eventos |
+| Query `token` | Candado `META_WEBHOOK_URL_TOKEN` |
+| `hub.verify_token` | Por org (`webhook_verify_token`) + fallback env |
+| `X-Hub-Signature-256` | HMAC con `app_secret_cifrado` de la org (lookup por `page_id`) |
 
 Flujo:
 
-1. `GET` — Meta manda `hub.mode`, `hub.verify_token`, `hub.challenge`. Validar `?token=` + `hub.verify_token` → devolver `hub.challenge`.
-2. `POST` — Validar `?token=` + firma. Si es leadgen: `page_id` → org → fetch Graph `/{leadgen_id}`.
-3. Resuelve/crea `campanas` → `conjuntos_anuncios` → `anuncios`.
-4. Upsert `leads` por (`organizacion_id`, `id_externo`). `usuario_creacion` = null (sistema).
-5. Responder 200 rápido. Si Graph falla, log + 5xx para que Meta reintente.
+1. `GET` — validar tokens → devolver `hub.challenge`.
+2. `POST` — validar firma. Leadgen: `page_id` → **`meta_paginas`** → org.
+3. Fetch Graph `/{leadgen_id}` → upsert campaña / ad set / ad → upsert lead (`meta_pagina_id`, `formulario_id`).
+4. Idempotencia: UNIQUE(`organizacion_id`, `id_externo`).
+5. 200 rápido; Graph falla → 5xx para reintento Meta.
 
-> El `?token=` **no sustituye** la firma ni el `page_id`. Es un candado sobre la URL. El tenant siempre se resuelve por `page_id`.
-
-### 8.3 Enrutado del webhook → organización (`page_id`)
-
-Cuando Meta envía un lead, el payload trae el **ID de la Página de Facebook** (`page_id`), no tu `organizacion_id`. Hay que resolver:
+### 8.3 Enrutado del webhook → organización
 
 ```
 Meta webhook (page_id + leadgen_id)
         ↓
-Validar ?token= de la URL + firma
+Validar ?token= + firma (App Secret de la org)
         ↓
-Buscar meta_conexiones WHERE page_id = ? AND estado = 1
+Buscar meta_paginas WHERE page_id = ? AND estado = 1
         ↓
-organizacion_id de esa fila
+organizacion_id + meta_pagina_id
         ↓
 Guardar lead en esa empresa
 ```
 
-Por eso, al conectar Meta, además de la cuenta publicitaria se debe guardar (y preferiblemente suscribir al webhook) la **Página** usada en Lead Ads:
+**Regla:** `page_id` único entre páginas activas (índice parcial). Una página no puede pertenecer a dos empresas.
 
-| Campo en `meta_conexiones` | Para qué |
-|----------------------------|----------|
-| `page_id` | Enrutar el webhook a la org correcta (A vs B) |
-| `ad_account_id` | Contexto de anuncios / listados |
-| `webhook_verify_token` | Validar el challenge GET de Meta (app o por org) |
+### 8.4 Formularios, backfill y salud webhook ✅ Fase 14
 
-**Regla MVP:** `page_id` único entre conexiones activas (`estado = 1`). Una página no puede pertenecer a dos empresas a la vez.
+| Capacidad | Dónde |
+|-----------|--------|
+| Sync catálogo `leadgen_forms` | Perfil página → “Sincronizar formularios” → `meta_formularios` |
+| Filtro leads por nombre de form | `/leads` select searchable (`GET /meta/forms`) |
+| Backfill / reimport por form + fechas | Perfil página → “Reimportar leads” (idempotente, cursor) |
+| Health-check `subscribed_apps` | “Verificar en Meta” + badge; notificación `META_WEBHOOK_SALUD` si falla |
+| Re-suscribir webhook | Ya desde Fase 13 |
 
-### 8.4 Despliegue HTTPS (OAuth / webhook)
+No hay ruta `/settings/meta/forms` dedicada: los forms viven en el **perfil de cada página**.
 
-No bloquea las fases 0–6. **Sí hace falta** al llegar a Meta (fases 7–9).
+### 8.5 Despliegue HTTPS (OAuth / webhook)
 
-| Uso | URL (cuando exista dominio) |
-|-----|-----------------------------|
+| Uso | URL |
+|-----|-----|
 | Webhook | `https://{dominio}/api/meta/webhooks?token=...` |
 | OAuth callback | `https://{dominio}/api/meta/oauth/callback` |
 
-Hasta entonces: API local. Al tocar Meta: dominio HTTPS real o túnel al mismo path. El hosting se decide después; el **path y contrato** ya quedan fijos aquí.
-
 ```env
-META_APP_ID=
-META_APP_SECRET=
+META_GRAPH_VERSION=v25.0
 META_VERIFY_TOKEN=
 META_WEBHOOK_URL_TOKEN=
 META_OAUTH_REDIRECT_URI=https://{dominio}/api/meta/oauth/callback
 FRONTEND_URL=https://{dominio-app}
 ```
+
+(`META_APP_ID` / `META_APP_SECRET` globales son fallback legacy; cada org registra su App.)
 
 ---
 
@@ -779,9 +803,13 @@ FRONTEND_URL=https://{dominio-app}
 |------|-----------|
 | `/login` | Auth (sin registro público) |
 | `/profile` | Perfil del usuario logueado (datos + cambio de contraseña) |
-| `/leads` | Listado, búsqueda, filtros (fecha, campaña, anuncio, formulario), detalle |
-| `/dashboard` | KPI: total, hoy, semana, mes (**día calendario en `America/Lima`**). Charts: por día, campaña, anuncio. Filtros: fecha, campaña, ad set, anuncio |
-| `/settings` | Datos de org + conexión Meta (credenciales por org, OAuth, página, cuenta ads) |
+| `/leads` | Listado, búsqueda, filtros (fecha, campaña, anuncio, **página**, **cuenta ads**, formulario por nombre), detalle |
+| `/dashboard` | KPI + charts; filtros fecha, campaña, ad set, anuncio, **cuenta ads** |
+| `/settings` | Datos de org + card resumen Meta → hub |
+| `/settings/meta` | Hub: Conexión \| Páginas \| Cuentas publicitarias |
+| `/settings/meta/pages` · `/pages/[id]` | Listado + **perfil** (webhook, formularios, backfill, health) |
+| `/settings/meta/ad-accounts` · `/ad-accounts/[id]` | Listado + **perfil** (sync campañas) |
+| `/notifications` | Notificaciones in-app (incl. alertas salud Meta) |
 
 Sin pipeline, tareas ni oportunidades.
 
@@ -937,27 +965,50 @@ KPIs + 3 gráficos + filtros. Charts en `src/components/charts/` (ApexCharts, co
 
 **Done cuando:** los números coinciden con el listado de leads para el mismo rango/filtro (misma zona Lima).
 
+### Fase 12 — Notificaciones in-app ✅
+
+Notificaciones por org + WebSocket; campana en header; listado `/notifications`. Tipos usados por Meta: p. ej. `META_WEBHOOK_SALUD` (Fase 14).
+
+**Done cuando:** el usuario ve avisos en tiempo casi real sin push browser.
+
+### Fase 13 — Meta multi-origen ✅
+
+- Tablas `meta_paginas`, `meta_cuentas_publicitarias`; FKs en `leads` / `campanas`.
+- Webhook enruta por `meta_paginas`; N páginas y N cuentas por org.
+- Hub UI `/settings/meta` + perfiles; filtros `metaPaginaId` / `metaCuentaId` en leads y dashboard.
+
+**Done cuando:** org con ≥2 páginas/cuentas; perfiles navegables; webhook por `page_id` único.
+
+### Fase 14 — Consolidar Lead Ads ✅
+
+- `META_GRAPH_VERSION` unificado.
+- Catálogo `meta_formularios` + sync Graph en perfil de página.
+- Filtro leads por nombre de formulario.
+- Backfill/reimport idempotente por form + fechas.
+- Health-check webhook + notificación in-app (on-demand, sin cron).
+
+**Done cuando:** sync forms + backfill + health verificados en código (smoke Meta real = operativo §13).
+
 ---
 
-## 11. Fuera de alcance (post-MVP)
+## 11. Fuera de alcance (siguiente)
 
+Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) oleadas B–E):
+
+- Insights / CPL / spend / ROAS
+- CAPI Conversion Leads / custom audiences
+- WhatsApp / Messenger inbox
+- Ads manager (crear/pausar campañas desde el CRM)
 - Invitaciones self-serve / registro público
-- Selector multi-organización (cambiar org activa) — hoy: primera membresía en login
+- Selector multi-organización
 - Billing / `subscriptions/`
-- CRM, WhatsApp, Automatizaciones (solo filas en catálogo)
 - Redis, BullMQ, workers
-- Sync de métricas publicitarias (inversión, CPL, CTR, ROAS)
-- Ads manager (crear campañas)
 - Pipeline, tareas, oportunidades
 - App móvil
 
-**Plan complementario (no reemplaza este documento):** [PLAN-FASE-13-META-MULTI.md](./PLAN-FASE-13-META-MULTI.md) — varias páginas Facebook + varias cuentas publicitarias por org, perfiles de cada origen, filtros en leads/dashboard.
+**Roadmap futuro:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) — catálogo completo de la API Meta (✅ hecho / 🔜 pendiente). Los planes de fase cerrados se absorben aquí y se eliminan.
 
-**Investigación Meta API (menú de integraciones futuras):** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) — qué ofrece Graph/Marketing/CAPI/WhatsApp y qué encaja en el CRM.
-
-**Plan Fase 14 (Oleada A Lead Ads):** [PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md](./PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md) — catálogo forms, backfill, salud webhook, versión Graph.
-
-Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + entrada de menú. **No se toca el kernel** (`usuarios` / `organizaciones` / guards).
+Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**
 
 ---
 
@@ -968,8 +1019,11 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Alta de empresas | **Solo admin de plataforma** (`/admin`). Sin registro público que cree orgs |
 | Alta de usuarios | Solo admin de plataforma en el MVP (asigna org + rol) |
 | Auth pública | Solo `login` / `refresh` / `logout` |
-| Webhook → org | Lookup `meta_conexiones.page_id` → `organizacion_id` |
-| Webhook URL | `https://{dominio}/api/meta/webhooks?token=...` (+ verify de Meta + firma) |
+| Webhook → org | Lookup **`meta_paginas.page_id`** → `organizacion_id` (+ `meta_pagina_id` en el lead) |
+| Webhook URL | `https://{dominio}/api/meta/webhooks?token=...` (+ verify + firma por org) |
+| Graph API | `META_GRAPH_VERSION` (default `v25.0`) — OAuth + client únicos |
+| Páginas / cuentas Meta | N por org (`meta_paginas`, `meta_cuentas_publicitarias`) |
+| Formularios leadgen | Catálogo `meta_formularios` + sync/backfill en perfil de página |
 | Deploy HTTPS | No bloquea fases 0–6; obligatorio para Meta. Dominio se define después |
 | Tenancy | Shared DB + `organizacion_id` |
 | Base de datos | Neon PostgreSQL (pooler + SSL). Credenciales en `.env` |
@@ -998,7 +1052,9 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 
 ---
 
-## 13. Checklist de cierre del MVP
+## 13. Checklist de cierre
+
+### MVP (fases 0–11)
 
 - [x] Neon + Prisma migrado y seedeado (tablas §4 + auditoría)
 - [x] Login / logout / refresh (sin register público)
@@ -1010,21 +1066,46 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Guards de membresía, rol y módulo
 - [x] `/admin` gestiona empresas, usuarios, módulos y módulos-por-empresa
 - [x] UI perfil, settings org y panel `/admin` (Fase 6b)
-- [x] OAuth Meta + credenciales por org + `page_id` + ad account + `token_cifrado`
-- [x] Webhook enruta por `page_id`, firma HMAC multi-org y guarda `leads` con origen
-- [x] `/leads` con listado, búsqueda, filtros (incl. formulario) y detalle
+- [x] OAuth Meta + credenciales por org + `token_cifrado`
+- [x] Webhook firma HMAC multi-org y guarda `leads` con origen
+- [x] `/leads` con listado, búsqueda, filtros y detalle
 - [x] `/dashboard` con 4 KPIs y 3 gráficos + filtros
-- [x] Guards de ruta por módulo en `/dashboard`, `/leads` y bloqueo `/settings` para `USUARIO`
+- [x] Guards de ruta por módulo; `/settings` bloqueado para `USUARIO`
 - [x] Redirect post-login según módulos habilitados
 - [x] `npm run build` en backend y frontend
-- [ ] Rotar `SEED_ADMIN_PASSWORD` (tras primer login real)
-- [ ] Smoke test Meta E2E en HTTPS (credenciales → OAuth → webhook → lead en Neon)
+
+### Extensiones Meta (fases 12–14)
+
+- [x] Notificaciones in-app + WebSocket
+- [x] N páginas + N cuentas ads; hub `/settings/meta` + perfiles
+- [x] Webhook enruta por `meta_paginas`; `page_id` único parcial
+- [x] Filtros leads/dashboard por página y cuenta ads
+- [x] `META_GRAPH_VERSION` unificado
+- [x] Catálogo forms + sync + filtro leads por nombre
+- [x] Backfill/reimport idempotente por form
+- [x] Health-check webhook + alerta `META_WEBHOOK_SALUD`
+
+### Operativo pendiente
+
+- [ ] Rotar `SEED_ADMIN_PASSWORD` (si aún es el seed)
+- [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health)
+
+---
+
+## 14. Cómo usar este plan
+
+1. Las fases **0–14** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
+2. No mezclar oleadas futuras ([INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)) con deuda operativa §13 sin ticket explícito.
+3. Cada cambio termina con `npm run build` en el repo tocado.
+4. Meta en producción: smoke test E2E (webhook + forms + health).
+
+**Siguiente paso concreto:** smoke test Meta real en prod · o planificar **Oleada B** (Insights/CPL) desde [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
 ---
 
 ## 15. Huecos conocidos (auditoría post-MVP)
 
-Auditoría cruzada backend + frontend (fases 0–11). Deuda **cerrada en código** salvo ítems operativos.
+Auditoría cruzada backend + frontend (fases 0–14). Deuda **cerrada en código** salvo ítems operativos.
 
 ### P0 — Meta / webhook (backend) ✅
 
@@ -1032,7 +1113,7 @@ Auditoría cruzada backend + frontend (fases 0–11). Deuda **cerrada en código
 |---|--------|--------|
 | 1 | Webhook HMAC con `app_secret_cifrado` por org (lookup por `page_id`) | ✅ `VerificarWebhookMetaUseCase` |
 | 2 | Verify token GET con `webhook_verify_token` por org (+ fallback `META_VERIFY_TOKEN`) | ✅ mismo use case |
-| 3 | Smoke test E2E con Meta real (HTTPS) | ⏳ operativo — pendiente deploy |
+| 3 | Smoke test E2E con Meta real (HTTPS) | ⏳ operativo — pendiente |
 
 ### P1 — Correctness / PLAN ✅
 
@@ -1065,16 +1146,6 @@ Auditoría cruzada backend + frontend (fases 0–11). Deuda **cerrada en código
 
 - **Meta App por org** (no env global): producto decidió `POST /meta/connections/app-credentials`; `META_APP_SECRET` / `META_VERIFY_TOKEN` quedan como fallback legacy opcional.
 - **Disconnect** limpia OAuth pero mantiene fila activa con credenciales App (`estado = 1`).
-- **Rutas Meta** renombradas vs §7 (`/current`, `/page`, `/disconnect`) — frontend alineado.
+- **Rutas Meta** hub `/settings/meta/*` (Fase 13); forms en perfil de página (Fase 14), no ruta `/forms` dedicada.
 - **Seed** crea org de prueba además del admin (útil en dev).
-
----
-
-## 14. Cómo usar este plan
-
-1. Las fases 0–11 están **cerradas**; usar §15 para priorizar hardening y producción.
-2. No mezclar features post-MVP (§11) con deuda de §15 sin ticket explícito.
-3. Cada cambio termina con `npm run build` en el repo tocado.
-4. Meta en producción exige HTTPS + smoke test §13.
-
-**Siguiente paso concreto:** deploy HTTPS → aplicar migración `page_id` unique → smoke test Meta → rotar `SEED_ADMIN_PASSWORD`.
+- **Health webhook** on-demand (sin cron Nest); decisión Fase 14 por hosting serverless.

@@ -27,6 +27,7 @@ import { VincularPaginaUseCase } from '../application/use-cases/vincular-pagina.
 import { DesvincularPaginaUseCase } from '../application/use-cases/desvincular-pagina.use-case';
 import { ResuscribirWebhookPaginaUseCase } from '../application/use-cases/resuscribir-webhook-pagina.use-case';
 import { ListarPaginasFiltroUseCase } from '../application/use-cases/listar-paginas-filtro.use-case';
+import { VerificarSaludWebhookPaginaUseCase } from '../application/use-cases/verificar-salud-webhook-pagina.use-case';
 import { VincularPaginaDto } from './dto/vincular-pagina.dto';
 
 @Controller('meta/pages')
@@ -42,6 +43,7 @@ export class MetaPagesController {
     private readonly desvincular: DesvincularPaginaUseCase,
     private readonly resuscribirWebhook: ResuscribirWebhookPaginaUseCase,
     private readonly listarFiltro: ListarPaginasFiltroUseCase,
+    private readonly verificarSalud: VerificarSaludWebhookPaginaUseCase,
   ) {}
 
   @Get()
@@ -105,5 +107,13 @@ export class MetaPagesController {
       id,
       ctx.usuarioId,
     );
+  }
+
+  @Post(':id/health-check')
+  healthCheck(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.verificarSalud.execute(ctx.organizacionId!, id, ctx.usuarioId);
   }
 }
