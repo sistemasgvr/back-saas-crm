@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
 import type {
   AppSuscritaGraph,
+  FiltroInsights,
   FiltroLeadsDeForm,
   MetaAnuncioGraph,
   MetaCampanaGraph,
@@ -14,6 +15,7 @@ import type {
   MetaCuentaPublicitariaGraph,
   MetaFormularioGraph,
   MetaGraphClient,
+  MetaInsightGraph,
   MetaLeadGraph,
   MetaPaginaGraph,
   MetaUsuario,
@@ -377,6 +379,54 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return data.data.map((app) => ({
       id: app.id,
       camposSuscritos: app.subscribed_fields ?? [],
+    }));
+  }
+
+  async obtenerInsights(
+    adAccountId: string,
+    accessToken: string,
+    filtro: FiltroInsights,
+  ): Promise<MetaInsightGraph[]> {
+    const camposComunes =
+      'spend,impressions,clicks,ctr,cpc,reach,account_currency,date_start';
+    const fields =
+      filtro.nivel === 'campaign'
+        ? `campaign_id,campaign_name,${camposComunes}`
+        : camposComunes;
+
+    const data = await this.get<
+      GraphListResponse<{
+        date_start: string;
+        spend?: string;
+        impressions?: string;
+        clicks?: string;
+        ctr?: string;
+        cpc?: string;
+        reach?: string;
+        account_currency?: string;
+        campaign_id?: string;
+        campaign_name?: string;
+      }>
+    >(`/${adAccountId}/insights`, {
+      fields,
+      time_range: JSON.stringify({ since: filtro.desde, until: filtro.hasta }),
+      time_increment: '1',
+      level: filtro.nivel,
+      access_token: accessToken,
+      limit: '500',
+    });
+
+    return data.data.map((item) => ({
+      fecha: item.date_start,
+      spend: Number(item.spend ?? 0),
+      impressions: Number(item.impressions ?? 0),
+      clicks: Number(item.clicks ?? 0),
+      ctr: item.ctr !== undefined ? Number(item.ctr) : undefined,
+      cpc: item.cpc !== undefined ? Number(item.cpc) : undefined,
+      reach: item.reach !== undefined ? Number(item.reach) : undefined,
+      moneda: item.account_currency,
+      campanaMetaId: item.campaign_id,
+      campanaNombre: item.campaign_name,
     }));
   }
 

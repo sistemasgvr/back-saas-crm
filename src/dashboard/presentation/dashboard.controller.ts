@@ -7,6 +7,8 @@ import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { ObtenerKpisUseCase } from '../application/use-cases/obtener-kpis.use-case';
 import { ObtenerSeriesUseCase } from '../application/use-cases/obtener-series.use-case';
+import { ObtenerKpisPublicitariosUseCase } from '../application/use-cases/obtener-kpis-publicitarios.use-case';
+import { ObtenerSeriesPublicitariasUseCase } from '../application/use-cases/obtener-series-publicitarias.use-case';
 import { FiltroDashboardQueryDto } from './dto/filtro-dashboard.query.dto';
 import { FiltroSeriesQueryDto } from './dto/filtro-series.query.dto';
 
@@ -17,6 +19,8 @@ export class DashboardController {
   constructor(
     private readonly obtenerKpis: ObtenerKpisUseCase,
     private readonly obtenerSeries: ObtenerSeriesUseCase,
+    private readonly obtenerKpisPublicitarios: ObtenerKpisPublicitariosUseCase,
+    private readonly obtenerSeriesPublicitarias: ObtenerSeriesPublicitariasUseCase,
   ) {}
 
   @Get('kpis')
@@ -33,5 +37,21 @@ export class DashboardController {
     @Query() query: FiltroSeriesQueryDto,
   ) {
     return this.obtenerSeries.execute(ctx.organizacionId!, query);
+  }
+
+  @Get('ads-kpis')
+  getAdsKpis(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: FiltroSeriesQueryDto,
+  ) {
+    return this.obtenerKpisPublicitarios.execute(ctx.organizacionId!, query);
+  }
+
+  @Get('ads-series')
+  getAdsSeries(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: FiltroSeriesQueryDto,
+  ) {
+    return this.obtenerSeriesPublicitarias.execute(ctx.organizacionId!, query);
   }
 }

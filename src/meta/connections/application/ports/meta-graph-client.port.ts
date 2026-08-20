@@ -89,6 +89,25 @@ export interface AppSuscritaGraph {
   camposSuscritos: string[];
 }
 
+export interface FiltroInsights {
+  desde: string;
+  hasta: string;
+  nivel: 'account' | 'campaign';
+}
+
+export interface MetaInsightGraph {
+  fecha: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr?: number;
+  cpc?: number;
+  reach?: number;
+  moneda?: string;
+  campanaMetaId?: string;
+  campanaNombre?: string;
+}
+
 export interface MetaGraphClient {
   /** appId/appSecret son de la Meta App propia de la organización, no de la plataforma. */
   intercambiarCodigoPorToken(
@@ -153,4 +172,9 @@ export interface MetaGraphClient {
     pageId: string,
     pageAccessToken: string,
   ): Promise<AppSuscritaGraph[]>;
+  obtenerInsights(
+    adAccountId: string,
+    accessToken: string,
+    filtro: FiltroInsights,
+  ): Promise<MetaInsightGraph[]>;
 }

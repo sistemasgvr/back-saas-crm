@@ -8,6 +8,7 @@ import { AdsModule } from './ads/ads.module';
 import { MetaLeadsModule } from './leads/meta-leads.module';
 import { MetaWebhooksModule } from './webhooks/meta-webhooks.module';
 import { MetaFormsModule } from './forms/meta-forms.module';
+import { MetaInsightsModule } from './insights/meta-insights.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { MetaFormsModule } from './forms/meta-forms.module';
     MetaLeadsModule,
     MetaWebhooksModule,
     MetaFormsModule,
+    MetaInsightsModule,
   ],
 })
 export class MetaModule {}

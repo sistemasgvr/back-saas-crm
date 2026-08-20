@@ -3,6 +3,7 @@ import { MetaConnectionsModule } from '../connections/meta-connections.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
 import { AdsetsModule } from '../adsets/adsets.module';
 import { AdsModule } from '../ads/ads.module';
+import { MetaInsightsModule } from '../insights/meta-insights.module';
 import { MetaAdAccountsController } from './presentation/meta-ad-accounts.controller';
 import { ListarCuentasVinculadasUseCase } from './application/use-cases/listar-cuentas-vinculadas.use-case';
 import { ListarCuentasDisponiblesUseCase } from './application/use-cases/listar-cuentas-disponibles.use-case';
@@ -20,6 +21,7 @@ import { PrismaMetaCuentasPublicitariasRepository } from './infrastructure/prism
     CampaignsModule,
     AdsetsModule,
     AdsModule,
+    forwardRef(() => MetaInsightsModule),
   ],
   controllers: [MetaAdAccountsController],
   providers: [

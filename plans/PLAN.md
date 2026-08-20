@@ -51,13 +51,13 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 
 ## 2. Estado actual
 
-**MVP (fases 0–11) + extensiones Meta (fases 12–14) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
+**MVP (fases 0–11) + extensiones Meta (fases 12–15) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
 
 | Área | Estado |
 |------|--------|
-| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, leads, dashboard KPIs), notificaciones in-app |
-| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta`, `/leads`, `/dashboard`, notificaciones, TanStack Query, RHF+Zod |
-| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, …) |
+| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, **Insights diarios**, leads, dashboard KPIs + ads KPIs/CPL), notificaciones in-app |
+| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta`, `/leads`, `/dashboard` (leads + inversión/CPL), notificaciones, TanStack Query, RHF+Zod |
+| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, `meta_insights_diarios`, …) |
 | Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
 | Graph API | Versión única `META_GRAPH_VERSION` (default `v25.0`) |
 
@@ -353,6 +353,19 @@ OAuth / Meta App por organización (1 sesión activa por org).
 |---------|--------|
 | `meta_pagina_id`, `form_id`, `nombre`, `estado_meta` | Catálogo Graph `leadgen_forms` |
 | `ultimo_sync_en` | Sync on-demand desde perfil de página |
+
+### 4.8e `meta_insights_diarios` ✅ Fase 15
+
+Snapshots diarios Ads Insights (nivel cuenta y/o campaña).
+
+| Columna | Notas |
+|---------|--------|
+| `meta_cuenta_publicitaria_id` | FK siempre |
+| `campana_id` | NULL = agregado cuenta ese día; no NULL = campaña |
+| `fecha` | DATE (día del rango Graph) |
+| `spend`, `impressions`, `clicks`, `ctr`, `cpc`, `reach`, `moneda` | Métricas |
+| `datos_crudos` | JSONB respuesta Insights |
+| Unicidad | Índices únicos **parciales** (cuenta con `campana_id IS NULL`; campaña con `campana_id IS NOT NULL`) |
 
 ### 4.9 `campanas`
 
@@ -688,6 +701,9 @@ Prefijo: `/api`. Auth: `Bearer` access token.
 | GET | `/leads/:id` | `META_LEADS` | PROPIETARIO, ADMINISTRADOR, USUARIO |
 | GET | `/dashboard/kpis` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
 | GET | `/dashboard/series` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
+| GET | `/dashboard/ads-kpis` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
+| GET | `/dashboard/ads-series` | `DASHBOARD` | PROPIETARIO, ADMINISTRADOR, USUARIO |
+| POST | `/meta/ad-accounts/:id/insights/sync` | `META_LEADS` | PROPIETARIO, ADMINISTRADOR |
 
 PATCH `/organizations/current` solo: `nombre`, `razonSocial`, `documentoFiscal`, `emailContacto`, `telefonoContacto`, `logoUrl`, `pais`, `zonaHoraria`. No `slug` / `notas` / `estado`.
 
@@ -706,14 +722,16 @@ Webhook Meta: `GET/POST /meta/webhooks` — **público**, validado por signature
 
 ## 8. Integración Meta (orden interno)
 
-Estado actual del producto (MVP + fases 13–14):
+Estado actual del producto (MVP + fases 13–15):
 
 ```
 Credenciales App por org → OAuth → Vincular N páginas + N cuentas ads
         ↓
 Webhook leadgen → meta_paginas.page_id → org + meta_pagina_id → upsert lead
         ↓
-Opcional: sync formularios / backfill histórico / health-check webhook
+Opcional: sync formularios / backfill / health-check webhook
+        ↓
+Opcional: sync Insights (spend…) → meta_insights_diarios → dashboard CPL
 ```
 
 ### 8.1 OAuth
@@ -804,11 +822,11 @@ FRONTEND_URL=https://{dominio-app}
 | `/login` | Auth (sin registro público) |
 | `/profile` | Perfil del usuario logueado (datos + cambio de contraseña) |
 | `/leads` | Listado, búsqueda, filtros (fecha, campaña, anuncio, **página**, **cuenta ads**, formulario por nombre), detalle |
-| `/dashboard` | KPI + charts; filtros fecha, campaña, ad set, anuncio, **cuenta ads** |
+| `/dashboard` | KPIs leads + **inversión/CTR/CPC/CPL** + charts (leads e inversión); filtros fecha, campaña, ad set, anuncio, **cuenta ads** |
 | `/settings` | Datos de org + card resumen Meta → hub |
 | `/settings/meta` | Hub: Conexión \| Páginas \| Cuentas publicitarias |
 | `/settings/meta/pages` · `/pages/[id]` | Listado + **perfil** (webhook, formularios, backfill, health) |
-| `/settings/meta/ad-accounts` · `/ad-accounts/[id]` | Listado + **perfil** (sync campañas) |
+| `/settings/meta/ad-accounts` · `/ad-accounts/[id]` | Listado + **perfil** (sync campañas + **sync métricas Insights**) |
 | `/notifications` | Notificaciones in-app (incl. alertas salud Meta) |
 
 Sin pipeline, tareas ni oportunidades.
@@ -989,16 +1007,33 @@ Notificaciones por org + WebSocket; campana en header; listado `/notifications`.
 
 **Done cuando:** sync forms + backfill + health verificados en código (smoke Meta real = operativo §13).
 
+### Fase 15 — Marketing API Insights + CPL ✅
+
+Oleada B del catálogo Meta: métricas publicitarias + reporting híbrido.
+
+- Tabla `meta_insights_diarios` (snapshots diarios cuenta/campaña) + sync on-demand Graph `/{act}/insights` (`time_increment=1`, rango ≤31 días).
+- `POST /meta/ad-accounts/:id/insights/sync` + UI “Sincronizar métricas” en perfil de cuenta.
+- `GET /dashboard/ads-kpis` y `/dashboard/ads-series`: spend, impressions, clicks, CTR, CPC, **CPL** (= spend Meta ÷ leads CRM del mismo filtro; `null` si 0 leads).
+- Dashboard: cards inversión/CTR/CPC/CPL + chart “Inversión por día”; filtros existentes respetados.
+- Sin async jobs / Redis; sin breakdowns demográficos; sin ROAS/CAPI/audiencias.
+- Verificación con datos QA en BD (cifras coherentes); smoke Graph real = operativo §13.
+
+**Done cuando:** sync Insights persiste diarios; dashboard muestra spend + CPL alineados al filtro (cuenta/fechas/campaña).
+
+**CPL (definición cerrada):** `spend_periodo / leads_periodo` — misma ventana y filtros que el dashboard de leads; sin sumar cross-currency en v1.
+
 ---
 
 ## 11. Fuera de alcance (siguiente)
 
-Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) oleadas B–E):
+Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)):
 
-- Insights / CPL / spend / ROAS
-- CAPI Conversion Leads / custom audiences
-- WhatsApp / Messenger inbox
-- Ads manager (crear/pausar campañas desde el CRM)
+- CAPI Conversion Leads / custom audiences (Oleada C)
+- WhatsApp / Messenger inbox (Oleada D)
+- Ads manager / Ad Rules (crear/pausar campañas) (Oleada E)
+- Breakdowns Insights (edad/género/placement) / async Insights + cron
+- ROAS (requiere conversiones Pixel/CAPI)
+- Catalog / Commerce / publicación orgánica
 - Invitaciones self-serve / registro público
 - Selector multi-organización
 - Billing / `subscriptions/`
@@ -1006,7 +1041,8 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Pipeline, tareas, oportunidades
 - App móvil
 
-**Roadmap futuro:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) — catálogo completo de la API Meta (✅ hecho / 🔜 pendiente). Los planes de fase cerrados se absorben aquí y se eliminan.
+**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+
 
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**
 
@@ -1024,6 +1060,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Graph API | `META_GRAPH_VERSION` (default `v25.0`) — OAuth + client únicos |
 | Páginas / cuentas Meta | N por org (`meta_paginas`, `meta_cuentas_publicitarias`) |
 | Formularios leadgen | Catálogo `meta_formularios` + sync/backfill en perfil de página |
+| Insights / CPL | Snapshots diarios `meta_insights_diarios`; sync on-demand; CPL = spend Meta ÷ leads CRM |
 | Deploy HTTPS | No bloquea fases 0–6; obligatorio para Meta. Dominio se define después |
 | Tenancy | Shared DB + `organizacion_id` |
 | Base de datos | Neon PostgreSQL (pooler + SSL). Credenciales en `.env` |
@@ -1074,7 +1111,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Redirect post-login según módulos habilitados
 - [x] `npm run build` en backend y frontend
 
-### Extensiones Meta (fases 12–14)
+### Extensiones Meta (fases 12–15)
 
 - [x] Notificaciones in-app + WebSocket
 - [x] N páginas + N cuentas ads; hub `/settings/meta` + perfiles
@@ -1084,28 +1121,30 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Catálogo forms + sync + filtro leads por nombre
 - [x] Backfill/reimport idempotente por form
 - [x] Health-check webhook + alerta `META_WEBHOOK_SALUD`
+- [x] Insights diarios + sync on-demand por cuenta ads
+- [x] Dashboard ads KPIs (spend/CTR/CPC) + **CPL híbrido** + serie inversión
 
 ### Operativo pendiente
 
 - [ ] Rotar `SEED_ADMIN_PASSWORD` (si aún es el seed)
-- [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health)
+- [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health / **Insights**)
 
 ---
 
 ## 14. Cómo usar este plan
 
-1. Las fases **0–14** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
+1. Las fases **0–15** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
 2. No mezclar oleadas futuras ([INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)) con deuda operativa §13 sin ticket explícito.
 3. Cada cambio termina con `npm run build` en el repo tocado.
-4. Meta en producción: smoke test E2E (webhook + forms + health).
+4. Meta en producción: smoke test E2E (webhook + forms + health + Insights).
 
-**Siguiente paso concreto:** smoke test Meta real en prod · o planificar **Oleada B** (Insights/CPL) desde [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+**Siguiente paso concreto:** smoke Meta real en prod · o Oleada C (CAPI / audiencias) según [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
 ---
 
 ## 15. Huecos conocidos (auditoría post-MVP)
 
-Auditoría cruzada backend + frontend (fases 0–14). Deuda **cerrada en código** salvo ítems operativos.
+Auditoría cruzada backend + frontend (fases 0–15). Deuda **cerrada en código** salvo ítems operativos.
 
 ### P0 — Meta / webhook (backend) ✅
 
@@ -1149,3 +1188,4 @@ Auditoría cruzada backend + frontend (fases 0–14). Deuda **cerrada en código
 - **Rutas Meta** hub `/settings/meta/*` (Fase 13); forms en perfil de página (Fase 14), no ruta `/forms` dedicada.
 - **Seed** crea org de prueba además del admin (útil en dev).
 - **Health webhook** on-demand (sin cron Nest); decisión Fase 14 por hosting serverless.
+- **Insights** on-demand (sin cron/async jobs); CPL es híbrido CRM (spend Meta ÷ leads locales), no réplica 1:1 de Ads Manager.

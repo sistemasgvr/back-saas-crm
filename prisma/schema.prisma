@@ -90,6 +90,7 @@ model Organizacion {
   metaPaginas              MetaPagina[]
   metaCuentasPublicitarias MetaCuentaPublicitaria[]
   metaFormularios          MetaFormulario[]
+  metaInsightsDiarios      MetaInsightDiario[]
   campanas                 Campana[]
   leads                    Lead[]
   notificaciones           Notificacion[]
@@ -118,6 +119,7 @@ model Campana {
   metaCuentaPublicitaria MetaCuentaPublicitaria? @relation(fields: [metaCuentaPublicitariaId], references: [id])
   conjuntosAnuncios      ConjuntoAnuncio[]
   leads                  Lead[]
+  insightsDiarios        MetaInsightDiario[]
 
   @@unique([organizacionId, metaCampanaId])
   @@index([metaCuentaPublicitariaId])
@@ -311,6 +313,7 @@ model MetaCuentaPublicitaria {
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
   metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
   campanas     Campana[]
+  insightsDiarios MetaInsightDiario[]
 
   // (organizacion_id, ad_account_id) único solo entre cuentas ACTIVAS: índice parcial
   // en la misma migración de meta_paginas_page_id_unique (Prisma DSL no soporta partial
@@ -346,6 +349,42 @@ model MetaFormulario {
   @@index([metaPaginaId])
   @@index([estado])
   @@map("meta_formularios")
+}
+
+model MetaInsightDiario {
+  id                       String   @id @default(uuid()) @db.Uuid
+  organizacionId           String   @map("organizacion_id") @db.Uuid
+  metaCuentaPublicitariaId String   @map("meta_cuenta_publicitaria_id") @db.Uuid
+  /** NULL = snapshot a nivel cuenta ese día; no NULL = snapshot a nivel campaña. */
+  campanaId                String?  @map("campana_id") @db.Uuid
+  fecha                    DateTime @db.Date
+  spend                    Decimal  @db.Decimal(14, 4)
+  impressions              BigInt
+  clicks                   BigInt
+  ctr                      Decimal? @db.Decimal(10, 6)
+  cpc                      Decimal? @db.Decimal(14, 4)
+  reach                    BigInt?
+  moneda                   String?  @db.VarChar(8)
+  datosCrudos              Json?    @map("datos_crudos")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion           Organizacion           @relation(fields: [organizacionId], references: [id])
+  metaCuentaPublicitaria MetaCuentaPublicitaria @relation(fields: [metaCuentaPublicitariaId], references: [id])
+  campana                Campana?               @relation(fields: [campanaId], references: [id])
+
+  // Unicidad por (organizacion, cuenta, campana NULL-o-no, fecha): dos índices únicos
+  // parciales en migración fase15_1_meta_insights_diarios (Prisma DSL no soporta
+  // partial unique, y NULL rompe la semántica de un @@unique normal en campana_id).
+  @@index([organizacionId, metaCuentaPublicitariaId, fecha])
+  @@index([campanaId])
+  @@index([fecha])
+  @@index([estado])
+  @@map("meta_insights_diarios")
 }
 
 model OrganizacionUsuario {

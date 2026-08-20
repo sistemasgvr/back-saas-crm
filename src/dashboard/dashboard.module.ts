@@ -1,15 +1,21 @@
 import { Module } from '@nestjs/common';
+import { MetaInsightsModule } from '../meta/insights/meta-insights.module';
 import { DashboardController } from './presentation/dashboard.controller';
 import { ObtenerKpisUseCase } from './application/use-cases/obtener-kpis.use-case';
 import { ObtenerSeriesUseCase } from './application/use-cases/obtener-series.use-case';
+import { ObtenerKpisPublicitariosUseCase } from './application/use-cases/obtener-kpis-publicitarios.use-case';
+import { ObtenerSeriesPublicitariasUseCase } from './application/use-cases/obtener-series-publicitarias.use-case';
 import { DASHBOARD_REPOSITORY } from './application/ports/dashboard.repository.port';
 import { PrismaDashboardRepository } from './infrastructure/prisma-dashboard.repository';
 
 @Module({
+  imports: [MetaInsightsModule],
   controllers: [DashboardController],
   providers: [
     ObtenerKpisUseCase,
     ObtenerSeriesUseCase,
+    ObtenerKpisPublicitariosUseCase,
+    ObtenerSeriesPublicitariasUseCase,
     { provide: DASHBOARD_REPOSITORY, useClass: PrismaDashboardRepository },
   ],
 })
