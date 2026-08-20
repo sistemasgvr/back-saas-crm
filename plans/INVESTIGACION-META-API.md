@@ -204,8 +204,8 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 | Meta App + OAuth por organización | ✅ |
 | Advanced Access App Review (cuentas de terceros) | 🔜 ops al escalar Live |
 | System User + token Business | 🔜 escala agencias |
-| `business_management` | 🔜 |
-| Debug token / permisos introspección | 🔜 ops |
+| `business_management` | ✅ opt-in Fase 16 (OAuth dinámico) |
+| Salud permisos token (`debug_token`) en UI Conexión | ✅ Fase 16 (lectura + opt-in toggles) |
 | Webhooks no-leadgen (`messages`, `feed`, etc.) | 🔜 según oleada |
 
 ---
@@ -216,6 +216,7 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 |------|----------|--------|
 | Lead Ads + multi página/cuenta + forms/backfill | ✅ Hecho | PLAN.md §8 |
 | Insights + CPL | ✅ Hecho | PLAN.md Fase 15 |
+| Salud permisos + opt-in scopes | ✅ Hecho | PLAN.md Fase 16 |
 | CAPI calidad + audiencias | Sí | Tras estados de lead |
 | WhatsApp inbox (+ Embedded Signup si partner) | Sí, módulo aparte | Alto valor LatAm |
 | Pausar campañas / Ad Rules simples | Opcional | Oleada E |
@@ -391,4 +392,4 @@ Antes de esta pasada el doc cubría bien el **hilo CRM Lead Ads → Insights →
 
 ---
 
-**Uso:** este archivo es el **menú de la API (CRM + inventario oficial)**. [PLAN.md](./PLAN.md) es lo **ya construido** (fases 0–15). Siguiente: **Oleada C** (CAPI / audiencias) o smoke Meta real.
+**Uso:** este archivo es el **menú de la API (CRM + inventario oficial)**. [PLAN.md](./PLAN.md) es lo **ya construido** (fases 0–16). Siguiente: **Oleada C** (CAPI / audiencias) o smoke Meta real.

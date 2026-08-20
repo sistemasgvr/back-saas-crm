@@ -51,13 +51,13 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 
 ## 2. Estado actual
 
-**MVP (fases 0–11) + extensiones Meta (fases 12–15) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
+**MVP (fases 0–11) + extensiones Meta (fases 12–16) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
 
 | Área | Estado |
 |------|--------|
-| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, **Insights diarios**, leads, dashboard KPIs + ads KPIs/CPL), notificaciones in-app |
-| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta`, `/leads`, `/dashboard` (leads + inversión/CPL), notificaciones, TanStack Query, RHF+Zod |
-| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, `meta_insights_diarios`, …) |
+| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth dinámico por features, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, **Insights diarios**, **salud permisos + opt-in**, leads, dashboard KPIs + ads KPIs/CPL), notificaciones in-app |
+| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta` (Conexión con panel permisos), `/leads`, `/dashboard` (leads + inversión/CPL), notificaciones, TanStack Query, RHF+Zod |
+| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, `meta_insights_diarios`, `features_deseadas` en conexiones, …) |
 | Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
 | Graph API | Versión única `META_GRAPH_VERSION` (default `v25.0`) |
 
@@ -324,7 +324,8 @@ OAuth / Meta App por organización (1 sesión activa por org).
 | `meta_user_nombre` | VARCHAR(200) NULL | |
 | `token_cifrado` | TEXT NULL | User token AES-256-GCM |
 | `token_expira_en` | TIMESTAMPTZ NULL | |
-| `scopes` | TEXT NULL | |
+| `scopes` | TEXT NULL | Persistidos tras OAuth / `debug_token` (Fase 16) |
+| `features_deseadas` | JSONB NULL | Opt-in de features Meta (Fase 16.4); núcleo siempre forzado server-side |
 | `webhook_verify_token` | VARCHAR(128) NOT NULL | Challenge webhook |
 | `page_id` / `page_nombre` / `ad_account_*` | | **Legacy MVP** — no usar en runtime nuevo |
 | Auditoría | | `estado`, `usuario_*`, `fecha_*` |
@@ -1022,6 +1023,21 @@ Oleada B del catálogo Meta: métricas publicitarias + reporting híbrido.
 
 **CPL (definición cerrada):** `spend_periodo / leads_periodo` — misma ventana y filtros que el dashboard de leads; sin sumar cross-currency en v1.
 
+### Fase 16 — Salud de permisos Meta + opt-in ✅
+
+Panel en hub Conexión: qué scopes tiene el token vs qué necesita cada feature; activar/desactivar opt-in.
+
+- `GET /debug_token` → scopes live; persistidos en `meta_conexiones.scopes` tras OAuth.
+- Matriz de features (núcleo Lead Ads + opt-ins Pages/Ads/IG/Business) en código.
+- `GET /meta/connections/permissions` + UI `MetaPermissionsPanel` (OK/Falta, badge faltantes deseados).
+- Columna `features_deseadas` JSONB; OAuth `scope=` dinámico según deseadas (o una feature al “Otorgar en Meta”).
+- Toggle opt-in: soft off + opción `revocarEnMeta` (`DELETE /{user}/permissions/{scope}`).
+- Features núcleo (`pages_show_list`, `pages_manage_metadata`, `leads_retrieval`) no desactivables.
+- Nota UI: Advanced Access / App Review no se detecta por API.
+- Sin granular `target_ids` (diferido).
+
+**Done cuando:** org ve permisos reales; puede opt-in BM/Insights (etc.) pidiendo solo esos scopes; soft/hard off funciona.
+
 ---
 
 ## 11. Fuera de alcance (siguiente)
@@ -1030,10 +1046,11 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 
 - CAPI Conversion Leads / custom audiences (Oleada C)
 - WhatsApp / Messenger inbox (Oleada D)
-- Ads manager / Ad Rules (crear/pausar campañas) (Oleada E)
+- Ads manager / Ad Rules (crear/pausar campañas) (Oleada E) — scope `ads_management` puede pre-autorizarse en Fase 16; feature producto pendiente
 - Breakdowns Insights (edad/género/placement) / async Insights + cron
+- Granular scopes (`target_ids`) en panel permisos
 - ROAS (requiere conversiones Pixel/CAPI)
-- Catalog / Commerce / publicación orgánica
+- Catalog / Commerce / publicación orgánica (scopes opt-in pueden pre-autorizarse; producto pendiente)
 - Invitaciones self-serve / registro público
 - Selector multi-organización
 - Billing / `subscriptions/`
@@ -1061,6 +1078,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Páginas / cuentas Meta | N por org (`meta_paginas`, `meta_cuentas_publicitarias`) |
 | Formularios leadgen | Catálogo `meta_formularios` + sync/backfill en perfil de página |
 | Insights / CPL | Snapshots diarios `meta_insights_diarios`; sync on-demand; CPL = spend Meta ÷ leads CRM |
+| Permisos Meta | `debug_token` + matriz features; OAuth dinámico; opt-in con soft/hard off (`features_deseadas`) |
 | Deploy HTTPS | No bloquea fases 0–6; obligatorio para Meta. Dominio se define después |
 | Tenancy | Shared DB + `organizacion_id` |
 | Base de datos | Neon PostgreSQL (pooler + SSL). Credenciales en `.env` |
@@ -1111,7 +1129,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Redirect post-login según módulos habilitados
 - [x] `npm run build` en backend y frontend
 
-### Extensiones Meta (fases 12–15)
+### Extensiones Meta (fases 12–16)
 
 - [x] Notificaciones in-app + WebSocket
 - [x] N páginas + N cuentas ads; hub `/settings/meta` + perfiles
@@ -1123,20 +1141,22 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Health-check webhook + alerta `META_WEBHOOK_SALUD`
 - [x] Insights diarios + sync on-demand por cuenta ads
 - [x] Dashboard ads KPIs (spend/CTR/CPC) + **CPL híbrido** + serie inversión
+- [x] Salud permisos (`debug_token`) + panel en Conexión
+- [x] Opt-in features + OAuth dinámico + soft/hard off
 
 ### Operativo pendiente
 
 - [ ] Rotar `SEED_ADMIN_PASSWORD` (si aún es el seed)
-- [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health / **Insights**)
+- [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health / Insights / **permisos opt-in**)
 
 ---
 
 ## 14. Cómo usar este plan
 
-1. Las fases **0–15** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
+1. Las fases **0–16** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
 2. No mezclar oleadas futuras ([INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)) con deuda operativa §13 sin ticket explícito.
 3. Cada cambio termina con `npm run build` en el repo tocado.
-4. Meta en producción: smoke test E2E (webhook + forms + health + Insights).
+4. Meta en producción: smoke test E2E (webhook + forms + health + Insights + permisos).
 
 **Siguiente paso concreto:** smoke Meta real en prod · o Oleada C (CAPI / audiencias) según [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
@@ -1144,7 +1164,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 
 ## 15. Huecos conocidos (auditoría post-MVP)
 
-Auditoría cruzada backend + frontend (fases 0–15). Deuda **cerrada en código** salvo ítems operativos.
+Auditoría cruzada backend + frontend (fases 0–16). Deuda **cerrada en código** salvo ítems operativos.
 
 ### P0 — Meta / webhook (backend) ✅
 
@@ -1189,3 +1209,4 @@ Auditoría cruzada backend + frontend (fases 0–15). Deuda **cerrada en código
 - **Seed** crea org de prueba además del admin (útil en dev).
 - **Health webhook** on-demand (sin cron Nest); decisión Fase 14 por hosting serverless.
 - **Insights** on-demand (sin cron/async jobs); CPL es híbrido CRM (spend Meta ÷ leads locales), no réplica 1:1 de Ads Manager.
+- **Permisos Meta** opt-in: núcleo Lead Ads siempre; BM/Ads/IG/etc. vía Switch + OAuth parcial; Advanced Access no detectable por API.

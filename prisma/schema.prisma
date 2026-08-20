@@ -233,6 +233,9 @@ model MetaConexion {
   tokenCifrado    String?   @map("token_cifrado")
   tokenExpiraEn   DateTime? @map("token_expira_en") @db.Timestamptz
   scopes          String?
+  /** IDs de features de meta-permisos-matriz.ts que la org quiere solicitar en
+   * OAuth (además de las núcleo, siempre incluidas) — PLAN.md Fase 16. */
+  featuresDeseadas Json?    @map("features_deseadas")
 
   webhookVerifyToken String @map("webhook_verify_token") @db.VarChar(128)
 

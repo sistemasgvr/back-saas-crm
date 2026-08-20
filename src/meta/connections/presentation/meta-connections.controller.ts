@@ -5,6 +5,7 @@ import {
   GoneException,
   HttpCode,
   HttpStatus,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -21,7 +22,10 @@ import { ListarPaginasUseCase } from '../application/use-cases/listar-paginas.us
 import { ListarCuentasPublicitariasUseCase } from '../application/use-cases/listar-cuentas-publicitarias.use-case';
 import { DesconectarUseCase } from '../application/use-cases/desconectar.use-case';
 import { GuardarCredencialesAppUseCase } from '../application/use-cases/guardar-credenciales-app.use-case';
+import { ObtenerSaludPermisosMetaUseCase } from '../application/use-cases/obtener-salud-permisos-meta.use-case';
+import { TogglearFeaturePermisoUseCase } from '../application/use-cases/togglear-feature-permiso.use-case';
 import { GuardarCredencialesDto } from './dto/guardar-credenciales.dto';
+import { PatchFeaturePermisoDto } from './dto/patch-feature-permiso.dto';
 
 @Controller('meta/connections')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
@@ -34,11 +38,35 @@ export class MetaConnectionsController {
     private readonly listarPaginas: ListarPaginasUseCase,
     private readonly listarCuentasPublicitarias: ListarCuentasPublicitariasUseCase,
     private readonly desconectar: DesconectarUseCase,
+    private readonly obtenerSaludPermisos: ObtenerSaludPermisosMetaUseCase,
+    private readonly togglearFeature: TogglearFeaturePermisoUseCase,
   ) {}
 
   @Get('current')
   getCurrent(@CurrentUser() ctx: RequestContext) {
     return this.obtenerConexionActual.execute(ctx.organizacionId!);
+  }
+
+  @Get('permissions')
+  getPermissions(@CurrentUser() ctx: RequestContext) {
+    return this.obtenerSaludPermisos.execute(ctx.organizacionId!);
+  }
+
+  @Patch('permissions/features')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async patchFeature(
+    @CurrentUser() ctx: RequestContext,
+    @Body() dto: PatchFeaturePermisoDto,
+  ): Promise<void> {
+    await this.togglearFeature.execute(
+      ctx.organizacionId!,
+      {
+        featureId: dto.featureId,
+        deseada: dto.deseada,
+        revocarEnMeta: dto.revocarEnMeta,
+      },
+      ctx.usuarioId,
+    );
   }
 
   @Post('app-credentials')

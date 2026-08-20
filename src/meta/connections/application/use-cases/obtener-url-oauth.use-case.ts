@@ -5,14 +5,7 @@ import type { MetaOAuthStateService } from '../ports/meta-oauth-state.port';
 import { META_CONEXIONES_REPOSITORY } from '../ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../ports/meta-conexiones.repository.port';
 import { obtenerVersionGraph } from '../../../../shared/infrastructure/meta-graph-version';
-
-// Lead Ads + lectura de anuncios/páginas (PLAN.md §8.1).
-const SCOPES = [
-  'pages_show_list',
-  'pages_manage_metadata',
-  'leads_retrieval',
-  'ads_read',
-].join(',');
+import { featuresDeseadasDe, scopesDeFeatures } from '../meta-permisos-matriz';
 
 @Injectable()
 export class ObtenerUrlOAuthUseCase {
@@ -27,6 +20,8 @@ export class ObtenerUrlOAuthUseCase {
   async execute(
     organizacionId: string,
     usuarioId: string,
+    rerequest?: boolean,
+    features?: string[],
   ): Promise<{ url: string }> {
     const conexion =
       await this.conexiones.findActivaPorOrganizacion(organizacionId);
@@ -38,13 +33,27 @@ export class ObtenerUrlOAuthUseCase {
 
     const state = this.oauthState.firmar({ organizacionId, usuarioId });
 
+    // Con `features` explícito (botón "Otorgar en Meta" de una fila puntual):
+    // se pide exactamente esa unión de scopes. Sin `features` (Conectar/Reconectar
+    // general): núcleo + lo que la org ya tiene marcado como deseado
+    // (PLAN.md Fase 16).
+    const scope =
+      features && features.length > 0
+        ? scopesDeFeatures(features)
+        : scopesDeFeatures(featuresDeseadasDe(conexion.featuresDeseadas));
+
     const params = new URLSearchParams({
       client_id: conexion.appId,
       redirect_uri: this.config.getOrThrow<string>('META_OAUTH_REDIRECT_URI'),
       state,
-      scope: SCOPES,
+      scope: scope.join(','),
       response_type: 'code',
     });
+    // Fuerza que Meta vuelva a mostrar el diálogo de permisos que el usuario
+    // haya denegado antes (PLAN.md Fase 16).
+    if (rerequest) {
+      params.set('auth_type', 'rerequest');
+    }
 
     const version = obtenerVersionGraph(this.config);
     return {

@@ -24,8 +24,23 @@ export class MetaOAuthController {
   @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
   @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @RequireModule('META_LEADS')
-  getUrl(@CurrentUser() ctx: RequestContext) {
-    return this.obtenerUrlOAuth.execute(ctx.organizacionId!, ctx.usuarioId);
+  getUrl(
+    @CurrentUser() ctx: RequestContext,
+    @Query('rerequest') rerequest?: string,
+    @Query('features') features?: string,
+  ) {
+    const featureIds = features
+      ? features
+          .split(',')
+          .map((f) => f.trim())
+          .filter(Boolean)
+      : undefined;
+    return this.obtenerUrlOAuth.execute(
+      ctx.organizacionId!,
+      ctx.usuarioId,
+      rerequest === '1',
+      featureIds,
+    );
   }
 
   // Público: lo invoca el navegador vía redirect de Meta, sin Bearer token.

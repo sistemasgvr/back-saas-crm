@@ -34,4 +34,10 @@ export interface MetaConexionesRepository {
   actualizarTokenOAuth(input: ActualizarTokenInput): Promise<MetaConexion>;
   /** Revoca la sesión OAuth (metaUserId/token/página/cuenta) pero conserva appId/appSecret. */
   limpiarConexionOAuth(id: string, usuarioEdicion: string): Promise<void>;
+  /** Preferencia de features opt-in a solicitar en OAuth (PLAN.md Fase 16). */
+  actualizarFeaturesDeseadas(
+    id: string,
+    featuresDeseadas: string[],
+    usuarioEdicion: string,
+  ): Promise<void>;
 }

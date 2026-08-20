@@ -102,4 +102,15 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
       },
     });
   }
+
+  async actualizarFeaturesDeseadas(
+    id: string,
+    featuresDeseadas: string[],
+    usuarioEdicion: string,
+  ): Promise<void> {
+    await this.prisma.metaConexion.update({
+      where: { id },
+      data: { featuresDeseadas, usuarioEdicion },
+    });
+  }
 }

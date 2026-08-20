@@ -6,6 +6,7 @@ import { firstValueFrom } from 'rxjs';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
 import type {
   AppSuscritaGraph,
+  DebugTokenGraph,
   FiltroInsights,
   FiltroLeadsDeForm,
   MetaAnuncioGraph,
@@ -428,6 +429,36 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       campanaMetaId: item.campaign_id,
       campanaNombre: item.campaign_name,
     }));
+  }
+
+  async debugToken(
+    inputToken: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<DebugTokenGraph> {
+    const data = await this.get<{
+      data: { is_valid?: boolean; scopes?: string[]; expires_at?: number };
+    }>('/debug_token', {
+      input_token: inputToken,
+      access_token: `${appId}|${appSecret}`,
+    });
+    return {
+      isValid: data.data.is_valid ?? false,
+      scopes: data.data.scopes ?? [],
+      expiresAt: data.data.expires_at
+        ? new Date(data.data.expires_at * 1000)
+        : undefined,
+    };
+  }
+
+  async revocarPermiso(
+    metaUserId: string,
+    permiso: string,
+    accessToken: string,
+  ): Promise<void> {
+    await this.delete(`/${metaUserId}/permissions/${permiso}`, {
+      access_token: accessToken,
+    });
   }
 
   private async get<T>(

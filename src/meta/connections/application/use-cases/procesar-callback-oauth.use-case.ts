@@ -63,12 +63,27 @@ export class ProcesarCallbackOAuthUseCase {
       ? new Date(Date.now() + largo.expiraEnSegundos * 1000)
       : undefined;
 
+    // Scopes reales otorgados (no lo que se pidió) — PLAN.md Fase 16
+    // §7.3: "no confiar solo en lo pedido". Un fallo acá no debe romper la conexión.
+    let scopes: string | undefined;
+    try {
+      const debug = await this.graph.debugToken(
+        largo.accessToken,
+        conexion.appId,
+        appSecret,
+      );
+      scopes = debug.scopes.join(',');
+    } catch {
+      scopes = undefined;
+    }
+
     await this.conexiones.actualizarTokenOAuth({
       organizacionId: state.organizacionId,
       metaUserId: usuarioMeta.id,
       metaUserNombre: usuarioMeta.nombre,
       tokenCifrado: this.tokenEncryption.encrypt(largo.accessToken),
       tokenExpiraEn,
+      scopes,
       usuarioEdicion: state.usuarioId,
     });
 

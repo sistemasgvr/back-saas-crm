@@ -95,6 +95,12 @@ export interface FiltroInsights {
   nivel: 'account' | 'campaign';
 }
 
+export interface DebugTokenGraph {
+  isValid: boolean;
+  scopes: string[];
+  expiresAt?: Date;
+}
+
 export interface MetaInsightGraph {
   fecha: string;
   spend: number;
@@ -177,4 +183,16 @@ export interface MetaGraphClient {
     accessToken: string,
     filtro: FiltroInsights,
   ): Promise<MetaInsightGraph[]>;
+  debugToken(
+    inputToken: string,
+    appId: string,
+    appSecret: string,
+  ): Promise<DebugTokenGraph>;
+  /** DELETE /{user-id}/permissions/{permission} — revoca un scope puntual sin
+   * cerrar la sesión completa (PLAN.md Fase 16). */
+  revocarPermiso(
+    metaUserId: string,
+    permiso: string,
+    accessToken: string,
+  ): Promise<void>;
 }
