@@ -953,6 +953,10 @@ KPIs + 3 gráficos + filtros. Charts en `src/components/charts/` (ApexCharts, co
 
 **Plan complementario (no reemplaza este documento):** [PLAN-FASE-13-META-MULTI.md](./PLAN-FASE-13-META-MULTI.md) — varias páginas Facebook + varias cuentas publicitarias por org, perfiles de cada origen, filtros en leads/dashboard.
 
+**Investigación Meta API (menú de integraciones futuras):** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) — qué ofrece Graph/Marketing/CAPI/WhatsApp y qué encaja en el CRM.
+
+**Plan Fase 14 (Oleada A Lead Ads):** [PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md](./PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md) — catálogo forms, backfill, salud webhook, versión Graph.
+
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + entrada de menú. **No se toca el kernel** (`usuarios` / `organizaciones` / guards).
 
 ---

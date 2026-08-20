@@ -11,6 +11,7 @@ export interface ListarLeadsInput {
   campanaId?: string;
   anuncioId?: string;
   metaPaginaId?: string;
+  metaCuentaId?: string;
   formularioId?: string;
   fechaDesde?: string;
   fechaHasta?: string;
@@ -31,6 +32,7 @@ export class ListarLeadsUseCase {
       campanaId: input.campanaId,
       anuncioId: input.anuncioId,
       metaPaginaId: input.metaPaginaId,
+      metaCuentaId: input.metaCuentaId,
       formularioId: input.formularioId,
       fechaDesde: input.fechaDesde
         ? inicioDiaLimaUtc(input.fechaDesde)

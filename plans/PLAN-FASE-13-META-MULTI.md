@@ -319,13 +319,32 @@ Cada subfase termina con `npm run build` en back y front tocados.
 
 ## 7. Criterios de cierre (Fase 13 completa)
 
-- [ ] Una org puede tener **≥2 páginas** activas; leads llegan de **todas**.
-- [ ] Desvincular una página **no** afecta las demás.
-- [ ] Una org puede tener **≥2 cuentas ads**; dashboard/leads filtran por cuenta.
-- [ ] Existe **perfil** navegable por página y por cuenta (URLs §5.1).
-- [ ] Webhook sigue enrutando correctamente; `page_id` no duplicado entre orgs.
-- [ ] Migración no pierde datos de conexiones MVP existentes.
-- [ ] `PLAN.md` original intacto; este doc referenciado desde §11.
+Estado verificado en código (2026-08-20). Smoke E2E con Meta real en producción sigue siendo operativo (PLAN.md §13).
+
+- [x] Una org puede tener **≥2 páginas** activas; leads llegan de **todas**.  
+  → `meta_paginas` N por org; webhook/ingest resuelven por `findActivaPorPageId` y asignan `meta_pagina_id`.
+- [x] Desvincular una página **no** afecta las demás.  
+  → Soft delete (`estado = 0`) + unsubscribe solo de esa `page_id`.
+- [x] Una org puede tener **≥2 cuentas ads**.  
+  → `meta_cuentas_publicitarias` N por org + sync por cuenta.
+- [x] **Dashboard / leads filtran por cuenta** (`metaCuentaId`).  
+  → Dashboard y `/leads` (API + `LeadsView` + deep link desde perfil de cuenta).
+- [x] Existe **perfil** navegable por página y por cuenta (URLs §5.1).  
+  → `/settings/meta/pages/[id]` y `/settings/meta/ad-accounts/[id]`.
+- [x] Webhook sigue enrutando correctamente; `page_id` no duplicado entre orgs.  
+  → Lookup en `meta_paginas`; unique parcial `meta_paginas_page_id_activo_unique`.
+- [x] Migración **no pierde** datos de conexiones MVP existentes.  
+  → Columnas legacy en `meta_conexiones` (`page_id`, `ad_account_id`, …) se conservan (deprecadas, no borradas).  
+  → **Nota:** la migración SQL crea tablas nuevas pero **no** hay `INSERT` automático MVP → `meta_paginas` / `meta_cuentas_publicitarias`; orgs solo-MVP deben **re-vincular** página/cuenta en el hub (o correr backfill manual).
+- [x] `PLAN.md` original intacto; este doc referenciado desde §11.
+
+### Pendiente menor post-cierre
+
+| Ítem | Acción |
+|------|--------|
+| Backfill SQL opcional MVP → tablas nuevas | Solo si quedan orgs con `page_id`/`ad_account_id` en `meta_conexiones` y sin filas en tablas Fase 13 |
+
+**Veredicto:** Fase 13 **cerrada** (filtro cuenta en leads incluido).
 
 ---
 
@@ -354,8 +373,10 @@ Cada subfase termina con `npm run build` en back y front tocados.
 ## 10. Referencias
 
 - [PLAN.md](./PLAN.md) — MVP fases 0–11, §8 Meta, §11 post-MVP.
+- [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) — catálogo de APIs Meta integrables post Fase 13.
+- [PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md](./PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md) — siguiente: forms, backfill, salud webhook.
 - Meta Graph: [Pages](https://developers.facebook.com/docs/graph-api/reference/page/), [Ad Account](https://developers.facebook.com/docs/marketing-api/reference/ad-account), [Leadgen webhook](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/webhooks-for-leadgen).
 
 ---
 
-**Siguiente paso concreto:** implementar **Fase 13.1** (schema + migración) en una rama dedicada; no mezclar con deploy/ops salvo que el webhook dependa de ello.
+**Siguiente paso concreto:** **[Fase 14](./PLAN-FASE-14-META-LEADADS-CONSOLIDAR.md)** (forms, backfill, salud webhook, versión Graph). Opcional: backfill SQL MVP → tablas Fase 13 si aún hay orgs sin re-vincular.

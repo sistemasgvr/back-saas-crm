@@ -26,6 +26,10 @@ export class ListarLeadsQueryDto extends PaginacionQueryDto {
   metaPaginaId?: string;
 
   @IsOptional()
+  @IsUUID()
+  metaCuentaId?: string;
+
+  @IsOptional()
   @IsString()
   @MaxLength(64)
   formularioId?: string;

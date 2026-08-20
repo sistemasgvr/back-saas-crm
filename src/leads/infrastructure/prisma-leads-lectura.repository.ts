@@ -46,6 +46,9 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       ...(filtro.campanaId ? { campanaId: filtro.campanaId } : {}),
       ...(filtro.anuncioId ? { anuncioId: filtro.anuncioId } : {}),
       ...(filtro.metaPaginaId ? { metaPaginaId: filtro.metaPaginaId } : {}),
+      ...(filtro.metaCuentaId
+        ? { campana: { metaCuentaPublicitariaId: filtro.metaCuentaId } }
+        : {}),
       ...(filtro.formularioId ? { formularioId: filtro.formularioId } : {}),
       ...(filtro.fechaDesde || filtro.fechaHasta
         ? {
