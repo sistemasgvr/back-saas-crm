@@ -44,27 +44,26 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 1. Existen empresas (`organizaciones`) aisladas por `organizacion_id`.
 2. Puedes crear/editar/desactivar empresas (`estado = 0`), ver usuarios y activar módulos desde `/admin`.
 3. Un usuario de empresa (creado/asignado por el admin de plataforma) puede iniciar sesión, conectar Meta, recibir leads por webhook y verlos en `/leads` y `/dashboard`.
-4. `META_LEADS` y `DASHBOARD` están activos por defecto; CRM / WhatsApp / Automatizaciones existen en catálogo pero no se construyen aún.
+4. `META_LEADS` y `DASHBOARD` están activos por defecto; `WHATSAPP` es opt-in por org (implementado). CRM / Automatizaciones siguen en catálogo sin producto completo.
 5. **Alta de empresas solo por admin de plataforma.** No hay registro público que cree organizaciones.
 
 ---
 
 ## 2. Estado actual
 
-**MVP (fases 0–11) + extensiones Meta (fases 12–16) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
+**MVP (fases 0–11) + extensiones Meta (fases 12–16) + gestión lead/WhatsApp (fases 17–19) implementados** en `back-saas-crm` + `front-saas-crm`. Build pasa en ambos repos.
 
 | Área | Estado |
 |------|--------|
-| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations, Meta (OAuth dinámico por features, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, **Insights diarios**, **salud permisos + opt-in**, leads, dashboard KPIs + ads KPIs/CPL), notificaciones in-app |
-| Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta` (Conexión con panel permisos), `/leads`, `/dashboard` (leads + inversión/CPL), notificaciones, TanStack Query, RHF+Zod |
-| Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, `meta_insights_diarios`, `features_deseadas` en conexiones, …) |
+| Backend | NestJS 11, Prisma, auth JWT, platform-admin, organizations (**rubro**), Meta (OAuth dinámico, **N páginas**, **N cuentas ads**, forms/backfill/salud webhook, Insights, permisos + opt-in, leads), **asignación de leads**, **WhatsApp Cloud API** (conexión, inbox, webhook), dashboard KPIs + ads KPIs/CPL, notificaciones in-app |
+| Frontend | Next.js 16, login, admin (rubro inmobiliaria), `/settings` + hub Meta + `/settings/whatsapp`, `/leads` (tomar/asignar/tipo), `/chats`, `/dashboard`, notificaciones, TanStack Query, RHF+Zod |
+| Datos | Neon PostgreSQL + migraciones + seed (`rubro`, `tipo_lead`/`asignado_*` en leads, `whatsapp_*`, módulo `WHATSAPP`, …) |
 | Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
 | Graph API | Versión única `META_GRAPH_VERSION` (default `v26.0`) |
 
-**Pendiente operativo (no bloquea código):** smoke test E2E con Meta real en producción, rotar `SEED_ADMIN_PASSWORD` si aún aplica.
+**Pendiente operativo (no bloquea código):** smoke test E2E Meta + WhatsApp real en producción (WABA, plantillas, webhook), rotar `SEED_ADMIN_PASSWORD` si aún aplica.
 
-Detalle de diseño ya absorbido en este documento. Roadmap futuro: [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
-**Siguiente oleada producto (gestión lead + WhatsApp):** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md).
+Detalle de diseño ya absorbido en este documento. Roadmap futuro: [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
 Ver **§15 Huecos conocidos** para deuda técnica priorizada.
 
@@ -215,6 +214,7 @@ Empresa cliente (tenant).
 | `logo_url` | TEXT NULL | |
 | `pais` | VARCHAR(2) NULL | ISO 3166-1 alpha-2 |
 | `zona_horaria` | VARCHAR(64) NOT NULL DEFAULT `'America/Lima'` | IANA. MVP: Lima, Perú |
+| `rubro` | VARCHAR(40) NOT NULL DEFAULT `'INMOBILIARIA'` | Vertical operativo: **solo `INMOBILIARIA`** por ahora (Fase 17). Otros códigos reservados |
 | `notas` | TEXT NULL | Uso interno plataforma |
 | `estado` | SMALLINT NOT NULL DEFAULT 1 | Desactivar empresa = `0` |
 | `usuario_creacion` | UUID NULL | |
@@ -222,7 +222,7 @@ Empresa cliente (tenant).
 | `fecha_creacion` | TIMESTAMPTZ NOT NULL | |
 | `fecha_modificacion` | TIMESTAMPTZ NOT NULL | |
 
-Índices: UNIQUE(`slug`), INDEX(`estado`).
+Índices: UNIQUE(`slug`), INDEX(`estado`), INDEX(`rubro`).
 
 ### 4.4 `organizacion_usuarios`
 
@@ -266,8 +266,8 @@ Catálogo de funcionalidades del SaaS.
 |--------|--------|-----------------------------------------------|
 | `META_LEADS` | Sí | `1` |
 | `DASHBOARD` | Sí | `1` |
+| `WHATSAPP` | Sí (Fase 19) | `0` (opt-in por org) |
 | `CRM` | Solo catálogo | `0` |
-| `WHATSAPP` | Solo catálogo | `0` |
 | `AUTOMATIZACIONES` | Solo catálogo | `0` |
 
 ### 4.6 `organizacion_modulos`
@@ -443,17 +443,31 @@ Snapshots diarios Ads Insights (nivel cuenta y/o campaña).
 | `telefono` | VARCHAR(40) NULL | |
 | `datos_crudos` | JSONB NOT NULL | Respuesta completa Graph API |
 | `fecha_lead` | TIMESTAMPTZ NULL | `created_time` de Meta |
-| `estado` | SMALLINT NOT NULL DEFAULT 1 | |
+| `tipo_lead` | VARCHAR(40) NULL | Inmobiliaria: `COMPRA` \| `VENTA` \| `OTRO` (Fase 18) |
+| `asignado_usuario_id` | UUID NULL | Dueño del lead (Fase 18) |
+| `asignado_en` | TIMESTAMPTZ NULL | |
+| `asignado_por_usuario_id` | UUID NULL | Quién asignó; null si se auto-tomó |
+| `estado` | SMALLINT NOT NULL DEFAULT 1 | Soft delete — **no** es pipeline de gestión |
 | `usuario_creacion` | UUID NULL | null en ingestión webhook |
 | `usuario_edicion` | UUID NULL | |
 | `fecha_creacion` | TIMESTAMPTZ NOT NULL | Alta en nuestro sistema |
 | `fecha_modificacion` | TIMESTAMPTZ NOT NULL | |
 
-Índices: UNIQUE(`organizacion_id`, `id_externo`) → idempotencia webhook; INDEX(`email`), INDEX(`telefono`), INDEX(`campana_id`), INDEX(`anuncio_id`), INDEX(`fecha_lead`), INDEX(`estado`).
+Índices: UNIQUE(`organizacion_id`, `id_externo`) → idempotencia webhook; INDEX(`email`), INDEX(`telefono`), INDEX(`campana_id`), INDEX(`anuncio_id`), INDEX(`fecha_lead`), INDEX(`estado`), INDEX(`asignado_usuario_id`), INDEX(`tipo_lead`).
 
----
+**Visibilidad (Fase 18):** `PROPIETARIO` / `ADMINISTRADOR` ven todos; `USUARIO` ve asignados a él + pool sin asignar (para tomar). Sin `estado_gestion` aún (pipeline diferido).
 
-### 4.13 Auth — `tokens_refresco`
+### 4.13 WhatsApp (Fase 19)
+
+| Tabla | Rol |
+|-------|-----|
+| `whatsapp_conexiones` | WABA / `phone_number_id` / vínculo a `meta_conexiones` (1 línea por org en v1) |
+| `whatsapp_conversaciones` | Conversación por `wa_id` + org; preferente `lead_id` |
+| `whatsapp_mensajes` | Historial in/out; idempotencia por `wamid` |
+
+Módulo `WHATSAPP` opt-in. Webhook mensajes/estados en el mismo endpoint Meta (`object = whatsapp_business_account`). Inbox `/chats`; settings `/settings/whatsapp`.
+
+### 4.14 Auth — `tokens_refresco`
 
 | Columna | Tipo | Notas |
 |---------|------|--------|
@@ -1039,6 +1053,44 @@ Panel en hub Conexión: qué scopes tiene el token vs qué necesita cada feature
 
 **Done cuando:** org ve permisos reales; puede opt-in BM/Insights (etc.) pidiendo solo esos scopes; soft/hard off funciona.
 
+### Fase 17 — Rubro inmobiliario ✅
+
+Vertical de producto en la org (ex-subplan G1).
+
+- Columna `organizaciones.rubro` (default `INMOBILIARIA`); índice.
+- Admin plataforma: create/edit org con rubro operativo **Inmobiliaria** (único soportado).
+- API/UI leen `rubro`; copy de gestión asume inmobiliaria.
+- Otros rubros: códigos reservados, sin flujos de producto.
+
+**Done cuando:** orgs del piloto quedan como `INMOBILIARIA` y el sistema lo usa.
+
+### Fase 18 — Asignación de leads (+ tipo) ✅
+
+Post-captura CRM (ex-subplan G2). Sin pipeline de estados.
+
+- Campos en `leads`: `tipo_lead` (`COMPRA` \| `VENTA` \| `OTRO`), `asignado_usuario_id`, `asignado_en`, `asignado_por_usuario_id`.
+- APIs: `POST /leads/:id/claim` · `assign` · `release` · `PATCH .../gestion` (`tipoLead`).
+- Tomar race-safe (`WHERE asignado IS NULL`).
+- Visibilidad: admin/propietario todos; `USUARIO` = míos + pool sin asignar.
+- UI `/leads` y detalle: Tomar / Asignar / Liberar / tipo; sin UI de `estado_gestion`.
+
+**Done cuando:** un usuario toma un lead libre; un admin asigna; el listado respeta roles.
+
+### Fase 19 — WhatsApp Cloud API (inbox) ✅
+
+Chat centralizado ligado al lead (ex-subplan G3 / Oleada D parcial).
+
+- Módulo `WHATSAPP` opt-in (`organizacion_modulos`).
+- Tablas `whatsapp_conexiones` · `whatsapp_conversaciones` · `whatsapp_mensajes`.
+- 1 número por org (v1); plantilla fuera de ventana 24h + mensajes de sesión.
+- Webhook Meta mensajes/estados (mismo endpoint que leadgen, distinto `object`).
+- Inbox `/chats`; settings `/settings/whatsapp`; CTA desde ficha lead.
+- Visibilidad chats: misma regla que leads (admin todo / usuario solo asignados).
+
+**Done cuando:** lead asignado → chat en CRM → respuesta del cliente visible; roles respetados.
+
+**Diferido (no en 17–19):** pipeline `NUEVO → CONTACTADO → …`; otros rubros; multimúmero; bots/IA.
+
 ---
 
 ## 11. Fuera de alcance (siguiente)
@@ -1046,7 +1098,7 @@ Panel en hub Conexión: qué scopes tiene el token vs qué necesita cada feature
 Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)):
 
 - CAPI Conversion Leads / custom audiences (Oleada C)
-- WhatsApp / Messenger inbox (Oleada D) → **subplan activo:** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md) (rubro + asignación + WA)
+- Messenger inbox / multimúmero WA / bots (extensiones sobre Fase 19)
 - Ads manager / Ad Rules (crear/pausar campañas) (Oleada E) — scope `ads_management` puede pre-autorizarse en Fase 16; feature producto pendiente
 - Breakdowns Insights (edad/género/placement) / async Insights + cron
 - Granular scopes (`target_ids`) en panel permisos
@@ -1056,12 +1108,11 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Selector multi-organización
 - Billing / `subscriptions/`
 - Redis, BullMQ, workers
-- Pipeline, tareas, oportunidades (gestión mínima de lead sí → subplan G2)
+- **Pipeline de estados** del lead (`NUEVO → CONTACTADO → EN_GESTION → CERRADO | DESCARTADO`) y tareas/oportunidades
+- Otros rubros distintos de inmobiliaria
 - App móvil
 
-**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
-**Post-captura (rubro, asignación, WhatsApp):** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md).
-
+**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**
 
@@ -1146,27 +1197,35 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Salud permisos (`debug_token`) + panel en Conexión
 - [x] Opt-in features + OAuth dinámico + soft/hard off
 
+### Gestión lead + WhatsApp (fases 17–19)
+
+- [x] Rubro `INMOBILIARIA` en organizaciones (admin + API)
+- [x] Asignación: claim / assign / release + `tipo_lead` + visibilidad por rol
+- [x] Módulo `WHATSAPP` opt-in + conexiones + inbox `/chats` + webhook mensajes
+- [x] CTA chat desde ficha lead; plantillas + sesión 24h
+
 ### Operativo pendiente
 
 - [ ] Rotar `SEED_ADMIN_PASSWORD` (si aún es el seed)
 - [ ] Smoke test Meta E2E en prod (OAuth → webhook → lead → sync forms / backfill / health / Insights / **permisos opt-in**)
+- [ ] Smoke WhatsApp E2E (WABA + plantilla + webhook → inbox)
 
 ---
 
 ## 14. Cómo usar este plan
 
-1. Las fases **0–16** están **cerradas en código**; este `PLAN.md` es la fuente de verdad.
+1. Las fases **0–19** están **cerradas en código**; este `PLAN.md` es la fuente de verdad (el subplan de gestión/WhatsApp ya se absorbó aquí).
 2. No mezclar oleadas futuras ([INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)) con deuda operativa §13 sin ticket explícito.
 3. Cada cambio termina con `npm run build` en el repo tocado.
-4. Meta en producción: smoke test E2E (webhook + forms + health + Insights + permisos).
+4. Meta/WhatsApp en producción: smoke test E2E.
 
-**Siguiente paso concreto:** smoke Meta real en prod · o Oleada C (CAPI / audiencias) según [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+**Siguiente paso concreto:** smoke Meta + WhatsApp real en prod · pipeline de estados del lead · u Oleada C (CAPI) según [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
 
 ---
 
 ## 15. Huecos conocidos (auditoría post-MVP)
 
-Auditoría cruzada backend + frontend (fases 0–16). Deuda **cerrada en código** salvo ítems operativos.
+Auditoría cruzada backend + frontend (fases 0–19). Deuda **cerrada en código** salvo ítems operativos.
 
 ### P0 — Meta / webhook (backend) ✅
 
