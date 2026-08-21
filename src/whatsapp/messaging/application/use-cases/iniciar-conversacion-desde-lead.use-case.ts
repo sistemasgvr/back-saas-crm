@@ -1,11 +1,15 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { LEADS_LECTURA_REPOSITORY } from '../../../../leads/application/ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../../../../leads/application/ports/leads-lectura.repository.port';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
-import { ultimosDigitos } from '../../../messaging/infrastructure/normalizar-telefono';
 
 /** Convierte Lead.telefono a un wa_id candidato: si ya trae código de país
  * (>= 11 dígitos) se usa tal cual; si son 9 dígitos (celular local Perú) se
@@ -47,9 +51,8 @@ export class IniciarConversacionDesdeLeadUseCase {
       );
     }
 
-    const [conexion] = await this.whatsappConexiones.listarPorOrganizacion(
-      organizacionId,
-    );
+    const [conexion] =
+      await this.whatsappConexiones.listarPorOrganizacion(organizacionId);
     if (!conexion) {
       throw new NotFoundException(
         'No hay un número de WhatsApp vinculado a esta organización',
@@ -61,6 +64,7 @@ export class IniciarConversacionDesdeLeadUseCase {
       whatsappConexionId: conexion.id,
       waId,
       nombreContacto: lead.nombre ?? undefined,
+      leadIdConocido: leadId,
     });
 
     return { conversacionId: id };

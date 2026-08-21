@@ -121,6 +121,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     whatsappConexionId: string;
     waId: string;
     nombreContacto?: string;
+    leadIdConocido?: string;
   }): Promise<{ id: string; esNueva: boolean }> {
     const existente = await this.prisma.whatsappConversacion.findUnique({
       where: {
@@ -132,19 +133,24 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
     if (existente) return { id: existente.id, esNueva: false };
 
-    // Intento de vínculo con un lead existente por teléfono — heurística MVP
-    // por sufijo de dígitos (ultimosDigitos), no cobertura 100% de formatos.
-    const sufijo = ultimosDigitos(input.waId);
-    const leadCandidato = sufijo
-      ? await this.prisma.lead.findFirst({
-          where: {
-            organizacionId: input.organizacionId,
-            estado: 1,
-            telefono: { contains: sufijo },
-          },
-          orderBy: { fechaCreacion: 'desc' },
-        })
-      : null;
+    // Si viene un lead conocido (CTA "Iniciar chat" desde su ficha) se usa
+    // directo — evita el riesgo de que la heurística de sufijo empareje con
+    // otro lead cuyo teléfono coincida por casualidad.
+    let leadId = input.leadIdConocido;
+    if (!leadId) {
+      const sufijo = ultimosDigitos(input.waId);
+      const leadCandidato = sufijo
+        ? await this.prisma.lead.findFirst({
+            where: {
+              organizacionId: input.organizacionId,
+              estado: 1,
+              telefono: { contains: sufijo },
+            },
+            orderBy: { fechaCreacion: 'desc' },
+          })
+        : null;
+      leadId = leadCandidato?.id;
+    }
 
     const conversacion = await this.prisma.whatsappConversacion.create({
       data: {
@@ -152,7 +158,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         whatsappConexionId: input.whatsappConexionId,
         waId: input.waId,
         nombreContacto: input.nombreContacto,
-        leadId: leadCandidato?.id,
+        leadId,
       },
     });
     return { id: conversacion.id, esNueva: true };

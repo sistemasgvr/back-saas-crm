@@ -29,5 +29,6 @@ import { PrismaLeadsGestionRepository } from './infrastructure/prisma-leads-gest
       useClass: PrismaLeadsGestionRepository,
     },
   ],
+  exports: [LEADS_LECTURA_REPOSITORY],
 })
 export class LeadsModule {}

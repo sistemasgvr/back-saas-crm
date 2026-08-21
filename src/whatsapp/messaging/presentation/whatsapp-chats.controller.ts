@@ -19,6 +19,7 @@ import { ListarConversacionesUseCase } from '../application/use-cases/listar-con
 import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
+import { IniciarConversacionDesdeLeadUseCase } from '../application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
 
 @Controller('whatsapp/chats')
@@ -30,6 +31,7 @@ export class WhatsappChatsController {
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
     private readonly listarPlantillas: ListarPlantillasUseCase,
+    private readonly iniciarDesdeLead: IniciarConversacionDesdeLeadUseCase,
   ) {}
 
   @Get()
@@ -43,6 +45,14 @@ export class WhatsappChatsController {
   @Get('templates')
   templates(@CurrentUser() ctx: RequestContext) {
     return this.listarPlantillas.execute(ctx.organizacionId!);
+  }
+
+  @Post('start-from-lead/:leadId')
+  startFromLead(
+    @CurrentUser() ctx: RequestContext,
+    @Param('leadId', ParseUUIDPipe) leadId: string,
+  ) {
+    return this.iniciarDesdeLead.execute(ctx.organizacionId!, leadId);
   }
 
   @Get(':id')

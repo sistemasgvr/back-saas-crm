@@ -63,14 +63,17 @@ export interface WhatsappConversacionesRepository {
   ): Promise<MensajeRow[]>;
   marcarLeida(id: string): Promise<void>;
 
-  /** Crea la conversación si no existe (por wa_id) — intenta vincular con un
-   * lead cuyo teléfono coincida. Devuelve si ya existía (para no re-vincular
-   * lead en cada mensaje si el usuario la desvinculó a mano después). */
+  /** Crea la conversación si no existe (por wa_id). Si `leadIdConocido` viene
+   * dado (CTA "Iniciar chat" desde una ficha de lead puntual), se vincula
+   * directo a ese lead; si no, intenta emparejar por teléfono (heurística,
+   * puede fallar). Devuelve si ya existía (para no re-vincular lead en cada
+   * mensaje si el usuario la desvinculó a mano después). */
   findOCrearConversacion(input: {
     organizacionId: string;
     whatsappConexionId: string;
     waId: string;
     nombreContacto?: string;
+    leadIdConocido?: string;
   }): Promise<{ id: string; esNueva: boolean }>;
 
   /** Idempotente por (organizacionId, wamid) — Meta reintenta webhooks. */
