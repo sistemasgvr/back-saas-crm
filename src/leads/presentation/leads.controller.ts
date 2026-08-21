@@ -76,7 +76,7 @@ export class LeadsController {
   }
 
   @Post(':id/claim')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   claim(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -85,7 +85,7 @@ export class LeadsController {
   }
 
   @Post(':id/assign')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('PROPIETARIO', 'ADMINISTRADOR')
   assign(
     @CurrentUser() ctx: RequestContext,
@@ -101,7 +101,7 @@ export class LeadsController {
   }
 
   @Post(':id/release')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('PROPIETARIO', 'ADMINISTRADOR')
   release(
     @CurrentUser() ctx: RequestContext,
@@ -111,6 +111,7 @@ export class LeadsController {
   }
 
   @Patch(':id/gestion')
+  @HttpCode(HttpStatus.NO_CONTENT)
   gestion(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,

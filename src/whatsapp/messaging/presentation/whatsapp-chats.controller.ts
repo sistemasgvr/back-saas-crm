@@ -67,7 +67,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/messages')
-  @HttpCode(HttpStatus.OK)
+  @HttpCode(HttpStatus.NO_CONTENT)
   send(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
