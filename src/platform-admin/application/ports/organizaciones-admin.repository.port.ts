@@ -13,6 +13,8 @@ export interface CrearOrganizacionInput {
   logoUrl?: string;
   pais?: string;
   zonaHoraria?: string;
+  /** Único valor operativo hoy: INMOBILIARIA — PLAN-GESTION-LEADS-WHATSAPP.md §3. */
+  rubro?: string;
 }
 
 export interface ActualizarOrganizacionAdminInput {
@@ -26,6 +28,7 @@ export interface ActualizarOrganizacionAdminInput {
   pais?: string;
   zonaHoraria?: string;
   notas?: string;
+  rubro?: string;
 }
 
 export interface FiltroListadoOrganizaciones {

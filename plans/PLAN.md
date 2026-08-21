@@ -63,7 +63,8 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 
 **Pendiente operativo (no bloquea código):** smoke test E2E con Meta real en producción, rotar `SEED_ADMIN_PASSWORD` si aún aplica.
 
-Detalle de diseño ya absorbido en este documento. Roadmap futuro: [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+Detalle de diseño ya absorbido en este documento. Roadmap futuro: [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
+**Siguiente oleada producto (gestión lead + WhatsApp):** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md).
 
 Ver **§15 Huecos conocidos** para deuda técnica priorizada.
 
@@ -1045,7 +1046,7 @@ Panel en hub Conexión: qué scopes tiene el token vs qué necesita cada feature
 Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)):
 
 - CAPI Conversion Leads / custom audiences (Oleada C)
-- WhatsApp / Messenger inbox (Oleada D)
+- WhatsApp / Messenger inbox (Oleada D) → **subplan activo:** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md) (rubro + asignación + WA)
 - Ads manager / Ad Rules (crear/pausar campañas) (Oleada E) — scope `ads_management` puede pre-autorizarse en Fase 16; feature producto pendiente
 - Breakdowns Insights (edad/género/placement) / async Insights + cron
 - Granular scopes (`target_ids`) en panel permisos
@@ -1055,10 +1056,11 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Selector multi-organización
 - Billing / `subscriptions/`
 - Redis, BullMQ, workers
-- Pipeline, tareas, oportunidades
+- Pipeline, tareas, oportunidades (gestión mínima de lead sí → subplan G2)
 - App móvil
 
-**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
+**Post-captura (rubro, asignación, WhatsApp):** [PLAN-GESTION-LEADS-WHATSAPP.md](./PLAN-GESTION-LEADS-WHATSAPP.md).
 
 
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**

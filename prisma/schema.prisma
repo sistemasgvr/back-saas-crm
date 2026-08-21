@@ -76,6 +76,9 @@ model Organizacion {
   logoUrl          String? @map("logo_url")
   pais             String? @db.VarChar(2)
   zonaHoraria      String  @default("America/Lima") @map("zona_horaria") @db.VarChar(64)
+  /** Único valor operativo hoy: INMOBILIARIA. Otros códigos quedan reservados
+   * sin producto — PLAN-GESTION-LEADS-WHATSAPP.md §3/§4.1. */
+  rubro            String  @default("INMOBILIARIA") @db.VarChar(40)
   notas            String?
 
   estado            Int      @default(1) @db.SmallInt
@@ -97,6 +100,7 @@ model Organizacion {
   notificacionesUsuario    NotificacionUsuario[]
 
   @@index([estado])
+  @@index([rubro])
   @@map("organizaciones")
 }
 

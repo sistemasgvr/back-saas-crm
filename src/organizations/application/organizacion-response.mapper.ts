@@ -14,6 +14,8 @@ export function toOrganizacionResponse(org: Organizacion) {
     logoUrl: org.logoUrl,
     pais: org.pais,
     zonaHoraria: org.zonaHoraria,
+    // Lo define el admin de plataforma (§3) — solo lectura para la org.
+    rubro: org.rubro,
     fechaCreacion: org.fechaCreacion,
   };
 }

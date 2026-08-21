@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -9,6 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { RUBROS_SOPORTADOS } from '../../../shared/domain/rubros-organizacion';
 
 class PrimerUsuarioDto {
   @IsEmail()
@@ -73,6 +75,10 @@ export class CreateOrganizacionDto {
   @IsString()
   @MaxLength(64)
   zonaHoraria?: string;
+
+  @IsOptional()
+  @IsIn(RUBROS_SOPORTADOS)
+  rubro?: string;
 
   @IsOptional()
   @ValidateNested()
