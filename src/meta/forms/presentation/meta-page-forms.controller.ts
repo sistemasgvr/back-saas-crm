@@ -22,6 +22,7 @@ import {
 import { BackfillLeadsFormularioUseCase } from '../../leads/application/use-cases/backfill-leads-formulario.use-case';
 import { ListarFormulariosPaginaUseCase } from '../application/use-cases/listar-formularios-pagina.use-case';
 import { SincronizarFormulariosPaginaUseCase } from '../application/use-cases/sincronizar-formularios-pagina.use-case';
+import { ContarLeadsMetaPaginaUseCase } from '../application/use-cases/contar-leads-meta-pagina.use-case';
 import { BackfillLeadsDto } from './dto/backfill-leads.dto';
 
 /** Rutas anidadas bajo /meta/pages/:id — controller separado (misma base path,
@@ -35,6 +36,7 @@ export class MetaPageFormsController {
     private readonly listarPorPagina: ListarFormulariosPaginaUseCase,
     private readonly sincronizar: SincronizarFormulariosPaginaUseCase,
     private readonly backfill: BackfillLeadsFormularioUseCase,
+    private readonly contarLeadsMeta: ContarLeadsMetaPaginaUseCase,
   ) {}
 
   @Get(':id/forms')
@@ -51,6 +53,16 @@ export class MetaPageFormsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.sincronizar.execute(ctx.organizacionId!, id, ctx.usuarioId);
+  }
+
+  /** Bajo demanda — el usuario lo pide explícitamente para comparar contra
+   * Meta (POST porque golpea Graph API, un form por vez, cuesta cuota). */
+  @Post(':id/forms/meta-counts')
+  contarEnMeta(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.contarLeadsMeta.execute(ctx.organizacionId!, id);
   }
 
   @Post(':id/forms/:formId/backfill')

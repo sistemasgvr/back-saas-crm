@@ -12,11 +12,19 @@ export interface MetaFormularioRow {
   locale: string | null;
   ultimoSyncEn: Date | null;
   fechaCreacion: Date;
+  totalLeads: number;
 }
 
 export interface FormularioFiltro {
   id: string;
   nombre: string;
+}
+
+export interface FormularioParaBackfill {
+  metaPaginaId: string;
+  formId: string;
+  nombre: string;
+  fechaCreacion: Date;
 }
 
 export interface UpsertFormularioInput {
@@ -40,6 +48,10 @@ export interface MetaFormulariosRepository {
     organizacionId: string,
     metaPaginaId?: string,
   ): Promise<FormularioFiltro[]>;
+  /** Forms activos de páginas activas — para sync masivo desde /leads. */
+  listarActivosParaBackfill(
+    organizacionId: string,
+  ): Promise<FormularioParaBackfill[]>;
   /** Crea o reactiva (si existía soft-deleted) — evita filas duplicadas al re-sincronizar. */
   upsertVinculado(input: UpsertFormularioInput): Promise<MetaFormularioRow>;
 }

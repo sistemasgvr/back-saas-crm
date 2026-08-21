@@ -83,7 +83,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       this.prisma.lead.findMany({
         where,
         include: { campana: true, anuncio: true, conjuntoAnuncio: true },
-        orderBy: { fechaLead: 'desc' },
+        orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
         skip: (filtro.page - 1) * filtro.pageSize,
         take: filtro.pageSize,
       }),

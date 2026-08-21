@@ -69,6 +69,23 @@ function mensajePermisoFaltante(scopes: string[], mensajeMeta: string): string {
   );
 }
 
+/** Meta casi nunca usa HTTP 429 real — el rate limit suele venir como HTTP 400
+ * con uno de estos códigos en el body. Se usa para decidir reintentos en el cliente. */
+export function esRateLimitMeta(error: unknown): boolean {
+  if (!(error instanceof AxiosError)) return false;
+  const code = (error.response?.data as { error?: MetaGraphErrorBody } | undefined)
+    ?.error?.code;
+  return (
+    error.response?.status === 429 ||
+    code === 4 ||
+    code === 17 ||
+    code === 32 ||
+    code === 613 ||
+    code === 80004 ||
+    code === 80005
+  );
+}
+
 /**
  * Traduce un error de Graph/Axios a HttpException Nest con mensaje usable en UI.
  * Códigos frecuentes: 190 token, 10/200 permisos, 4/17/32 rate limit, 100 parámetro.

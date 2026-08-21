@@ -33,18 +33,22 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     scopesRequeridos: ['leads_retrieval'],
     tipo: 'nucleo',
   },
+  {
+    id: 'ads_insights',
+    label: 'Cuentas publicitarias e Insights (lectura)',
+    // Núcleo: sin esto, la resolución de nombre de campaña/conjunto/anuncio
+    // de cada lead falla en silencio (queda como "errores" en el backfill) —
+    // es parte del flujo mínimo de Lead Ads según la doc de Meta, no un
+    // add-on opcional. Confirmado por el incidente real de Domaria (2026-08-20).
+    scopesRequeridos: ['ads_read'],
+    tipo: 'nucleo',
+  },
 
   // Opt-in — Business Manager y Marketing API.
   {
     id: 'pages_business',
     label: 'Páginas en Business Manager / Suite',
     scopesRequeridos: ['business_management'],
-    tipo: 'optin',
-  },
-  {
-    id: 'ads_insights',
-    label: 'Cuentas publicitarias e Insights (lectura)',
-    scopesRequeridos: ['ads_read'],
     tipo: 'optin',
   },
   {
@@ -60,13 +64,17 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     tipo: 'optin',
   },
 
-  // Opt-in — contenido y mensajería de la página.
   {
     id: 'pages_ads',
     label: 'Formularios Lead Ads y anuncios de la página',
+    // Núcleo: GET /{page-id}/leadgen_forms lo exige — sin esto, "Sincronizar
+    // formularios" falla con (#200) para TODA página, no es opcional para
+    // el flujo de Lead Ads (incidente real de Domaria, 2026-08-20).
     scopesRequeridos: ['pages_manage_ads'],
-    tipo: 'optin',
+    tipo: 'nucleo',
   },
+
+  // Opt-in — contenido y mensajería de la página.
   {
     id: 'pages_engagement',
     label: 'Leer contenido y engagement de la página',

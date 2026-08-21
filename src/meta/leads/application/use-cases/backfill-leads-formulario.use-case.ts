@@ -46,6 +46,9 @@ export class BackfillLeadsFormularioUseCase {
     metaPaginaId: string,
     formId: string,
     input: BackfillLeadsInput,
+    /** Compartido entre formularios por SincronizarLeadsOrganizacionUseCase
+     * para evitar reconsultar a Graph la misma campaña/conjunto/anuncio. */
+    cacheNombres: Map<string, string | null> = new Map(),
   ): Promise<ResultadoBackfill> {
     const pagina = await this.paginas.findPorId(organizacionId, metaPaginaId);
     if (!pagina) {
@@ -89,13 +92,31 @@ export class BackfillLeadsFormularioUseCase {
         },
       );
 
+      // Pre-calienta el cache con UNA llamada batch (ids=) para todas las
+      // campañas/conjuntos/anuncios de esta página de leads, en vez de dejar
+      // que cada lead dispare su propia llamada individual a Graph.
+      const idsFaltantes = new Set<string>();
+      for (const lead of respuesta.leads) {
+        for (const id of [lead.campaignId, lead.adsetId, lead.adId]) {
+          if (id && !cacheNombres.has(id)) idsFaltantes.add(id);
+        }
+      }
+      if (idsFaltantes.size > 0) {
+        const nombres = await this.graph.obtenerNombresRecursos(
+          [...idsFaltantes],
+          userAccessToken,
+        );
+        for (const [id, nombre] of nombres) cacheNombres.set(id, nombre);
+      }
+
       for (const lead of respuesta.leads) {
         try {
           const resultado = await this.ingestar.execute(
             organizacionId,
             metaPaginaId,
-            pageAccessToken,
+            userAccessToken,
             lead,
+            cacheNombres,
           );
           if (resultado.creado) importados += 1;
           else yaExistian += 1;

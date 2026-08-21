@@ -20,4 +20,11 @@ export interface LeadsRepository {
   upsertPorIdExterno(
     input: UpsertLeadInput,
   ): Promise<{ id: string; creado: boolean }>;
+  /** Check barato para saltar la resolución de campaña/conjunto/anuncio en
+   * Graph cuando el lead ya fue importado — evita repetir llamadas caras en
+   * cada re-sincronización (PLAN-FASE-14 §4.3). */
+  buscarIdPorIdExterno(
+    organizacionId: string,
+    idExterno: string,
+  ): Promise<string | null>;
 }

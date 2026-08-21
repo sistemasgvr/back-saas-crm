@@ -59,4 +59,15 @@ export class PrismaLeadsRepository implements LeadsRepository {
     });
     return { id: lead.id, creado: true };
   }
+
+  async buscarIdPorIdExterno(
+    organizacionId: string,
+    idExterno: string,
+  ): Promise<string | null> {
+    const existente = await this.prisma.lead.findUnique({
+      where: { organizacionId_idExterno: { organizacionId, idExterno } },
+      select: { id: true },
+    });
+    return existente?.id ?? null;
+  }
 }

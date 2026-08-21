@@ -4,7 +4,10 @@ import { ConfigService } from '@nestjs/config';
 import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
-import { excepcionDesdeErrorMeta } from '../application/mapear-error-meta-graph';
+import {
+  esRateLimitMeta,
+  excepcionDesdeErrorMeta,
+} from '../application/mapear-error-meta-graph';
 import type {
   AppSuscritaGraph,
   DebugTokenGraph,
@@ -153,6 +156,31 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       access_token: accessToken,
     });
     return data.name ?? null;
+  }
+
+  async obtenerNombresRecursos(
+    metaIds: string[],
+    accessToken: string,
+  ): Promise<Map<string, string | null>> {
+    const resultado = new Map<string, string | null>();
+    const idsUnicos = [...new Set(metaIds)];
+    if (idsUnicos.length === 0) return resultado;
+
+    // GET /?ids=a,b,c&fields=name resuelve varios objetos en una sola llamada
+    // — se trocea porque Graph no documenta un tope, 50 es el mismo límite de
+    // página usado en el resto del backfill (PLAN-FASE-14 §4.3).
+    const TAMANO_LOTE = 50;
+    for (let i = 0; i < idsUnicos.length; i += TAMANO_LOTE) {
+      const lote = idsUnicos.slice(i, i + TAMANO_LOTE);
+      const data = await this.get<Record<string, { id?: string; name?: string }>>(
+        '/',
+        { ids: lote.join(','), fields: 'name', access_token: accessToken },
+      );
+      for (const id of lote) {
+        resultado.set(id, data[id]?.name ?? null);
+      }
+    }
+    return resultado;
   }
 
   async listarCuentasPublicitarias(
@@ -369,6 +397,18 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     };
   }
 
+  async contarLeadsDeForm(
+    formId: string,
+    pageAccessToken: string,
+  ): Promise<number> {
+    // Campo propio del objeto Lead Gen Form — no hace falta listar leads.
+    const data = await this.get<{ leads_count?: number }>(`/${formId}`, {
+      fields: 'leads_count',
+      access_token: pageAccessToken,
+    });
+    return data.leads_count ?? 0;
+  }
+
   async obtenerAppsSuscritas(
     pageId: string,
     pageAccessToken: string,
@@ -466,25 +506,23 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     path: string,
     params: Record<string, string>,
   ): Promise<T> {
-    try {
-      const response = await firstValueFrom(
-        this.http.get<T>(`${this.graphBaseUrl}${path}`, { params }),
-      );
-      return response.data;
-    } catch (error) {
-      if (error instanceof AxiosError && error.response?.status === 429) {
-        // Backoff simple ante rate limit (PLAN-FASE-14 §4.3) — un solo reintento.
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        try {
-          const retry = await firstValueFrom(
-            this.http.get<T>(`${this.graphBaseUrl}${path}`, { params }),
-          );
-          return retry.data;
-        } catch (retryError) {
-          throw excepcionDesdeErrorMeta(retryError);
+    // Meta casi nunca devuelve HTTP 429 real ante rate limit — el código va
+    // en el body (ver esRateLimitMeta), así que el reintento se decide por eso.
+    const ESPERAS_RATE_LIMIT_MS = [1500, 4000];
+    for (let intento = 0; ; intento += 1) {
+      try {
+        const response = await firstValueFrom(
+          this.http.get<T>(`${this.graphBaseUrl}${path}`, { params }),
+        );
+        return response.data;
+      } catch (error) {
+        const espera = ESPERAS_RATE_LIMIT_MS[intento];
+        if (espera && esRateLimitMeta(error)) {
+          await new Promise((resolve) => setTimeout(resolve, espera));
+          continue;
         }
+        throw excepcionDesdeErrorMeta(error);
       }
-      throw excepcionDesdeErrorMeta(error);
     }
   }
 

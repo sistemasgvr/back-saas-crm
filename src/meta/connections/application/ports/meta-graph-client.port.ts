@@ -174,6 +174,18 @@ export interface MetaGraphClient {
     pageAccessToken: string,
     filtro: FiltroLeadsDeForm,
   ): Promise<PaginaLeadsDeForm>;
+  /** Resuelve el nombre de varios objetos (campaña/conjunto/anuncio) en UNA
+   * sola llamada Graph vía el parámetro `ids=` — evita N llamadas individuales
+   * cuando un backfill procesa muchos leads con pocos recursos distintos
+   * (causa raíz del rate limit visto en producción, PLAN-FASE-14 §4.3). */
+  obtenerNombresRecursos(
+    metaIds: string[],
+    accessToken: string,
+  ): Promise<Map<string, string | null>>;
+  /** Total real de leads que Meta tiene para el formulario — campo leads_count
+   * del propio objeto Lead Gen Form (no lista leads, solo trae el conteo). Para
+   * comparar contra lo ya importado, sin pagar el costo de listar/enriquecer. */
+  contarLeadsDeForm(formId: string, pageAccessToken: string): Promise<number>;
   obtenerAppsSuscritas(
     pageId: string,
     pageAccessToken: string,

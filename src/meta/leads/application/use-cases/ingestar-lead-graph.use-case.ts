@@ -38,15 +38,34 @@ export class IngestarLeadGraphUseCase {
     metaPaginaId: string,
     accessToken: string,
     lead: MetaLeadGraph,
+    /** Memoiza nombre por metaId dentro de una misma corrida de backfill —
+     * muchos leads comparten campaña/conjunto/anuncio, así se evita repetir
+     * la misma llamada a Graph y disparar su rate limit (PLAN-FASE-14 §4.3). */
+    cacheNombres: Map<string, string | null> = new Map(),
   ): Promise<ResultadoIngestarLead> {
+    // Si ya lo importamos antes, su campaña/conjunto/anuncio ya están
+    // resueltos en BD — no hace falta volver a golpear Graph por él.
+    const idExistente = await this.leads.buscarIdPorIdExterno(
+      organizacionId,
+      lead.leadgenId,
+    );
+    if (idExistente) {
+      return { leadId: idExistente, creado: false };
+    }
+
+    const nombreDe = async (metaId: string): Promise<string | null> => {
+      if (cacheNombres.has(metaId)) return cacheNombres.get(metaId)!;
+      const nombre = await this.graph.obtenerNombreRecurso(metaId, accessToken);
+      cacheNombres.set(metaId, nombre);
+      return nombre;
+    };
+
     let campanaId: string | undefined;
     let conjuntoAnuncioId: string | undefined;
     let anuncioId: string | undefined;
 
     if (lead.campaignId) {
-      const nombreCampana =
-        (await this.graph.obtenerNombreRecurso(lead.campaignId, accessToken)) ??
-        lead.campaignId;
+      const nombreCampana = (await nombreDe(lead.campaignId)) ?? lead.campaignId;
       const campana = await this.campanas.upsertPorMetaId({
         organizacionId,
         metaCampanaId: lead.campaignId,
@@ -56,9 +75,7 @@ export class IngestarLeadGraphUseCase {
     }
 
     if (lead.adsetId && campanaId) {
-      const nombreConjunto =
-        (await this.graph.obtenerNombreRecurso(lead.adsetId, accessToken)) ??
-        lead.adsetId;
+      const nombreConjunto = (await nombreDe(lead.adsetId)) ?? lead.adsetId;
       const conjunto = await this.conjuntos.upsertPorMetaId({
         organizacionId,
         campanaId,
@@ -69,9 +86,7 @@ export class IngestarLeadGraphUseCase {
     }
 
     if (lead.adId && conjuntoAnuncioId) {
-      const nombreAnuncio =
-        (await this.graph.obtenerNombreRecurso(lead.adId, accessToken)) ??
-        lead.adId;
+      const nombreAnuncio = (await nombreDe(lead.adId)) ?? lead.adId;
       const anuncio = await this.anuncios.upsertPorMetaId({
         organizacionId,
         conjuntoAnuncioId,
