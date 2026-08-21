@@ -1,4 +1,12 @@
-import { IsEmail, IsIn, IsOptional, IsString, Length, Matches, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 import { RUBROS_SOPORTADOS } from '../../../shared/domain/rubros-organizacion';
 
 export class UpdateOrganizacionAdminDto {

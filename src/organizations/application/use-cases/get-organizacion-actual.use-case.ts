@@ -6,7 +6,8 @@ import { toOrganizacionResponse } from '../organizacion-response.mapper';
 @Injectable()
 export class GetOrganizacionActualUseCase {
   constructor(
-    @Inject(ORGANIZACIONES_REPOSITORY) private readonly organizaciones: OrganizacionesRepository,
+    @Inject(ORGANIZACIONES_REPOSITORY)
+    private readonly organizaciones: OrganizacionesRepository,
   ) {}
 
   async execute(organizacionId: string) {

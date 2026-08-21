@@ -35,6 +35,8 @@ model Usuario {
   organizacionUsuarios  OrganizacionUsuario[]
   tokensRefresco        TokenRefresco[]
   notificacionesUsuario NotificacionUsuario[]
+  leadsAsignados        Lead[]                @relation("LeadAsignado")
+  leadsAsignadosPor     Lead[]                @relation("LeadAsignadoPor")
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -195,17 +197,26 @@ model Lead {
   datosCrudos       Json      @map("datos_crudos")
   fechaLead         DateTime? @map("fecha_lead") @db.Timestamptz
 
+  /** Inmobiliaria: COMPRA | VENTA | OTRO — opcional (PLAN-GESTION-LEADS-WHATSAPP.md §4.2). */
+  tipoLead             String?   @map("tipo_lead") @db.VarChar(40)
+  asignadoUsuarioId    String?   @map("asignado_usuario_id") @db.Uuid
+  asignadoEn           DateTime? @map("asignado_en") @db.Timestamptz
+  /** Null si el usuario se auto-tomó ("tomar") en vez de que un admin lo asignara. */
+  asignadoPorUsuarioId String?   @map("asignado_por_usuario_id") @db.Uuid
+
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
   usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion    Organizacion     @relation(fields: [organizacionId], references: [id])
-  metaPagina      MetaPagina?      @relation(fields: [metaPaginaId], references: [id])
-  campana         Campana?         @relation(fields: [campanaId], references: [id])
-  conjuntoAnuncio ConjuntoAnuncio? @relation(fields: [conjuntoAnuncioId], references: [id])
-  anuncio         Anuncio?         @relation(fields: [anuncioId], references: [id])
+  organizacion       Organizacion     @relation(fields: [organizacionId], references: [id])
+  metaPagina         MetaPagina?      @relation(fields: [metaPaginaId], references: [id])
+  campana            Campana?         @relation(fields: [campanaId], references: [id])
+  conjuntoAnuncio    ConjuntoAnuncio? @relation(fields: [conjuntoAnuncioId], references: [id])
+  anuncio            Anuncio?         @relation(fields: [anuncioId], references: [id])
+  asignadoUsuario    Usuario?         @relation("LeadAsignado", fields: [asignadoUsuarioId], references: [id])
+  asignadoPorUsuario Usuario?         @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
 
   @@unique([organizacionId, idExterno])
   @@index([email])
@@ -215,6 +226,8 @@ model Lead {
   @@index([anuncioId])
   @@index([fechaLead])
   @@index([estado])
+  @@index([asignadoUsuarioId])
+  @@index([tipoLead])
   @@map("leads")
 }
 

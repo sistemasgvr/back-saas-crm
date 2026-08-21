@@ -45,4 +45,10 @@ export class ListarLeadsQueryDto extends PaginacionQueryDto {
     message: 'fechaHasta debe tener formato YYYY-MM-DD',
   })
   fechaHasta?: string;
+
+  /** "mios" | "sin_asignar" | UUID de un usuario puntual. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  asignado?: string;
 }

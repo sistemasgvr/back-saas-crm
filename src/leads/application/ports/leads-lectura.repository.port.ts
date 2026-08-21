@@ -1,5 +1,14 @@
 export const LEADS_LECTURA_REPOSITORY = Symbol('LEADS_LECTURA_REPOSITORY');
 
+/** Decide qué leads puede ver quien consulta — se resuelve en el use-case a
+ * partir del rol (nunca confiar en lo que mande el cliente), la repo solo
+ * traduce esto a un where mecánico (PLAN-GESTION-LEADS-WHATSAPP.md §3). */
+export type FiltroAsignacion =
+  | { modo: 'todos' }
+  | { modo: 'mios_y_pool'; usuarioId: string }
+  | { modo: 'usuario'; usuarioId: string }
+  | { modo: 'sin_asignar' };
+
 export interface FiltroLeads {
   q?: string;
   campanaId?: string;
@@ -9,6 +18,7 @@ export interface FiltroLeads {
   formularioId?: string;
   fechaDesde?: Date;
   fechaHasta?: Date;
+  asignacion: FiltroAsignacion;
   page: number;
   pageSize: number;
 }
@@ -26,6 +36,8 @@ export interface LeadResumen {
   fechaLead: Date | null;
   campana: ReferenciaNombrada | null;
   anuncio: ReferenciaNombrada | null;
+  tipoLead: string | null;
+  asignado: ReferenciaNombrada | null;
 }
 
 export interface LeadDetalle extends LeadResumen {
@@ -50,4 +62,8 @@ export interface LeadsLecturaRepository {
     filtro: FiltroLeads,
   ): Promise<ListaLeadsResultado>;
   obtenerPorId(organizacionId: string, id: string): Promise<LeadDetalle | null>;
+  /** Miembros activos de la org para el selector de "Asignar" — PLAN §5 G2. */
+  listarMiembrosAsignables(
+    organizacionId: string,
+  ): Promise<ReferenciaNombrada[]>;
 }

@@ -9,11 +9,20 @@ import { toOrganizacionResponse } from '../organizacion-response.mapper';
 @Injectable()
 export class ActualizarOrganizacionActualUseCase {
   constructor(
-    @Inject(ORGANIZACIONES_REPOSITORY) private readonly organizaciones: OrganizacionesRepository,
+    @Inject(ORGANIZACIONES_REPOSITORY)
+    private readonly organizaciones: OrganizacionesRepository,
   ) {}
 
-  async execute(organizacionId: string, usuarioEdicion: string, input: ActualizarOrganizacionInput) {
-    const actualizada = await this.organizaciones.actualizar(organizacionId, input, usuarioEdicion);
+  async execute(
+    organizacionId: string,
+    usuarioEdicion: string,
+    input: ActualizarOrganizacionInput,
+  ) {
+    const actualizada = await this.organizaciones.actualizar(
+      organizacionId,
+      input,
+      usuarioEdicion,
+    );
     return toOrganizacionResponse(actualizada);
   }
 }

@@ -24,7 +24,14 @@ export class OrganizationsController {
   }
 
   @Patch('current')
-  updateCurrent(@CurrentUser() context: RequestContext, @Body() dto: UpdateOrganizacionDto) {
-    return this.actualizarOrganizacionActual.execute(context.organizacionId!, context.usuarioId, dto);
+  updateCurrent(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: UpdateOrganizacionDto,
+  ) {
+    return this.actualizarOrganizacionActual.execute(
+      context.organizacionId!,
+      context.usuarioId,
+      dto,
+    );
   }
 }

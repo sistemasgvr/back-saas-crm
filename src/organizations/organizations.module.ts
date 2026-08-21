@@ -10,7 +10,10 @@ import { PrismaOrganizacionesRepository } from './infrastructure/prisma-organiza
   providers: [
     GetOrganizacionActualUseCase,
     ActualizarOrganizacionActualUseCase,
-    { provide: ORGANIZACIONES_REPOSITORY, useClass: PrismaOrganizacionesRepository },
+    {
+      provide: ORGANIZACIONES_REPOSITORY,
+      useClass: PrismaOrganizacionesRepository,
+    },
   ],
 })
 export class OrganizationsModule {}

@@ -13,7 +13,11 @@ export class PrismaOrganizacionesRepository implements OrganizacionesRepository 
     return this.prisma.organizacion.findFirst({ where: { id, estado: 1 } });
   }
 
-  actualizar(id: string, data: ActualizarOrganizacionInput, usuarioEdicion: string) {
+  actualizar(
+    id: string,
+    data: ActualizarOrganizacionInput,
+    usuarioEdicion: string,
+  ) {
     return this.prisma.organizacion.update({
       where: { id },
       data: { ...data, usuarioEdicion },

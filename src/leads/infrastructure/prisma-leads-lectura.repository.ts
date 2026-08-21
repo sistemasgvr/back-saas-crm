@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
+  FiltroAsignacion,
   FiltroLeads,
   LeadDetalle,
   LeadResumen,
@@ -11,13 +12,32 @@ import type {
 } from '../application/ports/leads-lectura.repository.port';
 
 type LeadConRelaciones = Prisma.LeadGetPayload<{
-  include: { campana: true; anuncio: true; conjuntoAnuncio: true };
+  include: {
+    campana: true;
+    anuncio: true;
+    conjuntoAnuncio: true;
+    asignadoUsuario: true;
+  };
 }>;
 
 function refOpcional(
   ref: { id: string; nombre: string } | null,
 ): ReferenciaNombrada | null {
   return ref ? { id: ref.id, nombre: ref.nombre } : null;
+}
+
+function nombreUsuario(
+  usuario: {
+    id: string;
+    nombre: string;
+    apellido: string | null;
+  } | null,
+): ReferenciaNombrada | null {
+  if (!usuario) return null;
+  return {
+    id: usuario.id,
+    nombre: [usuario.nombre, usuario.apellido].filter(Boolean).join(' '),
+  };
 }
 
 function toResumen(lead: LeadConRelaciones): LeadResumen {
@@ -29,7 +49,29 @@ function toResumen(lead: LeadConRelaciones): LeadResumen {
     fechaLead: lead.fechaLead,
     campana: refOpcional(lead.campana),
     anuncio: refOpcional(lead.anuncio),
+    tipoLead: lead.tipoLead,
+    asignado: nombreUsuario(lead.asignadoUsuario),
   };
+}
+
+function whereDeAsignacion(
+  asignacion: FiltroAsignacion,
+): Prisma.LeadWhereInput {
+  switch (asignacion.modo) {
+    case 'todos':
+      return {};
+    case 'sin_asignar':
+      return { asignadoUsuarioId: null };
+    case 'usuario':
+      return { asignadoUsuarioId: asignacion.usuarioId };
+    case 'mios_y_pool':
+      return {
+        OR: [
+          { asignadoUsuarioId: asignacion.usuarioId },
+          { asignadoUsuarioId: null },
+        ],
+      };
+  }
 }
 
 @Injectable()
@@ -58,17 +100,34 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
             },
           }
         : {}),
-      ...(filtro.q
-        ? {
-            OR: [
-              { nombre: { contains: filtro.q, mode: 'insensitive' as const } },
-              { email: { contains: filtro.q, mode: 'insensitive' as const } },
+      // AND explícito: el where de asignación también puede traer su propio
+      // OR (mios_y_pool) y no debe pisar el OR de la búsqueda por texto.
+      AND: [
+        whereDeAsignacion(filtro.asignacion),
+        ...(filtro.q
+          ? [
               {
-                telefono: { contains: filtro.q, mode: 'insensitive' as const },
+                OR: [
+                  {
+                    nombre: {
+                      contains: filtro.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                  {
+                    email: { contains: filtro.q, mode: 'insensitive' as const },
+                  },
+                  {
+                    telefono: {
+                      contains: filtro.q,
+                      mode: 'insensitive' as const,
+                    },
+                  },
+                ],
               },
-            ],
-          }
-        : {}),
+            ]
+          : []),
+      ],
     };
   }
 
@@ -82,7 +141,12 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       this.prisma.lead.count({ where }),
       this.prisma.lead.findMany({
         where,
-        include: { campana: true, anuncio: true, conjuntoAnuncio: true },
+        include: {
+          campana: true,
+          anuncio: true,
+          conjuntoAnuncio: true,
+          asignadoUsuario: true,
+        },
         orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
         skip: (filtro.page - 1) * filtro.pageSize,
         take: filtro.pageSize,
@@ -104,7 +168,12 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
   ): Promise<LeadDetalle | null> {
     const lead = await this.prisma.lead.findFirst({
       where: { id, organizacionId, estado: 1 },
-      include: { campana: true, anuncio: true, conjuntoAnuncio: true },
+      include: {
+        campana: true,
+        anuncio: true,
+        conjuntoAnuncio: true,
+        asignadoUsuario: true,
+      },
     });
     if (!lead) return null;
 
@@ -116,5 +185,18 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       datosCrudos: lead.datosCrudos,
       fechaCreacion: lead.fechaCreacion,
     };
+  }
+
+  async listarMiembrosAsignables(
+    organizacionId: string,
+  ): Promise<ReferenciaNombrada[]> {
+    const miembros = await this.prisma.organizacionUsuario.findMany({
+      where: { organizacionId, estado: 1, usuario: { estado: 1 } },
+      include: { usuario: true },
+      orderBy: { usuario: { nombre: 'asc' } },
+    });
+    return miembros
+      .map((m) => nombreUsuario(m.usuario))
+      .filter((ref): ref is ReferenciaNombrada => ref !== null);
   }
 }
