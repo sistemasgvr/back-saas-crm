@@ -139,6 +139,21 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     scopesRequeridos: ['instagram_manage_messages'],
     tipo: 'optin',
   },
+
+  // Opt-in — WhatsApp Business Platform (Fase G3, PLAN-GESTION-LEADS-WHATSAPP.md).
+  // Solo lo piden las orgs que activan el módulo WHATSAPP — no toda org lo necesita.
+  {
+    id: 'whatsapp_management',
+    label: 'Vincular número de WhatsApp y ver plantillas',
+    scopesRequeridos: ['whatsapp_business_management'],
+    tipo: 'optin',
+  },
+  {
+    id: 'whatsapp_messaging',
+    label: 'Enviar y recibir mensajes de WhatsApp',
+    scopesRequeridos: ['whatsapp_business_messaging'],
+    tipo: 'optin',
+  },
 ];
 
 export const FEATURES_NUCLEO_IDS = MATRIZ_PERMISOS_META.filter(

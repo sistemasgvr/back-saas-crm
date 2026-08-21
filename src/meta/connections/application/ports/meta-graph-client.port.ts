@@ -78,6 +78,29 @@ export interface MetaFormularioGraph {
   locale?: string;
 }
 
+/** Un número de WhatsApp descubierto vía el WABA del negocio — Business
+ * Management API (PLAN-GESTION-LEADS-WHATSAPP.md §4.3 / Fase G3). */
+export interface MetaNumeroWhatsAppGraph {
+  wabaId: string;
+  wabaNombre: string;
+  phoneNumberId: string;
+  displayPhoneNumber: string;
+  verifiedName: string;
+  codeVerificationStatus?: string;
+  qualityRating?: string;
+}
+
+export interface MetaPlantillaWhatsAppGraph {
+  nombre: string;
+  idioma: string;
+  categoria: string;
+  estado: string;
+}
+
+export interface MetaMensajeWhatsAppEnviado {
+  wamid: string;
+}
+
 export interface FiltroLeadsDeForm {
   desde?: Date;
   hasta?: Date;
@@ -213,4 +236,37 @@ export interface MetaGraphClient {
     permiso: string,
     accessToken: string,
   ): Promise<void>;
+
+  // --- WhatsApp Cloud API / Business Management (Fase G3) ---
+  /** GET /me/businesses con expansión anidada a WABAs → phone_numbers — un
+   * solo round-trip para descubrir todo lo vinculable (Business Management API). */
+  listarNumerosWhatsApp(
+    accessToken: string,
+  ): Promise<MetaNumeroWhatsAppGraph[]>;
+  suscribirWabaWebhook(wabaId: string, accessToken: string): Promise<void>;
+  desuscribirWabaWebhook(wabaId: string, accessToken: string): Promise<void>;
+  obtenerAppsSuscritasWaba(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<AppSuscritaGraph[]>;
+  listarPlantillasWhatsApp(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<MetaPlantillaWhatsAppGraph[]>;
+  /** POST /{phone-number-id}/messages — sesión libre (dentro de la ventana 24h). */
+  enviarMensajeTextoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    texto: string,
+  ): Promise<MetaMensajeWhatsAppEnviado>;
+  /** POST /{phone-number-id}/messages type=template — primer contacto o fuera
+   * de la ventana 24h; requiere plantilla ya aprobada por Meta. */
+  enviarMensajePlantillaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    nombrePlantilla: string,
+    idioma: string,
+  ): Promise<MetaMensajeWhatsAppEnviado>;
 }

@@ -15,7 +15,9 @@ export function verificarFirmaWebhook(
     return false;
   }
 
-  const esperada = createHmac('sha256', appSecret).update(rawBody).digest('hex');
+  const esperada = createHmac('sha256', appSecret)
+    .update(rawBody)
+    .digest('hex');
   const recibida = signatureHeader.slice(PREFIJO.length);
 
   const bufEsperada = Buffer.from(esperada, 'hex');

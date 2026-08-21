@@ -26,11 +26,11 @@ model Usuario {
   esAdminPlataforma Int       @default(0) @map("es_admin_plataforma") @db.SmallInt
   ultimoLogin       DateTime? @map("ultimo_login") @db.Timestamptz
 
-  estado            Int       @default(1) @db.SmallInt
-  usuarioCreacion   String?   @map("usuario_creacion") @db.Uuid
-  usuarioEdicion    String?   @map("usuario_edicion") @db.Uuid
-  fechaCreacion     DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz
-  fechaModificacion DateTime  @updatedAt @map("fecha_modificacion") @db.Timestamptz
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacionUsuarios  OrganizacionUsuario[]
   tokensRefresco        TokenRefresco[]
@@ -78,8 +78,10 @@ model Organizacion {
   logoUrl          String? @map("logo_url")
   pais             String? @db.VarChar(2)
   zonaHoraria      String  @default("America/Lima") @map("zona_horaria") @db.VarChar(64)
-  /** Único valor operativo hoy: INMOBILIARIA. Otros códigos quedan reservados
-   * sin producto — PLAN-GESTION-LEADS-WHATSAPP.md §3/§4.1. */
+  /**
+   * Único valor operativo hoy: INMOBILIARIA. Otros códigos quedan reservados
+   * sin producto — PLAN-GESTION-LEADS-WHATSAPP.md §3/§4.1.
+   */
   rubro            String  @default("INMOBILIARIA") @db.VarChar(40)
   notas            String?
 
@@ -100,6 +102,8 @@ model Organizacion {
   leads                    Lead[]
   notificaciones           Notificacion[]
   notificacionesUsuario    NotificacionUsuario[]
+  whatsappConexiones       WhatsappConexion[]
+  whatsappConversaciones   WhatsappConversacion[]
 
   @@index([estado])
   @@index([rubro])
@@ -197,11 +201,15 @@ model Lead {
   datosCrudos       Json      @map("datos_crudos")
   fechaLead         DateTime? @map("fecha_lead") @db.Timestamptz
 
-  /** Inmobiliaria: COMPRA | VENTA | OTRO — opcional (PLAN-GESTION-LEADS-WHATSAPP.md §4.2). */
+  /**
+   * Inmobiliaria: COMPRA | VENTA | OTRO — opcional (PLAN-GESTION-LEADS-WHATSAPP.md §4.2).
+   */
   tipoLead             String?   @map("tipo_lead") @db.VarChar(40)
   asignadoUsuarioId    String?   @map("asignado_usuario_id") @db.Uuid
   asignadoEn           DateTime? @map("asignado_en") @db.Timestamptz
-  /** Null si el usuario se auto-tomó ("tomar") en vez de que un admin lo asignara. */
+  /**
+   * Null si el usuario se auto-tomó ("tomar") en vez de que un admin lo asignara.
+   */
   asignadoPorUsuarioId String?   @map("asignado_por_usuario_id") @db.Uuid
 
   estado            Int      @default(1) @db.SmallInt
@@ -210,13 +218,14 @@ model Lead {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion       Organizacion     @relation(fields: [organizacionId], references: [id])
-  metaPagina         MetaPagina?      @relation(fields: [metaPaginaId], references: [id])
-  campana            Campana?         @relation(fields: [campanaId], references: [id])
-  conjuntoAnuncio    ConjuntoAnuncio? @relation(fields: [conjuntoAnuncioId], references: [id])
-  anuncio            Anuncio?         @relation(fields: [anuncioId], references: [id])
-  asignadoUsuario    Usuario?         @relation("LeadAsignado", fields: [asignadoUsuarioId], references: [id])
-  asignadoPorUsuario Usuario?         @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
+  organizacion           Organizacion           @relation(fields: [organizacionId], references: [id])
+  metaPagina             MetaPagina?            @relation(fields: [metaPaginaId], references: [id])
+  campana                Campana?               @relation(fields: [campanaId], references: [id])
+  conjuntoAnuncio        ConjuntoAnuncio?       @relation(fields: [conjuntoAnuncioId], references: [id])
+  anuncio                Anuncio?               @relation(fields: [anuncioId], references: [id])
+  asignadoUsuario        Usuario?               @relation("LeadAsignado", fields: [asignadoUsuarioId], references: [id])
+  asignadoPorUsuario     Usuario?               @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
+  whatsappConversaciones WhatsappConversacion[]
 
   @@unique([organizacionId, idExterno])
   @@index([email])
@@ -241,18 +250,20 @@ model MetaConexion {
   appSecretCifrado String? @map("app_secret_cifrado")
 
   // Se completan recién cuando el OAuth de esa app termina con éxito.
-  metaUserId      String?   @map("meta_user_id") @db.VarChar(64)
-  metaUserNombre  String?   @map("meta_user_nombre") @db.VarChar(200)
-  adAccountId     String?   @map("ad_account_id") @db.VarChar(64)
-  adAccountNombre String?   @map("ad_account_nombre") @db.VarChar(200)
-  pageId          String?   @map("page_id") @db.VarChar(64)
-  pageNombre      String?   @map("page_nombre") @db.VarChar(200)
-  tokenCifrado    String?   @map("token_cifrado")
-  tokenExpiraEn   DateTime? @map("token_expira_en") @db.Timestamptz
-  scopes          String?
-  /** IDs de features de meta-permisos-matriz.ts que la org quiere solicitar en
-   * OAuth (además de las núcleo, siempre incluidas) — PLAN.md Fase 16. */
-  featuresDeseadas Json?    @map("features_deseadas")
+  metaUserId       String?   @map("meta_user_id") @db.VarChar(64)
+  metaUserNombre   String?   @map("meta_user_nombre") @db.VarChar(200)
+  adAccountId      String?   @map("ad_account_id") @db.VarChar(64)
+  adAccountNombre  String?   @map("ad_account_nombre") @db.VarChar(200)
+  pageId           String?   @map("page_id") @db.VarChar(64)
+  pageNombre       String?   @map("page_nombre") @db.VarChar(200)
+  tokenCifrado     String?   @map("token_cifrado")
+  tokenExpiraEn    DateTime? @map("token_expira_en") @db.Timestamptz
+  scopes           String?
+  /**
+   * IDs de features de meta-permisos-matriz.ts que la org quiere solicitar en
+   * OAuth (además de las núcleo, siempre incluidas) — PLAN.md Fase 16.
+   */
+  featuresDeseadas Json?     @map("features_deseadas")
 
   webhookVerifyToken String @map("webhook_verify_token") @db.VarChar(128)
 
@@ -262,9 +273,10 @@ model MetaConexion {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion             Organizacion             @relation(fields: [organizacionId], references: [id])
-  paginas                  MetaPagina[]
-  cuentasPublicitarias     MetaCuentaPublicitaria[]
+  organizacion         Organizacion             @relation(fields: [organizacionId], references: [id])
+  paginas              MetaPagina[]
+  cuentasPublicitarias MetaCuentaPublicitaria[]
+  whatsappConexiones   WhatsappConexion[]
 
   // page_id único entre conexiones activas: índice parcial en migración
   // 20260817223000_meta_conexiones_page_id_unique (Prisma DSL no soporta partial unique).
@@ -279,18 +291,18 @@ model MetaConexion {
 }
 
 model MetaPagina {
-  id                 String    @id @default(uuid()) @db.Uuid
-  organizacionId     String    @map("organizacion_id") @db.Uuid
-  metaConexionId     String    @map("meta_conexion_id") @db.Uuid
-  pageId             String    @map("page_id") @db.VarChar(64)
-  nombre             String    @db.VarChar(200)
-  tokenPaginaCifrado String?   @map("token_pagina_cifrado")
-  webhookSuscrito    Int       @default(0) @map("webhook_suscrito") @db.SmallInt
-  webhookSuscritoEn  DateTime? @map("webhook_suscrito_en") @db.Timestamptz
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizacionId       String    @map("organizacion_id") @db.Uuid
+  metaConexionId       String    @map("meta_conexion_id") @db.Uuid
+  pageId               String    @map("page_id") @db.VarChar(64)
+  nombre               String    @db.VarChar(200)
+  tokenPaginaCifrado   String?   @map("token_pagina_cifrado")
+  webhookSuscrito      Int       @default(0) @map("webhook_suscrito") @db.SmallInt
+  webhookSuscritoEn    DateTime? @map("webhook_suscrito_en") @db.Timestamptz
   webhookUltimoCheckEn DateTime? @map("webhook_ultimo_check_en") @db.Timestamptz
   webhookUltimoError   String?   @map("webhook_ultimo_error")
-  fotoUrl            String?   @map("foto_url")
-  categoria          String?   @db.VarChar(120)
+  fotoUrl              String?   @map("foto_url")
+  categoria            String?   @db.VarChar(120)
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
@@ -298,8 +310,8 @@ model MetaPagina {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
-  metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
+  organizacion Organizacion     @relation(fields: [organizacionId], references: [id])
+  metaConexion MetaConexion     @relation(fields: [metaConexionId], references: [id])
   leads        Lead[]
   formularios  MetaFormulario[]
 
@@ -330,9 +342,9 @@ model MetaCuentaPublicitaria {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
-  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
-  metaConexion MetaConexion @relation(fields: [metaConexionId], references: [id])
-  campanas     Campana[]
+  organizacion    Organizacion        @relation(fields: [organizacionId], references: [id])
+  metaConexion    MetaConexion        @relation(fields: [metaConexionId], references: [id])
+  campanas        Campana[]
   insightsDiarios MetaInsightDiario[]
 
   // (organizacion_id, ad_account_id) único solo entre cuentas ACTIVAS: índice parcial
@@ -375,7 +387,9 @@ model MetaInsightDiario {
   id                       String   @id @default(uuid()) @db.Uuid
   organizacionId           String   @map("organizacion_id") @db.Uuid
   metaCuentaPublicitariaId String   @map("meta_cuenta_publicitaria_id") @db.Uuid
-  /** NULL = snapshot a nivel cuenta ese día; no NULL = snapshot a nivel campaña. */
+  /**
+   * NULL = snapshot a nivel cuenta ese día; no NULL = snapshot a nivel campaña.
+   */
   campanaId                String?  @map("campana_id") @db.Uuid
   fecha                    DateTime @db.Date
   spend                    Decimal  @db.Decimal(14, 4)
@@ -517,4 +531,124 @@ model NotificacionUsuario {
   @@index([notificacionId])
   @@index([estado])
   @@map("notificaciones_usuario")
+}
+
+model WhatsappConexion {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  /**
+   * Reusa el token OAuth ya guardado en MetaConexion — mismo patrón que
+   * MetaPagina/MetaCuentaPublicitaria, sin credenciales propias
+   * (PLAN-GESTION-LEADS-WHATSAPP.md §4.3).
+   */
+  metaConexionId String @map("meta_conexion_id") @db.Uuid
+
+  wabaId           String  @map("waba_id") @db.VarChar(64)
+  phoneNumberId    String  @map("phone_number_id") @db.VarChar(64)
+  numeroDisplay    String? @map("numero_display") @db.VarChar(40)
+  nombreVerificado String? @map("nombre_verificado") @db.VarChar(255)
+  estadoNumero     String? @map("estado_numero") @db.VarChar(40)
+
+  webhookSuscrito      Int       @default(0) @map("webhook_suscrito") @db.SmallInt
+  webhookSuscritoEn    DateTime? @map("webhook_suscrito_en") @db.Timestamptz
+  webhookUltimoCheckEn DateTime? @map("webhook_ultimo_check_en") @db.Timestamptz
+  webhookUltimoError   String?   @map("webhook_ultimo_error")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion   Organizacion           @relation(fields: [organizacionId], references: [id])
+  metaConexion   MetaConexion           @relation(fields: [metaConexionId], references: [id])
+  conversaciones WhatsappConversacion[]
+
+  // phone_number_id único entre conexiones activas: índice parcial en migración
+  // (Prisma DSL no soporta partial unique) — permite re-vincular tras desvincular.
+  @@index([organizacionId, phoneNumberId])
+  @@index([estado])
+  @@map("whatsapp_conexiones")
+}
+
+model WhatsappConversacion {
+  id                 String  @id @default(uuid()) @db.Uuid
+  organizacionId     String  @map("organizacion_id") @db.Uuid
+  whatsappConexionId String  @map("whatsapp_conexion_id") @db.Uuid
+  /**
+   * Null si el número aún no calza con ningún lead (mensaje entrante suelto,
+   * no viene de un formulario Meta) — PLAN §4.3, riesgo "scope creep" evitado.
+   */
+  leadId             String? @map("lead_id") @db.Uuid
+
+  /**
+   * Teléfono E.164 sin '+' — mismo formato que usa el payload de Meta. Es la
+   * clave real de una conversación: uno por (org, wa_id), con o sin lead.
+   */
+  waId            String    @map("wa_id") @db.VarChar(40)
+  nombreContacto  String?   @map("nombre_contacto") @db.VarChar(200)
+  ultimoMensajeEn DateTime? @map("ultimo_mensaje_en") @db.Timestamptz
+  /**
+   * 24h desde el último mensaje ENTRANTE — mientras no expire se puede mandar
+   * mensaje de sesión libre; si expiró, solo plantilla aprobada.
+   */
+  ventanaExpiraEn DateTime? @map("ventana_expira_en") @db.Timestamptz
+  noLeidos        Int       @default(0) @map("no_leidos")
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion     Organizacion      @relation(fields: [organizacionId], references: [id])
+  whatsappConexion WhatsappConexion  @relation(fields: [whatsappConexionId], references: [id])
+  lead             Lead?             @relation(fields: [leadId], references: [id])
+  mensajes         WhatsappMensaje[]
+
+  @@unique([organizacionId, waId])
+  @@index([leadId])
+  @@index([whatsappConexionId])
+  @@index([ultimoMensajeEn])
+  @@map("whatsapp_conversaciones")
+}
+
+model WhatsappMensaje {
+  id                     String @id @default(uuid()) @db.Uuid
+  organizacionId         String @map("organizacion_id") @db.Uuid
+  whatsappConversacionId String @map("whatsapp_conversacion_id") @db.Uuid
+
+  /**
+   * id de Meta (wamid) — idempotencia ante reintentos de webhook.
+   */
+  wamid           String   @db.VarChar(128)
+  /**
+   * entrante | saliente
+   */
+  direccion       String   @db.VarChar(10)
+  /**
+   * text | template | image | document | audio | video (arrancamos con text/template).
+   */
+  tipo            String   @db.VarChar(20)
+  texto           String?
+  plantillaNombre String?  @map("plantilla_nombre") @db.VarChar(200)
+  /**
+   * enviado | entregado | leido | fallido — solo aplica a salientes.
+   */
+  estadoEntrega   String?  @map("estado_entrega") @db.VarChar(20)
+  errorMensaje    String?  @map("error_mensaje")
+  datosCrudos     Json     @map("datos_crudos")
+  /**
+   * Timestamp real de Meta (puede diferir de fechaCreacion si el webhook llega tarde).
+   */
+  fechaMensaje    DateTime @map("fecha_mensaje") @db.Timestamptz
+
+  usuarioCreacion String?  @map("usuario_creacion") @db.Uuid
+  fechaCreacion   DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  whatsappConversacion WhatsappConversacion @relation(fields: [whatsappConversacionId], references: [id])
+
+  @@unique([organizacionId, wamid])
+  @@index([whatsappConversacionId, fechaMensaje])
+  @@map("whatsapp_mensajes")
 }

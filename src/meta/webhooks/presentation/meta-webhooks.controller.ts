@@ -16,8 +16,12 @@ import { ProcesarLeadEntranteUseCase } from '../../leads/application/use-cases/p
 import { PageSinConexionError } from '../../leads/application/errors/page-sin-conexion.error';
 import { extraerEventosLeadgen } from '../domain/leadgen-webhook-payload.interface';
 import type { LeadgenWebhookPayload } from '../domain/leadgen-webhook-payload.interface';
+import { extraerEventosWhatsApp } from '../domain/whatsapp-webhook-payload.interface';
+import type { WhatsappWebhookPayload } from '../domain/whatsapp-webhook-payload.interface';
 import { VerificarWebhookMetaUseCase } from '../application/use-cases/verificar-webhook-meta.use-case';
 import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
+import { ProcesarMensajeWhatsAppEntranteUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
+import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
@@ -30,6 +34,8 @@ export class MetaWebhooksController {
     private readonly verificarWebhook: VerificarWebhookMetaUseCase,
     private readonly procesarLead: ProcesarLeadEntranteUseCase,
     private readonly crearNotificacion: CrearNotificacionUseCase,
+    private readonly procesarMensajeWhatsApp: ProcesarMensajeWhatsAppEntranteUseCase,
+    private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -86,8 +92,46 @@ export class MetaWebhooksController {
     // confiamos en ingest idempotente + backfill manual.
     res.status(200).send('OK');
 
+    // Mismo endpoint/firma para "page" (leadgen) y "whatsapp_business_account"
+    // (Fase G3) — Meta permite apuntar ambas suscripciones a la misma URL;
+    // se distingue por payload.object (PLAN-GESTION-LEADS-WHATSAPP.md §4.3).
+    if (payload.object === 'whatsapp_business_account') {
+      void this.procesarEventosWhatsAppEnBackground(
+        payload as unknown as WhatsappWebhookPayload,
+      );
+      return;
+    }
+
     const eventos = extraerEventosLeadgen(payload);
     void this.procesarEventosEnBackground(eventos);
+  }
+
+  private async procesarEventosWhatsAppEnBackground(
+    payload: WhatsappWebhookPayload,
+  ): Promise<void> {
+    const { mensajes, estados } = extraerEventosWhatsApp(payload);
+
+    for (const evento of mensajes) {
+      try {
+        await this.procesarMensajeWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando mensaje WhatsApp ${evento.wamid} (phone_number_id ${evento.phoneNumberId})`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
+    for (const evento of estados) {
+      try {
+        await this.procesarEstadoWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando estado WhatsApp ${evento.wamid}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
   }
 
   private async procesarEventosEnBackground(

@@ -1,0 +1,39 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { MetaConnectionsModule } from '../../meta/connections/meta-connections.module';
+import { WhatsappConnectionsModule } from '../connections/whatsapp-connections.module';
+import { NotificationsModule } from '../../notifications/notifications.module';
+import { WhatsappChatsController } from './presentation/whatsapp-chats.controller';
+import { ListarConversacionesUseCase } from './application/use-cases/listar-conversaciones.use-case';
+import { ObtenerConversacionUseCase } from './application/use-cases/obtener-conversacion.use-case';
+import { EnviarMensajeWhatsAppUseCase } from './application/use-cases/enviar-mensaje-whatsapp.use-case';
+import { ListarPlantillasUseCase } from './application/use-cases/listar-plantillas.use-case';
+import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
+import { ProcesarEstadoWhatsAppUseCase } from './application/use-cases/procesar-estado-whatsapp.use-case';
+import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
+import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-whatsapp-conversaciones.repository';
+
+@Module({
+  imports: [
+    forwardRef(() => MetaConnectionsModule),
+    WhatsappConnectionsModule,
+    NotificationsModule,
+  ],
+  controllers: [WhatsappChatsController],
+  providers: [
+    ListarConversacionesUseCase,
+    ObtenerConversacionUseCase,
+    EnviarMensajeWhatsAppUseCase,
+    ListarPlantillasUseCase,
+    ProcesarMensajeWhatsAppEntranteUseCase,
+    ProcesarEstadoWhatsAppUseCase,
+    {
+      provide: WHATSAPP_CONVERSACIONES_REPOSITORY,
+      useClass: PrismaWhatsappConversacionesRepository,
+    },
+  ],
+  exports: [
+    ProcesarMensajeWhatsAppEntranteUseCase,
+    ProcesarEstadoWhatsAppUseCase,
+  ],
+})
+export class WhatsappMessagingModule {}

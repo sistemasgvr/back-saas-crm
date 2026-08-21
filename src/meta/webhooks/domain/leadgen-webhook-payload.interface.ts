@@ -15,7 +15,9 @@ export interface EventoLeadgen {
   leadgenId: string;
 }
 
-export function extraerEventosLeadgen(payload: LeadgenWebhookPayload): EventoLeadgen[] {
+export function extraerEventosLeadgen(
+  payload: LeadgenWebhookPayload,
+): EventoLeadgen[] {
   const eventos: EventoLeadgen[] = [];
 
   for (const entry of payload.entry ?? []) {

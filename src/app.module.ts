@@ -15,6 +15,7 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { MetaModule } from './meta/meta.module';
 import { LeadsModule } from './leads/leads.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     MetaModule,
     LeadsModule,
     NotificationsModule,
+    WhatsappModule,
   ],
   controllers: [AppController],
   providers: [AppService],

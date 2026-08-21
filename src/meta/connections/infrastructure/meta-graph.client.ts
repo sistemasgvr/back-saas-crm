@@ -22,7 +22,10 @@ import type {
   MetaGraphClient,
   MetaInsightGraph,
   MetaLeadGraph,
+  MetaMensajeWhatsAppEnviado,
+  MetaNumeroWhatsAppGraph,
   MetaPaginaGraph,
+  MetaPlantillaWhatsAppGraph,
   MetaUsuario,
   PaginaLeadsDeForm,
   TokenIntercambiado,
@@ -637,6 +640,153 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     });
   }
 
+  // --- WhatsApp Cloud API / Business Management (Fase G3) ---
+
+  async listarNumerosWhatsApp(
+    accessToken: string,
+  ): Promise<MetaNumeroWhatsAppGraph[]> {
+    const data = await this.get<{
+      data: {
+        id: string;
+        name: string;
+        owned_whatsapp_business_accounts?: {
+          data: {
+            id: string;
+            name: string;
+            phone_numbers?: {
+              data: {
+                id: string;
+                display_phone_number: string;
+                verified_name: string;
+                code_verification_status?: string;
+                quality_rating?: string;
+              }[];
+            };
+          }[];
+        };
+      }[];
+    }>('/me/businesses', {
+      fields:
+        'name,owned_whatsapp_business_accounts{id,name,phone_numbers{id,display_phone_number,verified_name,code_verification_status,quality_rating}}',
+      access_token: accessToken,
+    });
+
+    const numeros: MetaNumeroWhatsAppGraph[] = [];
+    for (const negocio of data.data) {
+      for (const waba of negocio.owned_whatsapp_business_accounts?.data ?? []) {
+        for (const numero of waba.phone_numbers?.data ?? []) {
+          numeros.push({
+            wabaId: waba.id,
+            wabaNombre: waba.name,
+            phoneNumberId: numero.id,
+            displayPhoneNumber: numero.display_phone_number,
+            verifiedName: numero.verified_name,
+            codeVerificationStatus: numero.code_verification_status,
+            qualityRating: numero.quality_rating,
+          });
+        }
+      }
+    }
+    return numeros;
+  }
+
+  async suscribirWabaWebhook(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<void> {
+    await this.post(`/${wabaId}/subscribed_apps`, {
+      access_token: accessToken,
+    });
+  }
+
+  async desuscribirWabaWebhook(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<void> {
+    await this.delete(`/${wabaId}/subscribed_apps`, {
+      access_token: accessToken,
+    });
+  }
+
+  async obtenerAppsSuscritasWaba(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<AppSuscritaGraph[]> {
+    const data = await this.get<
+      GraphListResponse<{ id: string; subscribed_fields?: string[] }>
+    >(`/${wabaId}/subscribed_apps`, { access_token: accessToken });
+    return data.data.map((app) => ({
+      id: app.id,
+      camposSuscritos: app.subscribed_fields ?? [],
+    }));
+  }
+
+  async listarPlantillasWhatsApp(
+    wabaId: string,
+    accessToken: string,
+  ): Promise<MetaPlantillaWhatsAppGraph[]> {
+    const { data } = await this.getAllPages<{
+      name: string;
+      language: string;
+      category: string;
+      status: string;
+    }>(`/${wabaId}/message_templates`, {
+      fields: 'name,language,category,status',
+      access_token: accessToken,
+      limit: '100',
+    });
+    return data.map((t) => ({
+      nombre: t.name,
+      idioma: t.language,
+      categoria: t.category,
+      estado: t.status,
+    }));
+  }
+
+  async enviarMensajeTextoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    texto: string,
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'text',
+        text: { body: texto },
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
+  async enviarMensajePlantillaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    nombrePlantilla: string,
+    idioma: string,
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'template',
+        template: {
+          name: nombrePlantilla,
+          language: { code: idioma },
+        },
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
   /**
    * Acumula todas las páginas de un edge Graph siguiendo `paging.cursors.after`
    * mientras exista `paging.next` (mismo criterio que `listarLeadsDeForm`).
@@ -711,6 +861,25 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       await firstValueFrom(
         this.http.delete(`${this.graphBaseUrl}${path}`, { params }),
       );
+    } catch (error) {
+      throw excepcionDesdeErrorMeta(error);
+    }
+  }
+
+  /** POST con body JSON real (a diferencia de `post()`, que solo manda
+   * query params) — lo necesita el envío de mensajes de WhatsApp. */
+  private async postJson<T>(
+    path: string,
+    body: unknown,
+    accessToken: string,
+  ): Promise<T> {
+    try {
+      const response = await firstValueFrom(
+        this.http.post<T>(`${this.graphBaseUrl}${path}`, body, {
+          params: { access_token: accessToken },
+        }),
+      );
+      return response.data;
     } catch (error) {
       throw excepcionDesdeErrorMeta(error);
     }
