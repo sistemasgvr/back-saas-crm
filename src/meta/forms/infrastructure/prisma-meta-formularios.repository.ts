@@ -71,24 +71,6 @@ export class PrismaMetaFormulariosRepository implements MetaFormulariosRepositor
     return formularios.map((f) => ({ id: f.formId, nombre: f.nombre }));
   }
 
-  async listarActivosParaBackfill(organizacionId: string) {
-    const formularios = await this.prisma.metaFormulario.findMany({
-      where: {
-        organizacionId,
-        estado: 1,
-        metaPagina: { estado: 1 },
-      },
-      select: {
-        metaPaginaId: true,
-        formId: true,
-        nombre: true,
-        fechaCreacion: true,
-      },
-      orderBy: [{ metaPaginaId: 'asc' }, { nombre: 'asc' }],
-    });
-    return formularios;
-  }
-
   async upsertVinculado(
     input: UpsertFormularioInput,
   ): Promise<MetaFormularioRow> {

@@ -12,6 +12,7 @@ export interface ResultadoProcesarLead {
   motivo?: string;
   leadId?: string;
   organizacionId?: string;
+  creado?: boolean;
 }
 
 @Injectable()
@@ -29,20 +30,42 @@ export class ProcesarLeadEntranteUseCase {
     leadgenId: string,
   ): Promise<ResultadoProcesarLead> {
     const pagina = await this.paginas.findActivaPorPageId(pageId);
-    if (!pagina?.conexionTokenCifrado) {
+    if (
+      !pagina ||
+      (!pagina.tokenPaginaCifrado && !pagina.conexionTokenCifrado)
+    ) {
       throw new PageSinConexionError(pageId);
     }
 
-    const accessToken = this.tokenEncryption.decrypt(
-      pagina.conexionTokenCifrado,
-    );
+    const userToken = pagina.conexionTokenCifrado
+      ? this.tokenEncryption.decrypt(pagina.conexionTokenCifrado)
+      : null;
+
+    let pageToken: string | null = pagina.tokenPaginaCifrado
+      ? this.tokenEncryption.decrypt(pagina.tokenPaginaCifrado)
+      : null;
+
+    if (!pageToken && userToken) {
+      pageToken = await this.graph.obtenerAccessTokenPagina(
+        pagina.pageId,
+        userToken,
+      );
+    }
+
+    if (!pageToken) {
+      throw new PageSinConexionError(pageId);
+    }
+
     // Puede lanzar BadGatewayException — el caller (controller) responde 5xx para que Meta reintente.
-    const lead = await this.graph.obtenerLead(leadgenId, accessToken);
+    const lead = await this.graph.obtenerLead(leadgenId, pageToken);
+
+    // User token preferido para enriquecer nombres (ads_read); Page token como fallback.
+    const tokenEnriquecimiento = userToken ?? pageToken;
 
     const resultado = await this.ingestar.execute(
       pagina.organizacionId,
       pagina.id,
-      accessToken,
+      tokenEnriquecimiento,
       lead,
     );
 
@@ -50,6 +73,7 @@ export class ProcesarLeadEntranteUseCase {
       procesado: true,
       leadId: resultado.leadId,
       organizacionId: pagina.organizacionId,
+      creado: resultado.creado,
     };
   }
 }

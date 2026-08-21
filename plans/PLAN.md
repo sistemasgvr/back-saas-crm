@@ -59,7 +59,7 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 | Frontend | Next.js 16, login, admin, `/settings` + hub `/settings/meta` (Conexión con panel permisos), `/leads`, `/dashboard` (leads + inversión/CPL), notificaciones, TanStack Query, RHF+Zod |
 | Datos | Neon PostgreSQL + migraciones + seed (`meta_paginas`, `meta_cuentas_publicitarias`, `meta_formularios`, `meta_insights_diarios`, `features_deseadas` en conexiones, …) |
 | Infra local | API `:4000`, Next `:3000`, CORS, prefijo `/api`, `proxy.ts` refresh en frontend |
-| Graph API | Versión única `META_GRAPH_VERSION` (default `v25.0`) |
+| Graph API | Versión única `META_GRAPH_VERSION` (default `v26.0`) |
 
 **Pendiente operativo (no bloquea código):** smoke test E2E con Meta real en producción, rotar `SEED_ADMIN_PASSWORD` si aún aplica.
 
@@ -803,7 +803,7 @@ No hay ruta `/settings/meta/forms` dedicada: los forms viven en el **perfil de c
 | OAuth callback | `https://{dominio}/api/meta/oauth/callback` |
 
 ```env
-META_GRAPH_VERSION=v25.0
+META_GRAPH_VERSION=v26.0
 META_VERIFY_TOKEN=
 META_WEBHOOK_URL_TOKEN=
 META_OAUTH_REDIRECT_URI=https://{dominio}/api/meta/oauth/callback
@@ -1074,7 +1074,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 | Auth pública | Solo `login` / `refresh` / `logout` |
 | Webhook → org | Lookup **`meta_paginas.page_id`** → `organizacion_id` (+ `meta_pagina_id` en el lead) |
 | Webhook URL | `https://{dominio}/api/meta/webhooks?token=...` (+ verify + firma por org) |
-| Graph API | `META_GRAPH_VERSION` (default `v25.0`) — OAuth + client únicos |
+| Graph API | `META_GRAPH_VERSION` (default `v26.0`) — OAuth + client únicos |
 | Páginas / cuentas Meta | N por org (`meta_paginas`, `meta_cuentas_publicitarias`) |
 | Formularios leadgen | Catálogo `meta_formularios` + sync/backfill en perfil de página |
 | Insights / CPL | Snapshots diarios `meta_insights_diarios`; sync on-demand; CPL = spend Meta ÷ leads CRM |

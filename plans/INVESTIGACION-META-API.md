@@ -8,8 +8,8 @@ No sustituye a [PLAN.md](./PLAN.md) (fuente de verdad de lo ya construido).
 
 **Repos:** `back-saas-crm` · `front-saas-crm`  
 **Actualizado:** 2026-08-20 (auditoría web)  
-**Graph en código:** `META_GRAPH_VERSION` (default `v25.0`)  
-**Nota versión:** Meta publicó **Graph / Marketing API v26.0** (jul 2026). Revisar changelog antes de subir `META_GRAPH_VERSION` (deprecaciones Commerce Order Management, placements IG Explore / Messenger Stories, etc.).
+**Graph en código:** `META_GRAPH_VERSION` (default `v26.0`)  
+**Nota versión:** Código ya apunta a **Graph / Marketing API v26.0** (jul 2026). Remociones de protocolo legacy ya aplicadas (Batch para nombres; sin `ids=` / `pretty` / `debug` / `date_format` / ETag). Revisar changelog operativo (Commerce Order Management, placements IG Explore / Messenger Stories, etc.).
 
 Leyenda de estado respecto a **este** CRM:
 
@@ -386,7 +386,7 @@ Antes de esta pasada el doc cubría bien el **hilo CRM Lead Ads → Insights →
 | Batch Graph + async insights | Diseño a escala post-Fase 15 |
 | Ads Library (`ads_archive`) | Transparencia, no ops del anunciante |
 | App Events / Offline legacy | Preferir CAPI |
-| Graph v26 disponible | Planificar upgrade desde `v25.0` |
+| Graph v26 (default en código) | Upgrade aplicado; validar smoke Meta real |
 
 **Conclusión:** para el CRM **no faltaba el camino crítico** (Lead Ads → Insights → CAPI → WA). Faltaba el **mapa periférico** para no reinventar Commerce/Social/Ads Manager ni subestimar el tamaño real de WhatsApp y medición.
 

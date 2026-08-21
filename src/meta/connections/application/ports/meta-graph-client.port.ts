@@ -65,6 +65,12 @@ export interface MetaAnuncioGraph {
   estado?: string;
 }
 
+/** Listado Graph con señal de tope de paginación (MAX_PAGINAS_GRAPH en el client). */
+export interface ListadoGraph<T> {
+  items: T[];
+  truncado: boolean;
+}
+
 export interface MetaFormularioGraph {
   id: string;
   nombre: string;
@@ -156,15 +162,15 @@ export interface MetaGraphClient {
   listarCampanasDeCuenta(
     adAccountId: string,
     accessToken: string,
-  ): Promise<MetaCampanaGraph[]>;
+  ): Promise<ListadoGraph<MetaCampanaGraph>>;
   listarConjuntosDeCampana(
     campanaId: string,
     accessToken: string,
-  ): Promise<MetaConjuntoAnuncioGraph[]>;
+  ): Promise<ListadoGraph<MetaConjuntoAnuncioGraph>>;
   listarAnunciosDeConjunto(
     conjuntoId: string,
     accessToken: string,
-  ): Promise<MetaAnuncioGraph[]>;
+  ): Promise<ListadoGraph<MetaAnuncioGraph>>;
   listarLeadgenForms(
     pageId: string,
     pageAccessToken: string,
@@ -175,9 +181,9 @@ export interface MetaGraphClient {
     filtro: FiltroLeadsDeForm,
   ): Promise<PaginaLeadsDeForm>;
   /** Resuelve el nombre de varios objetos (campaña/conjunto/anuncio) en UNA
-   * sola llamada Graph vía el parámetro `ids=` — evita N llamadas individuales
-   * cuando un backfill procesa muchos leads con pocos recursos distintos
-   * (causa raíz del rate limit visto en producción, PLAN-FASE-14 §4.3). */
+   * sola HTTP round-trip vía Graph Batch API (no `ids=`, deprecado en v26.0+)
+   * — evita N llamadas individuales cuando un backfill procesa muchos leads
+   * con pocos recursos distintos (PLAN-FASE-14 §4.3). */
   obtenerNombresRecursos(
     metaIds: string[],
     accessToken: string,

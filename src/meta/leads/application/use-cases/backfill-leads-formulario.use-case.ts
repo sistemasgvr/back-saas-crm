@@ -13,6 +13,11 @@ import { IngestarLeadGraphUseCase } from './ingestar-lead-graph.use-case';
 const MAX_PAGINAS_GRAPH = 10;
 const TAMANO_PAGINA = 50;
 
+/** Meta Lead Ads: leads suelen estar disponibles ~90 días vía API. */
+const DIAS_RETENCION_META = 90;
+const AVISO_RETENCION_META =
+  'Meta solo retiene leads ~90 días; no aparecerán leads más antiguos.';
+
 export interface BackfillLeadsInput {
   desde?: Date;
   hasta?: Date;
@@ -25,6 +30,15 @@ export interface ResultadoBackfill {
   errores: number;
   incompleto: boolean;
   nextCursor?: string;
+  /** true si `desde` se recortó al límite de retención ~90 días de Meta. */
+  rangoRecortadoPorRetencion?: boolean;
+  avisoRetencion?: string;
+}
+
+function limiteRetencionMeta(referencia: Date = new Date()): Date {
+  const limite = new Date(referencia);
+  limite.setUTCDate(limite.getUTCDate() - DIAS_RETENCION_META);
+  return limite;
 }
 
 @Injectable()
@@ -46,8 +60,7 @@ export class BackfillLeadsFormularioUseCase {
     metaPaginaId: string,
     formId: string,
     input: BackfillLeadsInput,
-    /** Compartido entre formularios por SincronizarLeadsOrganizacionUseCase
-     * para evitar reconsultar a Graph la misma campaña/conjunto/anuncio. */
+    /** Cache opcional de nombres campaña/conjunto/anuncio para reutilizar entre páginas Graph. */
     cacheNombres: Map<string, string | null> = new Map(),
   ): Promise<ResultadoBackfill> {
     const pagina = await this.paginas.findPorId(organizacionId, metaPaginaId);
@@ -80,21 +93,39 @@ export class BackfillLeadsFormularioUseCase {
     let cursor = input.cursor;
     let incompleto = false;
 
+    // Soft clamp: Meta no devuelve leads >~90 días; recortar `desde` y avisar a la UI.
+    const referencia = input.hasta ?? new Date();
+    const limiteDesde = limiteRetencionMeta(referencia);
+    let desdeEfectivo = input.desde;
+    let rangoRecortadoPorRetencion = false;
+    let avisoRetencion: string | undefined;
+
+    if (input.desde) {
+      if (input.desde.getTime() < limiteDesde.getTime()) {
+        desdeEfectivo = limiteDesde;
+        rangoRecortadoPorRetencion = true;
+        avisoRetencion = AVISO_RETENCION_META;
+      }
+    } else if (!input.cursor) {
+      // Historial completo / sin rango: Meta igual no devolverá >~90 días.
+      avisoRetencion = AVISO_RETENCION_META;
+    }
+
     for (let intento = 0; intento < MAX_PAGINAS_GRAPH; intento += 1) {
       const respuesta = await this.graph.listarLeadsDeForm(
         formId,
         pageAccessToken,
         {
-          desde: input.desde,
+          desde: desdeEfectivo,
           hasta: input.hasta,
           despues: cursor,
           limit: TAMANO_PAGINA,
         },
       );
 
-      // Pre-calienta el cache con UNA llamada batch (ids=) para todas las
-      // campañas/conjuntos/anuncios de esta página de leads, en vez de dejar
-      // que cada lead dispare su propia llamada individual a Graph.
+      // Pre-calienta el cache con UNA llamada Graph Batch (no ids=) para todas
+      // las campañas/conjuntos/anuncios de esta página de leads, en vez de
+      // dejar que cada lead dispare su propia llamada individual a Graph.
       const idsFaltantes = new Set<string>();
       for (const lead of respuesta.leads) {
         for (const id of [lead.campaignId, lead.adsetId, lead.adId]) {
@@ -102,11 +133,19 @@ export class BackfillLeadsFormularioUseCase {
         }
       }
       if (idsFaltantes.size > 0) {
-        const nombres = await this.graph.obtenerNombresRecursos(
-          [...idsFaltantes],
-          userAccessToken,
-        );
-        for (const [id, nombre] of nombres) cacheNombres.set(id, nombre);
+        try {
+          const nombres = await this.graph.obtenerNombresRecursos(
+            [...idsFaltantes],
+            userAccessToken,
+          );
+          for (const [id, nombre] of nombres) cacheNombres.set(id, nombre);
+        } catch (error) {
+          // El enriquecimiento de nombres no debe abortar la importación de leads.
+          this.logger.warn(
+            `Backfill: no se pudieron resolver nombres de ads para el form ${formId}`,
+            error instanceof Error ? error.stack : error,
+          );
+        }
       }
 
       for (const lead of respuesta.leads) {
@@ -140,6 +179,8 @@ export class BackfillLeadsFormularioUseCase {
       errores,
       incompleto,
       nextCursor: incompleto ? cursor : undefined,
+      ...(rangoRecortadoPorRetencion ? { rangoRecortadoPorRetencion: true } : {}),
+      ...(avisoRetencion ? { avisoRetencion } : {}),
     };
   }
 }

@@ -4,27 +4,20 @@ import { MetaConnectionsModule } from '../connections/meta-connections.module';
 import { MetaLeadsModule } from '../leads/meta-leads.module';
 import { MetaPageFormsController } from './presentation/meta-page-forms.controller';
 import { MetaFormsController } from './presentation/meta-forms.controller';
-import { MetaLeadsSyncController } from './presentation/meta-leads-sync.controller';
 import { ListarFormulariosPaginaUseCase } from './application/use-cases/listar-formularios-pagina.use-case';
 import { ListarFormulariosFiltroUseCase } from './application/use-cases/listar-formularios-filtro.use-case';
 import { SincronizarFormulariosPaginaUseCase } from './application/use-cases/sincronizar-formularios-pagina.use-case';
-import { SincronizarLeadsOrganizacionUseCase } from './application/use-cases/sincronizar-leads-organizacion.use-case';
 import { ContarLeadsMetaPaginaUseCase } from './application/use-cases/contar-leads-meta-pagina.use-case';
 import { META_FORMULARIOS_REPOSITORY } from './application/ports/meta-formularios.repository.port';
 import { PrismaMetaFormulariosRepository } from './infrastructure/prisma-meta-formularios.repository';
 
 @Module({
   imports: [MetaPagesModule, MetaConnectionsModule, MetaLeadsModule],
-  controllers: [
-    MetaPageFormsController,
-    MetaFormsController,
-    MetaLeadsSyncController,
-  ],
+  controllers: [MetaPageFormsController, MetaFormsController],
   providers: [
     ListarFormulariosPaginaUseCase,
     ListarFormulariosFiltroUseCase,
     SincronizarFormulariosPaginaUseCase,
-    SincronizarLeadsOrganizacionUseCase,
     ContarLeadsMetaPaginaUseCase,
     {
       provide: META_FORMULARIOS_REPOSITORY,

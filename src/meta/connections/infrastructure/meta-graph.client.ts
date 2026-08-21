@@ -1,7 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
-import { AxiosError } from 'axios';
 import { firstValueFrom } from 'rxjs';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
 import {
@@ -13,6 +12,7 @@ import type {
   DebugTokenGraph,
   FiltroInsights,
   FiltroLeadsDeForm,
+  ListadoGraph,
   MetaAnuncioGraph,
   MetaCampanaGraph,
   MetaConjuntoAnuncioGraph,
@@ -40,6 +40,9 @@ const ESTADOS_CUENTA: Record<number, string> = {
   101: 'CLOSED',
 };
 
+/** Tope de seguridad para evitar bucles infinitos si Meta no deja de devolver `paging.next`. */
+const MAX_PAGINAS_GRAPH = 100;
+
 interface GraphTokenResponse {
   access_token: string;
   token_type?: string;
@@ -48,10 +51,16 @@ interface GraphTokenResponse {
 
 interface GraphListResponse<T> {
   data: T[];
+  paging?: {
+    cursors?: { after?: string; before?: string };
+    next?: string;
+  };
 }
 
 @Injectable()
 export class AxiosMetaGraphClient implements MetaGraphClient {
+  private readonly logger = new Logger(AxiosMetaGraphClient.name);
+
   constructor(
     private readonly http: HttpService,
     private readonly config: ConfigService,
@@ -105,27 +114,42 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   }
 
   async listarPaginas(accessToken: string): Promise<MetaPaginaGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; name: string }>
-    >('/me/accounts', {
+    const { data: pages } = await this.getAllPages<{
+      id: string;
+      name: string;
+    }>('/me/accounts', {
       fields: 'id,name',
       access_token: accessToken,
+      limit: '100',
     });
-    return data.data.map((pagina) => ({ id: pagina.id, nombre: pagina.name }));
+    return pages.map((pagina) => ({ id: pagina.id, nombre: pagina.name }));
   }
 
   async obtenerAccessTokenPagina(
     pageId: string,
     userAccessToken: string,
   ): Promise<string | null> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; access_token?: string }>
-    >('/me/accounts', {
+    // Página hasta encontrar pageId (crítico para backfill): no acumula todo.
+    const params: Record<string, string> = {
       fields: 'id,access_token',
       access_token: userAccessToken,
-    });
-    const pagina = data.data.find((item) => item.id === pageId);
-    return pagina?.access_token ?? null;
+      limit: '100',
+    };
+    let after: string | undefined;
+    for (let pagina = 0; pagina < MAX_PAGINAS_GRAPH; pagina += 1) {
+      const pageParams = after ? { ...params, after } : params;
+      const data = await this.get<
+        GraphListResponse<{ id: string; access_token?: string }>
+      >('/me/accounts', pageParams);
+      const encontrada = data.data.find((item) => item.id === pageId);
+      if (encontrada) return encontrada.access_token ?? null;
+      if (!data.paging?.next || !data.paging.cursors?.after) return null;
+      after = data.paging.cursors.after;
+    }
+    this.logger.warn(
+      `obtenerAccessTokenPagina: se alcanzó el tope de ${MAX_PAGINAS_GRAPH} páginas sin hallar pageId=${pageId}`,
+    );
+    return null;
   }
 
   async suscribirPaginaLeadgen(
@@ -166,33 +190,133 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     const idsUnicos = [...new Set(metaIds)];
     if (idsUnicos.length === 0) return resultado;
 
-    // GET /?ids=a,b,c&fields=name resuelve varios objetos en una sola llamada
-    // — se trocea porque Graph no documenta un tope, 50 es el mismo límite de
-    // página usado en el resto del backfill (PLAN-FASE-14 §4.3).
+    // Graph v26+ rechaza GET /?ids=... (legacy). Usar Batch API (máx 50 ops)
+    // para resolver nombres en una sola HTTP round-trip por lote.
     const TAMANO_LOTE = 50;
     for (let i = 0; i < idsUnicos.length; i += TAMANO_LOTE) {
       const lote = idsUnicos.slice(i, i + TAMANO_LOTE);
-      const data = await this.get<Record<string, { id?: string; name?: string }>>(
-        '/',
-        { ids: lote.join(','), fields: 'name', access_token: accessToken },
-      );
+      const nombres = await this.obtenerNombresViaBatch(lote, accessToken);
       for (const id of lote) {
-        resultado.set(id, data[id]?.name ?? null);
+        resultado.set(id, nombres.get(id) ?? null);
       }
     }
+    return resultado;
+  }
+
+  /**
+   * Fallback por id: GET /{id}?fields=name (sin `ids=`) para no bloquear
+   * el backfill cuando el batch falla o Meta responde error de lote.
+   */
+  private async resolverNombresPorId(
+    ids: string[],
+    accessToken: string,
+  ): Promise<Map<string, string | null>> {
+    const resultado = new Map<string, string | null>();
+    for (const id of ids) {
+      try {
+        resultado.set(id, await this.obtenerNombreRecurso(id, accessToken));
+      } catch {
+        resultado.set(id, null);
+      }
+    }
+    return resultado;
+  }
+
+  /**
+   * POST / con body `batch=[...]` — alternativa soportada a `GET /?ids=`
+   * (deprecado en Graph v26.0+). Form-urlencoded según docs de Meta Batch.
+   * Si un id individual falla, queda null sin tumbar el lote entero.
+   */
+  private async obtenerNombresViaBatch(
+    ids: string[],
+    accessToken: string,
+  ): Promise<Map<string, string | null>> {
+    const resultado = new Map<string, string | null>();
+    const batch = ids.map((id) => ({
+      method: 'GET',
+      relative_url: `${id}?fields=name`,
+    }));
+
+    try {
+      const body = new URLSearchParams({
+        access_token: accessToken,
+        include_headers: 'false',
+        batch: JSON.stringify(batch),
+      });
+
+      // Mismo criterio que get(): Meta suele meter rate limit en el body, no 429.
+      const ESPERAS_RATE_LIMIT_MS = [1500, 4000];
+      let data: { code?: number; body?: string }[] | { error?: unknown };
+      for (let intento = 0; ; intento += 1) {
+        try {
+          const responses = await firstValueFrom(
+            this.http.post<
+              { code?: number; body?: string }[] | { error?: unknown }
+            >(`${this.graphBaseUrl}/`, body.toString(), {
+              headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+              },
+            }),
+          );
+          data = responses.data;
+          break;
+        } catch (error) {
+          const espera = ESPERAS_RATE_LIMIT_MS[intento];
+          if (espera && esRateLimitMeta(error)) {
+            await new Promise((resolve) => setTimeout(resolve, espera));
+            continue;
+          }
+          throw excepcionDesdeErrorMeta(error);
+        }
+      }
+
+      // Respuesta no-array (incluye `{ error: ... }` de Meta): fallback por id.
+      if (!Array.isArray(data)) {
+        this.logger.warn(
+          `Batch de nombres Graph devolvió error/no-array; se reintenta por id (${ids.length})`,
+        );
+        return this.resolverNombresPorId(ids, accessToken);
+      }
+
+      for (let i = 0; i < ids.length; i += 1) {
+        const item = data[i];
+        if (!item || item.code !== 200 || !item.body) {
+          resultado.set(ids[i], null);
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(item.body) as {
+            name?: string;
+            error?: unknown;
+          };
+          resultado.set(ids[i], parsed.error ? null : (parsed.name ?? null));
+        } catch {
+          resultado.set(ids[i], null);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Batch de nombres Graph falló; se reintenta por id (${ids.length})`,
+        error instanceof Error ? error.message : error,
+      );
+      return this.resolverNombresPorId(ids, accessToken);
+    }
+
     return resultado;
   }
 
   async listarCuentasPublicitarias(
     accessToken: string,
   ): Promise<MetaCuentaPublicitariaGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; name: string }>
-    >('/me/adaccounts', {
+    const { data: cuentas } = await this.getAllPages<{
+      id: string;
+      name: string;
+    }>('/me/adaccounts', {
       fields: 'id,name',
       access_token: accessToken,
+      limit: '100',
     });
-    return data.data.map((cuenta) => ({ id: cuenta.id, nombre: cuenta.name }));
+    return cuentas.map((cuenta) => ({ id: cuenta.id, nombre: cuenta.name }));
   }
 
   async obtenerCuentaPublicitaria(
@@ -256,76 +380,89 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   async listarCampanasDeCuenta(
     adAccountId: string,
     accessToken: string,
-  ): Promise<MetaCampanaGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; name: string; status?: string }>
-    >(`/${adAccountId}/campaigns`, {
+  ): Promise<ListadoGraph<MetaCampanaGraph>> {
+    const { data: campanas, truncado } = await this.getAllPages<{
+      id: string;
+      name: string;
+      status?: string;
+    }>(`/${adAccountId}/campaigns`, {
       fields: 'id,name,status',
       access_token: accessToken,
       limit: '200',
     });
-    return data.data.map((c) => ({
-      id: c.id,
-      nombre: c.name,
-      estado: c.status,
-    }));
+    return {
+      items: campanas.map((c) => ({
+        id: c.id,
+        nombre: c.name,
+        estado: c.status,
+      })),
+      truncado,
+    };
   }
 
   async listarConjuntosDeCampana(
     campanaId: string,
     accessToken: string,
-  ): Promise<MetaConjuntoAnuncioGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; name: string; status?: string }>
-    >(`/${campanaId}/adsets`, {
+  ): Promise<ListadoGraph<MetaConjuntoAnuncioGraph>> {
+    const { data: conjuntos, truncado } = await this.getAllPages<{
+      id: string;
+      name: string;
+      status?: string;
+    }>(`/${campanaId}/adsets`, {
       fields: 'id,name,status',
       access_token: accessToken,
       limit: '200',
     });
-    return data.data.map((c) => ({
-      id: c.id,
-      nombre: c.name,
-      campanaId,
-      estado: c.status,
-    }));
+    return {
+      items: conjuntos.map((c) => ({
+        id: c.id,
+        nombre: c.name,
+        campanaId,
+        estado: c.status,
+      })),
+      truncado,
+    };
   }
 
   async listarAnunciosDeConjunto(
     conjuntoId: string,
     accessToken: string,
-  ): Promise<MetaAnuncioGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{ id: string; name: string; status?: string }>
-    >(`/${conjuntoId}/ads`, {
+  ): Promise<ListadoGraph<MetaAnuncioGraph>> {
+    const { data: anuncios, truncado } = await this.getAllPages<{
+      id: string;
+      name: string;
+      status?: string;
+    }>(`/${conjuntoId}/ads`, {
       fields: 'id,name,status',
       access_token: accessToken,
       limit: '200',
     });
-    return data.data.map((a) => ({
-      id: a.id,
-      nombre: a.name,
-      conjuntoAnuncioId: conjuntoId,
-      estado: a.status,
-    }));
+    return {
+      items: anuncios.map((a) => ({
+        id: a.id,
+        nombre: a.name,
+        conjuntoAnuncioId: conjuntoId,
+        estado: a.status,
+      })),
+      truncado,
+    };
   }
 
   async listarLeadgenForms(
     pageId: string,
     pageAccessToken: string,
   ): Promise<MetaFormularioGraph[]> {
-    const data = await this.get<
-      GraphListResponse<{
-        id: string;
-        name: string;
-        status?: string;
-        locale?: string;
-      }>
-    >(`/${pageId}/leadgen_forms`, {
+    const { data: forms } = await this.getAllPages<{
+      id: string;
+      name: string;
+      status?: string;
+      locale?: string;
+    }>(`/${pageId}/leadgen_forms`, {
       fields: 'id,name,status,locale',
       access_token: pageAccessToken,
       limit: '200',
     });
-    return data.data.map((form) => ({
+    return forms.map((form) => ({
       id: form.id,
       nombre: form.name,
       estado: form.status,
@@ -436,20 +573,18 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         ? `campaign_id,campaign_name,${camposComunes}`
         : camposComunes;
 
-    const data = await this.get<
-      GraphListResponse<{
-        date_start: string;
-        spend?: string;
-        impressions?: string;
-        clicks?: string;
-        ctr?: string;
-        cpc?: string;
-        reach?: string;
-        account_currency?: string;
-        campaign_id?: string;
-        campaign_name?: string;
-      }>
-    >(`/${adAccountId}/insights`, {
+    const { data: items } = await this.getAllPages<{
+      date_start: string;
+      spend?: string;
+      impressions?: string;
+      clicks?: string;
+      ctr?: string;
+      cpc?: string;
+      reach?: string;
+      account_currency?: string;
+      campaign_id?: string;
+      campaign_name?: string;
+    }>(`/${adAccountId}/insights`, {
       fields,
       time_range: JSON.stringify({ since: filtro.desde, until: filtro.hasta }),
       time_increment: '1',
@@ -458,7 +593,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       limit: '500',
     });
 
-    return data.data.map((item) => ({
+    return items.map((item) => ({
       fecha: item.date_start,
       spend: Number(item.spend ?? 0),
       impressions: Number(item.impressions ?? 0),
@@ -500,6 +635,35 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     await this.delete(`/${metaUserId}/permissions/${permiso}`, {
       access_token: accessToken,
     });
+  }
+
+  /**
+   * Acumula todas las páginas de un edge Graph siguiendo `paging.cursors.after`
+   * mientras exista `paging.next` (mismo criterio que `listarLeadsDeForm`).
+   * `truncado=true` si se cortó por MAX_PAGINAS_GRAPH con más páginas pendientes.
+   */
+  private async getAllPages<T>(
+    path: string,
+    params: Record<string, string>,
+  ): Promise<{ data: T[]; truncado: boolean }> {
+    const acumulado: T[] = [];
+    let after: string | undefined;
+
+    for (let pagina = 0; pagina < MAX_PAGINAS_GRAPH; pagina += 1) {
+      const pageParams = after ? { ...params, after } : params;
+      const data = await this.get<GraphListResponse<T>>(path, pageParams);
+      acumulado.push(...(data.data ?? []));
+
+      if (!data.paging?.next || !data.paging.cursors?.after) {
+        return { data: acumulado, truncado: false };
+      }
+      after = data.paging.cursors.after;
+    }
+
+    this.logger.warn(
+      `getAllPages: resultado POSIBLEMENTE TRUNCADO — tope de ${MAX_PAGINAS_GRAPH} páginas alcanzado en ${path} (items=${acumulado.length}); puede haber más datos en Graph`,
+    );
+    return { data: acumulado, truncado: true };
   }
 
   private async get<T>(

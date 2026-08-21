@@ -52,12 +52,6 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     tipo: 'optin',
   },
   {
-    id: 'ads_management',
-    label: 'Gestionar campañas y anuncios',
-    scopesRequeridos: ['ads_management'],
-    tipo: 'optin',
-  },
-  {
     id: 'catalog_management',
     label: 'Gestionar catálogos de productos',
     scopesRequeridos: ['catalog_management'],
@@ -73,14 +67,28 @@ export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
     scopesRequeridos: ['pages_manage_ads'],
     tipo: 'nucleo',
   },
-
-  // Opt-in — contenido y mensajería de la página.
   {
     id: 'pages_engagement',
     label: 'Leer contenido y engagement de la página',
+    // Núcleo: Meta Retrieving Leads lista pages_read_engagement para campos
+    // a nivel de anuncio en leadgen — sin esto, la recuperación completa de
+    // leads+ad falla o queda incompleta (alineado con doc Meta / incidente
+    // Domaria 2026-08-20).
     scopesRequeridos: ['pages_read_engagement'],
-    tipo: 'optin',
+    tipo: 'nucleo',
   },
+  {
+    id: 'ads_management',
+    label: 'Campos de anuncio en leads y gestión de campañas',
+    // Núcleo: Meta Retrieving Leads lista ads_management para recuperación
+    // completa lead+ad; también cubre gestión de campañas. No es un add-on
+    // opcional del flujo mínimo Lead Ads (doc Meta / incidente Domaria
+    // 2026-08-20).
+    scopesRequeridos: ['ads_management'],
+    tipo: 'nucleo',
+  },
+
+  // Opt-in — contenido y mensajería de la página.
   {
     id: 'pages_posts',
     label: 'Publicar y editar publicaciones de la página',

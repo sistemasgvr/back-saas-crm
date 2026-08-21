@@ -13,10 +13,17 @@ import type { AnunciosRepository } from '../../../ads/application/ports/anuncios
 import { META_CUENTAS_PUBLICITARIAS_REPOSITORY } from '../ports/meta-cuentas-publicitarias.repository.port';
 import type { MetaCuentasPublicitariasRepository } from '../ports/meta-cuentas-publicitarias.repository.port';
 
+/** Pausa entre campañas para aliviar presión N+1 (campaign → adsets → ads) contra Graph. */
+const PAUSA_ENTRE_CAMPANAS_MS = 50;
+
 export interface ResultadoSync {
   campanas: number;
   conjuntos: number;
   anuncios: number;
+  /** true si algún listado Graph se cortó por el tope de paginación del client. */
+  truncado?: boolean;
+  /** Mensaje legible cuando hubo truncación; ausente si el sync fue completo. */
+  aviso?: string;
 }
 
 /**
@@ -61,13 +68,16 @@ export class SincronizarCuentaUseCase {
 
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
     const resultado: ResultadoSync = { campanas: 0, conjuntos: 0, anuncios: 0 };
+    let truncado = false;
 
-    const campanasGraph = await this.graph.listarCampanasDeCuenta(
+    const listadoCampanas = await this.graph.listarCampanasDeCuenta(
       cuenta.adAccountId,
       accessToken,
     );
+    if (listadoCampanas.truncado) truncado = true;
 
-    for (const campanaGraph of campanasGraph) {
+    for (let i = 0; i < listadoCampanas.items.length; i += 1) {
+      const campanaGraph = listadoCampanas.items[i];
       try {
         const campanaLocal = await this.campanas.upsertPorMetaId({
           organizacionId,
@@ -78,11 +88,13 @@ export class SincronizarCuentaUseCase {
         });
         resultado.campanas += 1;
 
-        const conjuntosGraph = await this.graph.listarConjuntosDeCampana(
+        const listadoConjuntos = await this.graph.listarConjuntosDeCampana(
           campanaGraph.id,
           accessToken,
         );
-        for (const conjuntoGraph of conjuntosGraph) {
+        if (listadoConjuntos.truncado) truncado = true;
+
+        for (const conjuntoGraph of listadoConjuntos.items) {
           try {
             const conjuntoLocal = await this.conjuntos.upsertPorMetaId({
               organizacionId,
@@ -93,11 +105,13 @@ export class SincronizarCuentaUseCase {
             });
             resultado.conjuntos += 1;
 
-            const anunciosGraph = await this.graph.listarAnunciosDeConjunto(
+            const listadoAnuncios = await this.graph.listarAnunciosDeConjunto(
               conjuntoGraph.id,
               accessToken,
             );
-            for (const anuncioGraph of anunciosGraph) {
+            if (listadoAnuncios.truncado) truncado = true;
+
+            for (const anuncioGraph of listadoAnuncios.items) {
               try {
                 await this.anuncios.upsertPorMetaId({
                   organizacionId,
@@ -127,6 +141,20 @@ export class SincronizarCuentaUseCase {
           error instanceof Error ? error.stack : error,
         );
       }
+
+      // Alivio leve de presión N+1 contra Marketing API (MVP; no sustituye colas).
+      if (i < listadoCampanas.items.length - 1) {
+        await new Promise((r) => setTimeout(r, PAUSA_ENTRE_CAMPANAS_MS));
+      }
+    }
+
+    if (truncado) {
+      resultado.truncado = true;
+      resultado.aviso =
+        'La sincronización se truncó por el tope de paginación de Graph; puede faltar jerarquía (campañas/conjuntos/anuncios).';
+      this.logger.warn(
+        `Sync cuenta ${cuenta.adAccountId}: listado Graph truncado (tope de páginas)`,
+      );
     }
 
     await this.cuentas.actualizarUltimoSync(cuenta.id, usuarioEdicion);
