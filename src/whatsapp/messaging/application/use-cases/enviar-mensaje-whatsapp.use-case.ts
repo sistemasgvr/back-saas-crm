@@ -22,6 +22,7 @@ export interface EnviarMensajeInput {
   texto?: string;
   plantillaNombre?: string;
   plantillaIdioma?: string;
+  parametros?: string[];
 }
 
 @Injectable()
@@ -109,6 +110,7 @@ export class EnviarMensajeWhatsAppUseCase {
         conversacion.waId,
         input.plantillaNombre,
         input.plantillaIdioma,
+        input.parametros,
       );
       tipo = 'template';
     }

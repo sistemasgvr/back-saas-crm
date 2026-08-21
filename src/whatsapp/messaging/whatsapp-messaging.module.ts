@@ -8,6 +8,7 @@ import { ListarConversacionesUseCase } from './application/use-cases/listar-conv
 import { ObtenerConversacionUseCase } from './application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from './application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { ListarPlantillasUseCase } from './application/use-cases/listar-plantillas.use-case';
+import { CrearPlantillaUseCase } from './application/use-cases/crear-plantilla.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from './application/use-cases/procesar-estado-whatsapp.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from './application/use-cases/iniciar-conversacion-desde-lead.use-case';
@@ -27,6 +28,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ObtenerConversacionUseCase,
     EnviarMensajeWhatsAppUseCase,
     ListarPlantillasUseCase,
+    CrearPlantillaUseCase,
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEstadoWhatsAppUseCase,
     IniciarConversacionDesdeLeadUseCase,

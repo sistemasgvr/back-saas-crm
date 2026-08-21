@@ -95,10 +95,29 @@ export interface MetaPlantillaWhatsAppGraph {
   idioma: string;
   categoria: string;
   estado: string;
+  /** Texto crudo del BODY (con {{1}}, {{2}}… si los tiene) — el front cuenta
+   * variables desde acá para pedir sus valores antes de enviar. */
+  cuerpoTexto?: string;
+  encabezadoTexto?: string;
 }
 
 export interface MetaMensajeWhatsAppEnviado {
   wamid: string;
+}
+
+export interface CrearPlantillaWhatsAppInput {
+  nombre: string;
+  categoria: 'AUTHENTICATION' | 'MARKETING' | 'UTILITY';
+  idioma: string;
+  /** Puede incluir variables {{1}}, {{2}}… — si las tiene, `ejemplosCuerpo`
+   * debe traer un valor de muestra por cada una (Meta exige ejemplos para
+   * revisar la plantilla). */
+  cuerpo: string;
+  ejemplosCuerpo?: string[];
+  encabezado?: string;
+  /** Solo admite UNA variable {{1}} — límite de Meta para el header. */
+  ejemploEncabezado?: string;
+  pie?: string;
 }
 
 export interface FiltroLeadsDeForm {
@@ -253,6 +272,13 @@ export interface MetaGraphClient {
     wabaId: string,
     accessToken: string,
   ): Promise<MetaPlantillaWhatsAppGraph[]>;
+  /** POST /{waba-id}/message_templates — queda en PENDING hasta que Meta la
+   * revise (horas a días); no se puede enviar hasta que quede APPROVED. */
+  crearPlantillaWhatsApp(
+    wabaId: string,
+    accessToken: string,
+    input: CrearPlantillaWhatsAppInput,
+  ): Promise<void>;
   /** POST /{phone-number-id}/messages — sesión libre (dentro de la ventana 24h). */
   enviarMensajeTextoWhatsApp(
     phoneNumberId: string,
@@ -268,5 +294,8 @@ export interface MetaGraphClient {
     para: string,
     nombrePlantilla: string,
     idioma: string,
+    /** Valores para {{1}}, {{2}}… del BODY, en orden — vacío/omitido si la
+     * plantilla no tiene variables. */
+    parametros?: string[],
   ): Promise<MetaMensajeWhatsAppEnviado>;
 }

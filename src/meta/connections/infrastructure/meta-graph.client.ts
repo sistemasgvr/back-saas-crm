@@ -9,6 +9,7 @@ import {
 } from '../application/mapear-error-meta-graph';
 import type {
   AppSuscritaGraph,
+  CrearPlantillaWhatsAppInput,
   DebugTokenGraph,
   FiltroInsights,
   FiltroLeadsDeForm,
@@ -730,8 +731,9 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       language: string;
       category: string;
       status: string;
+      components?: { type: string; text?: string }[];
     }>(`/${wabaId}/message_templates`, {
-      fields: 'name,language,category,status',
+      fields: 'name,language,category,status,components',
       access_token: accessToken,
       limit: '100',
     });
@@ -740,7 +742,48 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       idioma: t.language,
       categoria: t.category,
       estado: t.status,
+      cuerpoTexto: t.components?.find((c) => c.type === 'BODY')?.text,
+      encabezadoTexto: t.components?.find((c) => c.type === 'HEADER')?.text,
     }));
+  }
+
+  async crearPlantillaWhatsApp(
+    wabaId: string,
+    accessToken: string,
+    input: CrearPlantillaWhatsAppInput,
+  ): Promise<void> {
+    const components: Record<string, unknown>[] = [];
+    if (input.encabezado) {
+      components.push({
+        type: 'HEADER',
+        format: 'TEXT',
+        text: input.encabezado,
+        ...(input.ejemploEncabezado
+          ? { example: { header_text: [input.ejemploEncabezado] } }
+          : {}),
+      });
+    }
+    components.push({
+      type: 'BODY',
+      text: input.cuerpo,
+      ...(input.ejemplosCuerpo?.length
+        ? { example: { body_text: [input.ejemplosCuerpo] } }
+        : {}),
+    });
+    if (input.pie) {
+      components.push({ type: 'FOOTER', text: input.pie });
+    }
+
+    await this.postJson(
+      `/${wabaId}/message_templates`,
+      {
+        name: input.nombre,
+        category: input.categoria,
+        language: input.idioma,
+        components,
+      },
+      accessToken,
+    );
   }
 
   async enviarMensajeTextoWhatsApp(
@@ -769,6 +812,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     para: string,
     nombrePlantilla: string,
     idioma: string,
+    parametros?: string[],
   ): Promise<MetaMensajeWhatsAppEnviado> {
     const data = await this.postJson<{ messages: { id: string }[] }>(
       `/${phoneNumberId}/messages`,
@@ -780,6 +824,19 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         template: {
           name: nombrePlantilla,
           language: { code: idioma },
+          ...(parametros?.length
+            ? {
+                components: [
+                  {
+                    type: 'body',
+                    parameters: parametros.map((texto) => ({
+                      type: 'text',
+                      text: texto,
+                    })),
+                  },
+                ],
+              }
+            : {}),
         },
       },
       accessToken,

@@ -13,17 +13,21 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
+import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
+import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { ListarConversacionesUseCase } from '../application/use-cases/listar-conversaciones.use-case';
 import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
+import { CrearPlantillaUseCase } from '../application/use-cases/crear-plantilla.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from '../application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
+import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 
 @Controller('whatsapp/chats')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
 @RequireModule('WHATSAPP')
 export class WhatsappChatsController {
   constructor(
@@ -31,6 +35,7 @@ export class WhatsappChatsController {
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
     private readonly listarPlantillas: ListarPlantillasUseCase,
+    private readonly crearPlantilla: CrearPlantillaUseCase,
     private readonly iniciarDesdeLead: IniciarConversacionDesdeLeadUseCase,
   ) {}
 
@@ -45,6 +50,23 @@ export class WhatsappChatsController {
   @Get('templates')
   templates(@CurrentUser() ctx: RequestContext) {
     return this.listarPlantillas.execute(ctx.organizacionId!);
+  }
+
+  /** Todas (con estado), no solo APPROVED — para la pantalla de gestión. */
+  @Get('templates/all')
+  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  templatesAll(@CurrentUser() ctx: RequestContext) {
+    return this.listarPlantillas.execute(ctx.organizacionId!, false);
+  }
+
+  @Post('templates')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  createTemplate(
+    @CurrentUser() ctx: RequestContext,
+    @Body() dto: CrearPlantillaDto,
+  ) {
+    return this.crearPlantilla.execute(ctx.organizacionId!, dto);
   }
 
   @Post('start-from-lead/:leadId')
