@@ -1,6 +1,9 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import { USUARIOS_ADMIN_REPOSITORY } from '../ports/usuarios-admin.repository.port';
-import type { CrearUsuarioInput, UsuariosAdminRepository } from '../ports/usuarios-admin.repository.port';
+import type {
+  CrearUsuarioInput,
+  UsuariosAdminRepository,
+} from '../ports/usuarios-admin.repository.port';
 import { PASSWORD_HASHER } from '../../../auth/application/ports/password-hasher.port';
 import type { PasswordHasher } from '../../../auth/application/ports/password-hasher.port';
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
@@ -19,19 +22,26 @@ export interface CrearUsuarioUseCaseInput extends CrearUsuarioInput {
 @Injectable()
 export class CrearUsuarioUseCase {
   constructor(
-    @Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository,
+    @Inject(USUARIOS_ADMIN_REPOSITORY)
+    private readonly usuarios: UsuariosAdminRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
 
   async execute(input: CrearUsuarioUseCaseInput, usuarioCreacion: string) {
     const existente = await this.usuarios.buscarActivoPorEmail(input.email);
     if (existente) {
-      throw new ConflictException(`Ya existe un usuario activo con el email ${input.email}`);
+      throw new ConflictException(
+        `Ya existe un usuario activo con el email ${input.email}`,
+      );
     }
 
     const { password, asignacion, ...datosUsuario } = input;
     const passwordHash = await this.hasher.hash(password);
-    const usuario = await this.usuarios.crear(datosUsuario, passwordHash, usuarioCreacion);
+    const usuario = await this.usuarios.crear(
+      datosUsuario,
+      passwordHash,
+      usuarioCreacion,
+    );
 
     if (asignacion) {
       await this.usuarios.asignarAOrganizacion(

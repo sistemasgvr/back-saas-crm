@@ -1,4 +1,9 @@
-import { BadRequestException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { USUARIOS_REPOSITORY } from '../ports/usuarios.repository.port';
 import type { UsuariosRepository } from '../ports/usuarios.repository.port';
 import { PASSWORD_HASHER } from '../ports/password-hasher.port';
@@ -11,7 +16,11 @@ export class ChangePasswordUseCase {
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
 
-  async execute(usuarioId: string, passwordActual: string, passwordNueva: string): Promise<void> {
+  async execute(
+    usuarioId: string,
+    passwordActual: string,
+    passwordNueva: string,
+  ): Promise<void> {
     const usuario = await this.usuarios.findActivoById(usuarioId);
     if (!usuario) {
       throw new UnauthorizedException('Usuario inactivo');

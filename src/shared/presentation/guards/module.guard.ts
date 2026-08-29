@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../infrastructure/prisma.service';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -18,18 +23,22 @@ export class ModuleGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const codigo = this.reflector.getAllAndOverride<string>(REQUIRE_MODULE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const codigo = this.reflector.getAllAndOverride<string>(
+      REQUIRE_MODULE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (!codigo) {
       return true;
     }
 
-    const { user } = context.switchToHttp().getRequest<{ user: RequestContext }>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user: RequestContext }>();
     if (!user?.organizacionId) {
-      throw new ForbiddenException('No hay una organización activa en la sesión');
+      throw new ForbiddenException(
+        'No hay una organización activa en la sesión',
+      );
     }
 
     const relacion = await this.prisma.organizacionModulo.findFirst({
@@ -42,7 +51,9 @@ export class ModuleGuard implements CanActivate {
     });
 
     if (!relacion) {
-      throw new ForbiddenException(`El módulo ${codigo} no está habilitado para esta organización`);
+      throw new ForbiddenException(
+        `El módulo ${codigo} no está habilitado para esta organización`,
+      );
     }
 
     return true;

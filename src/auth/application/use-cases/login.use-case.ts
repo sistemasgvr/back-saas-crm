@@ -35,12 +35,17 @@ export class LoginUseCase {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const passwordValida = await this.hasher.compare(input.password, usuario.passwordHash);
+    const passwordValida = await this.hasher.compare(
+      input.password,
+      usuario.passwordHash,
+    );
     if (!passwordValida) {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const membresiasActivas = await this.membresias.findMembresiasActivas(usuario.id);
+    const membresiasActivas = await this.membresias.findMembresiasActivas(
+      usuario.id,
+    );
     // MVP: si el usuario pertenece a más de una organización se activa la primera;
     // no existe todavía un endpoint de "elegir organización" (PLAN.md §5.1).
     const activa = membresiasActivas[0];

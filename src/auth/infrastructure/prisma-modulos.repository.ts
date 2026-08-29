@@ -9,7 +9,9 @@ import {
 export class PrismaModulosRepository implements ModulosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findModulosPorOrganizacion(organizacionId: string): Promise<ModuloOrganizacion[]> {
+  async findModulosPorOrganizacion(
+    organizacionId: string,
+  ): Promise<ModuloOrganizacion[]> {
     const filas = await this.prisma.organizacionModulo.findMany({
       where: { organizacionId, estado: 1, modulo: { estado: 1 } },
       include: { modulo: true },

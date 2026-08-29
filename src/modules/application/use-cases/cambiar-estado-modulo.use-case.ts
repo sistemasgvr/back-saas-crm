@@ -5,7 +5,8 @@ import type { ModulosCatalogoRepository } from '../ports/modulos-catalogo.reposi
 @Injectable()
 export class CambiarEstadoModuloUseCase {
   constructor(
-    @Inject(MODULOS_CATALOGO_REPOSITORY) private readonly modulos: ModulosCatalogoRepository,
+    @Inject(MODULOS_CATALOGO_REPOSITORY)
+    private readonly modulos: ModulosCatalogoRepository,
   ) {}
 
   async execute(id: string, estado: 0 | 1, usuarioEdicion: string) {

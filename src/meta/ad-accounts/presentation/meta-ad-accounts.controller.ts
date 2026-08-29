@@ -11,6 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -29,6 +35,8 @@ import { SincronizarCuentaUseCase } from '../application/use-cases/sincronizar-c
 import { ListarCuentasFiltroUseCase } from '../application/use-cases/listar-cuentas-filtro.use-case';
 import { VincularCuentaDto } from './dto/vincular-cuenta.dto';
 
+@ApiTags('Meta Ad Accounts')
+@ApiBearerAuth('JWT-auth')
 @Controller('meta/ad-accounts')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
 @Roles('PROPIETARIO', 'ADMINISTRADOR')
@@ -45,6 +53,17 @@ export class MetaAdAccountsController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Listar cuentas publicitarias vinculadas',
+    description:
+      'Cuentas de Meta Ads ya vinculadas a la organización (paginado).',
+  })
+  @ApiResponse({ status: 200, description: 'Página de cuentas vinculadas.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   findAll(
     @CurrentUser() ctx: RequestContext,
     @Query() query: PaginacionQueryDto,
@@ -57,6 +76,17 @@ export class MetaAdAccountsController {
   }
 
   @Get('available')
+  @ApiOperation({
+    summary: 'Cuentas publicitarias disponibles para vincular',
+    description:
+      'Consulta en vivo a Graph API las cuentas accesibles que aún no están vinculadas.',
+  })
+  @ApiResponse({ status: 200, description: 'Cuentas disponibles.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   findAvailable(@CurrentUser() ctx: RequestContext) {
     return this.listarDisponibles.execute(ctx.organizacionId!);
   }
@@ -64,11 +94,35 @@ export class MetaAdAccountsController {
   /** Sin restricción de rol — cualquier miembro con el módulo puede poblar el filtro de /dashboard. */
   @Get('filtro')
   @Roles()
+  @ApiOperation({
+    summary: 'Cuentas para poblar el filtro del dashboard',
+    description:
+      'Lista liviana (id + nombre), accesible a cualquier rol con el módulo activo.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cuentas para el selector de filtro.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo META_LEADS no activo.' })
   findFiltro(@CurrentUser() ctx: RequestContext) {
     return this.listarFiltro.execute(ctx.organizacionId!);
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Obtener el perfil de una cuenta publicitaria vinculada',
+  })
+  @ApiResponse({ status: 200, description: 'Perfil de la cuenta.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La cuenta no existe o no pertenece a la organización.',
+  })
   findOne(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -77,6 +131,13 @@ export class MetaAdAccountsController {
   }
 
   @Post()
+  @ApiOperation({ summary: 'Vincular una cuenta publicitaria' })
+  @ApiResponse({ status: 201, description: 'Cuenta vinculada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   create(@CurrentUser() ctx: RequestContext, @Body() dto: VincularCuentaDto) {
     return this.vincular.execute(
       ctx.organizacionId!,
@@ -88,6 +149,17 @@ export class MetaAdAccountsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Desvincular una cuenta publicitaria' })
+  @ApiResponse({ status: 204, description: 'Cuenta desvinculada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La cuenta no existe o no pertenece a la organización.',
+  })
   async remove(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -96,6 +168,21 @@ export class MetaAdAccountsController {
   }
 
   @Post(':id/sync')
+  @ApiOperation({
+    summary: 'Sincronizar campañas/conjuntos/anuncios de la cuenta',
+    description:
+      'Trae desde Graph API las campañas, conjuntos de anuncios y anuncios de la cuenta.',
+  })
+  @ApiResponse({ status: 201, description: 'Sincronización completada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La cuenta no existe o no pertenece a la organización.',
+  })
   sync(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,

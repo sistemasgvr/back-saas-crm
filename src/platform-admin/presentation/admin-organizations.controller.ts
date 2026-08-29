@@ -1,4 +1,22 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { ListarOrganizacionesQueryDto } from './dto/listar-organizaciones.query.dto';
 import { PlatformAdminGuard } from '../../shared/presentation/guards/platform-admin.guard';
@@ -12,6 +30,8 @@ import { DesactivarOrganizacionUseCase } from '../application/use-cases/desactiv
 import { CreateOrganizacionDto } from './dto/create-organizacion.dto';
 import { UpdateOrganizacionAdminDto } from './dto/update-organizacion-admin.dto';
 
+@ApiTags('Platform Admin')
+@ApiBearerAuth('JWT-auth')
 @Controller('admin/organizations')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class AdminOrganizationsController {
@@ -24,11 +44,37 @@ export class AdminOrganizationsController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateOrganizacionDto, @CurrentUser() ctx: RequestContext) {
+  @ApiOperation({
+    summary: 'Crear una organización (tenant)',
+    description:
+      'Solo super-admin. Opcionalmente crea de una vez su primer usuario PROPIETARIO.',
+  })
+  @ApiResponse({ status: 201, description: 'Organización creada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 409, description: 'El slug ya existe.' })
+  create(
+    @Body() dto: CreateOrganizacionDto,
+    @CurrentUser() ctx: RequestContext,
+  ) {
     return this.crearOrganizacion.execute(dto, ctx.usuarioId);
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'Listar organizaciones',
+    description:
+      'Solo super-admin. Paginado, con búsqueda y filtro por estado.',
+  })
+  @ApiResponse({ status: 200, description: 'Página de organizaciones.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
   findAll(@Query() query: ListarOrganizacionesQueryDto) {
     return this.listarOrganizaciones.execute({
       page: query.page,
@@ -39,11 +85,33 @@ export class AdminOrganizationsController {
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Obtener una organización por id',
+    description: 'Solo super-admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Detalle de la organización.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 404, description: 'La organización no existe.' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.obtenerOrganizacion.execute(id);
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Actualizar una organización',
+    description: 'Solo super-admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Organización actualizada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 404, description: 'La organización no existe.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateOrganizacionAdminDto,
@@ -54,7 +122,22 @@ export class AdminOrganizationsController {
 
   @Patch(':id/desactivar')
   @HttpCode(HttpStatus.OK)
-  deactivate(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() ctx: RequestContext) {
+  @ApiOperation({
+    summary: 'Desactivar una organización',
+    description:
+      'Solo super-admin. Bloquea el acceso de todos sus usuarios sin borrar datos.',
+  })
+  @ApiResponse({ status: 200, description: 'Organización desactivada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 404, description: 'La organización no existe.' })
+  deactivate(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() ctx: RequestContext,
+  ) {
     return this.desactivarOrganizacion.execute(id, ctx.usuarioId);
   }
 }

@@ -52,9 +52,7 @@ export class PrismaMetaFormulariosRepository implements MetaFormulariosRepositor
       conteos.map((c) => [c.formularioId, c._count._all]),
     );
 
-    return formularios.map((f) =>
-      toRow(f, totalPorFormId.get(f.formId) ?? 0),
-    );
+    return formularios.map((f) => toRow(f, totalPorFormId.get(f.formId) ?? 0));
   }
 
   async listarActivosFiltro(organizacionId: string, metaPaginaId?: string) {

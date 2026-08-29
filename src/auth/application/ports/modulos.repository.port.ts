@@ -6,5 +6,7 @@ export interface ModuloOrganizacion {
 }
 
 export interface ModulosRepository {
-  findModulosPorOrganizacion(organizacionId: string): Promise<ModuloOrganizacion[]>;
+  findModulosPorOrganizacion(
+    organizacionId: string,
+  ): Promise<ModuloOrganizacion[]>;
 }

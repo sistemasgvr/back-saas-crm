@@ -1,4 +1,6 @@
-export const CONJUNTOS_ANUNCIOS_REPOSITORY = Symbol('CONJUNTOS_ANUNCIOS_REPOSITORY');
+export const CONJUNTOS_ANUNCIOS_REPOSITORY = Symbol(
+  'CONJUNTOS_ANUNCIOS_REPOSITORY',
+);
 
 export interface ConjuntoAnuncioFiltro {
   id: string;
@@ -17,7 +19,10 @@ export interface UpsertConjuntoAnuncioInput {
 }
 
 export interface ConjuntosAnunciosRepository {
-  listarPorOrganizacion(organizacionId: string, campanaId?: string): Promise<ConjuntoAnuncioFiltro[]>;
+  listarPorOrganizacion(
+    organizacionId: string,
+    campanaId?: string,
+  ): Promise<ConjuntoAnuncioFiltro[]>;
   /** Idempotente por (organizacionId, metaConjuntoId) — usado por la ingestión del webhook (Fase 9). */
   upsertPorMetaId(input: UpsertConjuntoAnuncioInput): Promise<{ id: string }>;
 }

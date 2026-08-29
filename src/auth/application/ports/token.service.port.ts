@@ -1,4 +1,7 @@
-import { AccessTokenPayload, RefreshTokenPayload } from '../../domain/jwt-payload.interface';
+import {
+  AccessTokenPayload,
+  RefreshTokenPayload,
+} from '../../domain/jwt-payload.interface';
 
 export const TOKEN_SERVICE = Symbol('TOKEN_SERVICE');
 

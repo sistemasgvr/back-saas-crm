@@ -28,9 +28,14 @@ export class TokenEncryptionService {
   encrypt(plainText: string): string {
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(plainText, 'utf8'),
+      cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
-    return [iv, authTag, ciphertext].map((buf) => buf.toString('base64')).join('.');
+    return [iv, authTag, ciphertext]
+      .map((buf) => buf.toString('base64'))
+      .join('.');
   }
 
   decrypt(payload: string): string {
@@ -38,7 +43,11 @@ export class TokenEncryptionService {
     if (!ivB64 || !authTagB64 || !ciphertextB64) {
       throw new Error('Formato de payload cifrado inválido');
     }
-    const decipher = createDecipheriv(ALGORITHM, this.key, Buffer.from(ivB64, 'base64'));
+    const decipher = createDecipheriv(
+      ALGORITHM,
+      this.key,
+      Buffer.from(ivB64, 'base64'),
+    );
     decipher.setAuthTag(Buffer.from(authTagB64, 'base64'));
     const plaintext = Buffer.concat([
       decipher.update(Buffer.from(ciphertextB64, 'base64')),

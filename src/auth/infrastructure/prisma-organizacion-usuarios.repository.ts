@@ -30,7 +30,12 @@ export class PrismaOrganizacionUsuariosRepository implements OrganizacionUsuario
     organizacionId: string,
   ): Promise<MembresiaActiva | null> {
     const fila = await this.prisma.organizacionUsuario.findFirst({
-      where: { usuarioId, organizacionId, estado: 1, organizacion: { estado: 1 } },
+      where: {
+        usuarioId,
+        organizacionId,
+        estado: 1,
+        organizacion: { estado: 1 },
+      },
       include: { organizacion: true },
     });
 

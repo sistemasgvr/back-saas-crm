@@ -4,7 +4,9 @@ import type { UsuariosRepository } from '../ports/usuarios.repository.port';
 
 @Injectable()
 export class UpdateMeUseCase {
-  constructor(@Inject(USUARIOS_REPOSITORY) private readonly usuarios: UsuariosRepository) {}
+  constructor(
+    @Inject(USUARIOS_REPOSITORY) private readonly usuarios: UsuariosRepository,
+  ) {}
 
   async execute(
     usuarioId: string,

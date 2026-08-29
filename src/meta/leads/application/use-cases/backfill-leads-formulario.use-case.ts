@@ -179,7 +179,9 @@ export class BackfillLeadsFormularioUseCase {
       errores,
       incompleto,
       nextCursor: incompleto ? cursor : undefined,
-      ...(rangoRecortadoPorRetencion ? { rangoRecortadoPorRetencion: true } : {}),
+      ...(rangoRecortadoPorRetencion
+        ? { rangoRecortadoPorRetencion: true }
+        : {}),
       ...(avisoRetencion ? { avisoRetencion } : {}),
     };
   }

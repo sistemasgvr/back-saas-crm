@@ -32,7 +32,10 @@ export class CrearPlantillaUseCase {
 
   async execute(organizacionId: string, input: CrearPlantillaWhatsAppInput) {
     const variablesCuerpo = contarVariablesPlantilla(input.cuerpo);
-    if (variablesCuerpo > 0 && input.ejemplosCuerpo?.length !== variablesCuerpo) {
+    if (
+      variablesCuerpo > 0 &&
+      input.ejemplosCuerpo?.length !== variablesCuerpo
+    ) {
       throw new BadRequestException(
         `El mensaje usa ${variablesCuerpo} variable(s) ({{1}}..{{${variablesCuerpo}}}) — hace falta un ejemplo por cada una`,
       );

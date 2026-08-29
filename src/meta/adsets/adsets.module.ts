@@ -8,7 +8,10 @@ import { PrismaConjuntosAnunciosRepository } from './infrastructure/prisma-conju
   controllers: [AdsetsController],
   providers: [
     ListarConjuntosAnunciosUseCase,
-    { provide: CONJUNTOS_ANUNCIOS_REPOSITORY, useClass: PrismaConjuntosAnunciosRepository },
+    {
+      provide: CONJUNTOS_ANUNCIOS_REPOSITORY,
+      useClass: PrismaConjuntosAnunciosRepository,
+    },
   ],
   exports: [CONJUNTOS_ANUNCIOS_REPOSITORY],
 })

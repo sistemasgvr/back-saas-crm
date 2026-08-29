@@ -8,10 +8,15 @@ import type {
 @Injectable()
 export class ActualizarModuloUseCase {
   constructor(
-    @Inject(MODULOS_CATALOGO_REPOSITORY) private readonly modulos: ModulosCatalogoRepository,
+    @Inject(MODULOS_CATALOGO_REPOSITORY)
+    private readonly modulos: ModulosCatalogoRepository,
   ) {}
 
-  async execute(id: string, input: ActualizarModuloInput, usuarioEdicion: string) {
+  async execute(
+    id: string,
+    input: ActualizarModuloInput,
+    usuarioEdicion: string,
+  ) {
     const existente = await this.modulos.obtenerPorId(id);
     if (!existente) {
       throw new NotFoundException('Módulo no encontrado');

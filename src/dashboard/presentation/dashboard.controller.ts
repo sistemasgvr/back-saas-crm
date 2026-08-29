@@ -1,4 +1,10 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
@@ -12,6 +18,8 @@ import { ObtenerSeriesPublicitariasUseCase } from '../application/use-cases/obte
 import { FiltroDashboardQueryDto } from './dto/filtro-dashboard.query.dto';
 import { FiltroSeriesQueryDto } from './dto/filtro-series.query.dto';
 
+@ApiTags('Dashboard')
+@ApiBearerAuth('JWT-auth')
 @Controller('dashboard')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard)
 @RequireModule('DASHBOARD')
@@ -24,6 +32,17 @@ export class DashboardController {
   ) {}
 
   @Get('kpis')
+  @ApiOperation({
+    summary: 'KPIs de leads',
+    description:
+      'Totales de leads (nuevos, contactados, convertidos, etc.) para el rango y filtros dados.',
+  })
+  @ApiResponse({ status: 200, description: 'KPIs calculados.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'La organización no tiene el módulo DASHBOARD activo.',
+  })
   getKpis(
     @CurrentUser() ctx: RequestContext,
     @Query() query: FiltroDashboardQueryDto,
@@ -32,6 +51,16 @@ export class DashboardController {
   }
 
   @Get('series')
+  @ApiOperation({
+    summary: 'Serie temporal de leads',
+    description: 'Conteo de leads agrupado por día para graficar tendencia.',
+  })
+  @ApiResponse({ status: 200, description: 'Puntos de la serie.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'La organización no tiene el módulo DASHBOARD activo.',
+  })
   getSeries(
     @CurrentUser() ctx: RequestContext,
     @Query() query: FiltroSeriesQueryDto,
@@ -40,6 +69,17 @@ export class DashboardController {
   }
 
   @Get('ads-kpis')
+  @ApiOperation({
+    summary: 'KPIs publicitarios',
+    description:
+      'Gasto, impresiones, clics y costo por lead agregados desde Meta Insights.',
+  })
+  @ApiResponse({ status: 200, description: 'KPIs publicitarios calculados.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'La organización no tiene el módulo DASHBOARD activo.',
+  })
   getAdsKpis(
     @CurrentUser() ctx: RequestContext,
     @Query() query: FiltroSeriesQueryDto,
@@ -48,6 +88,16 @@ export class DashboardController {
   }
 
   @Get('ads-series')
+  @ApiOperation({
+    summary: 'Serie temporal publicitaria',
+    description: 'Gasto/impresiones/clics por día desde Meta Insights.',
+  })
+  @ApiResponse({ status: 200, description: 'Puntos de la serie publicitaria.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'La organización no tiene el módulo DASHBOARD activo.',
+  })
   getAdsSeries(
     @CurrentUser() ctx: RequestContext,
     @Query() query: FiltroSeriesQueryDto,

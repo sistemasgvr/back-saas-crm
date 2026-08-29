@@ -65,7 +65,8 @@ export class IngestarLeadGraphUseCase {
     let anuncioId: string | undefined;
 
     if (lead.campaignId) {
-      const nombreCampana = (await nombreDe(lead.campaignId)) ?? lead.campaignId;
+      const nombreCampana =
+        (await nombreDe(lead.campaignId)) ?? lead.campaignId;
       const campana = await this.campanas.upsertPorMetaId({
         organizacionId,
         metaCampanaId: lead.campaignId,

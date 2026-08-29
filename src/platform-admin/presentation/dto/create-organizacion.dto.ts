@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsEmail,
@@ -13,17 +14,21 @@ import {
 import { RUBROS_SOPORTADOS } from '../../../shared/domain/rubros-organizacion';
 
 class PrimerUsuarioDto {
+  @ApiProperty({ example: 'propietario@empresa.com' })
   @IsEmail()
   email: string;
 
+  @ApiProperty({ minLength: 8 })
   @IsString()
   @MinLength(8)
   password: string;
 
+  @ApiProperty({ example: 'Juan', maxLength: 120 })
   @IsString()
   @MaxLength(120)
   nombre: string;
 
+  @ApiPropertyOptional({ example: 'Pérez', maxLength: 120 })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -31,10 +36,17 @@ class PrimerUsuarioDto {
 }
 
 export class CreateOrganizacionDto {
+  @ApiProperty({ example: 'Domaria Inmobiliaria', maxLength: 200 })
   @IsString()
   @MaxLength(200)
   nombre: string;
 
+  @ApiProperty({
+    example: 'domaria-inmobiliaria',
+    maxLength: 120,
+    description:
+      'Identificador único, minúsculas/números/guiones (usado en URLs)',
+  })
   @IsString()
   @MaxLength(120)
   @Matches(/^[a-z0-9]+(-[a-z0-9]+)*$/, {
@@ -42,44 +54,72 @@ export class CreateOrganizacionDto {
   })
   slug: string;
 
+  @ApiPropertyOptional({
+    example: 'Domaria Inmobiliaria S.A.C.',
+    maxLength: 255,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(255)
   razonSocial?: string;
 
+  @ApiPropertyOptional({ example: '20601234567', maxLength: 50 })
   @IsOptional()
   @IsString()
   @MaxLength(50)
   documentoFiscal?: string;
 
+  @ApiPropertyOptional({ example: 'contacto@domaria.pe', maxLength: 255 })
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
   emailContacto?: string;
 
+  @ApiPropertyOptional({ example: '+51987654321', maxLength: 40 })
   @IsOptional()
   @IsString()
   @MaxLength(40)
   telefonoContacto?: string;
 
+  @ApiPropertyOptional({ description: 'URL pública del logo' })
   @IsOptional()
   @IsString()
   logoUrl?: string;
 
+  @ApiPropertyOptional({
+    example: 'PE',
+    minLength: 2,
+    maxLength: 2,
+    description: 'Código de país ISO 3166-1 alpha-2',
+  })
   @IsOptional()
   @IsString()
   @Length(2, 2)
   pais?: string;
 
+  @ApiPropertyOptional({
+    example: 'America/Lima',
+    maxLength: 64,
+    description: 'Zona horaria IANA',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(64)
   zonaHoraria?: string;
 
+  @ApiPropertyOptional({
+    enum: RUBROS_SOPORTADOS,
+    description: 'Rubro/vertical de negocio de la organización',
+  })
   @IsOptional()
   @IsIn(RUBROS_SOPORTADOS)
   rubro?: string;
 
+  @ApiPropertyOptional({
+    type: PrimerUsuarioDto,
+    description:
+      'Si se envía, crea de una vez al primer usuario (PROPIETARIO) de la organización',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => PrimerUsuarioDto)

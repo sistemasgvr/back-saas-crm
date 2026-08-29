@@ -9,13 +9,22 @@ import type {
 export class PrismaOrganizacionModulosAdminRepository implements OrganizacionModulosAdminRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listarMatrizPorOrganizacion(organizacionId: string): Promise<ModuloConHabilitado[]> {
+  async listarMatrizPorOrganizacion(
+    organizacionId: string,
+  ): Promise<ModuloConHabilitado[]> {
     const [catalogo, relaciones] = await Promise.all([
-      this.prisma.modulo.findMany({ where: { estado: 1 }, orderBy: { orden: 'asc' } }),
-      this.prisma.organizacionModulo.findMany({ where: { organizacionId, estado: 1 } }),
+      this.prisma.modulo.findMany({
+        where: { estado: 1 },
+        orderBy: { orden: 'asc' },
+      }),
+      this.prisma.organizacionModulo.findMany({
+        where: { organizacionId, estado: 1 },
+      }),
     ]);
 
-    const porModuloId = new Map(relaciones.map((relacion) => [relacion.moduloId, relacion]));
+    const porModuloId = new Map(
+      relaciones.map((relacion) => [relacion.moduloId, relacion]),
+    );
 
     return catalogo.map((modulo) => ({
       id: modulo.id,
@@ -56,7 +65,9 @@ export class PrismaOrganizacionModulosAdminRepository implements OrganizacionMod
         habilitado: habilitado ? 1 : 0,
         usuarioEdicion,
         fechaActivacion:
-          habilitado && existente.habilitado === 0 ? new Date() : existente.fechaActivacion,
+          habilitado && existente.habilitado === 0
+            ? new Date()
+            : existente.fechaActivacion,
       },
     });
   }

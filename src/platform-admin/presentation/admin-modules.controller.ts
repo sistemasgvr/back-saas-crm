@@ -1,4 +1,19 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { PlatformAdminGuard } from '../../shared/presentation/guards/platform-admin.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
@@ -11,6 +26,8 @@ import { CreateModuloDto } from './dto/create-modulo.dto';
 import { UpdateModuloDto } from './dto/update-modulo.dto';
 import { CambiarEstadoDto } from './dto/cambiar-estado.dto';
 
+@ApiTags('Platform Admin')
+@ApiBearerAuth('JWT-auth')
 @Controller('admin/modules')
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class AdminModulesController {
@@ -22,16 +39,49 @@ export class AdminModulesController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Listar módulos del catálogo',
+    description:
+      'Solo super-admin. Catálogo global de módulos activables por organización.',
+  })
+  @ApiResponse({ status: 200, description: 'Lista de módulos.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
   findAll() {
     return this.listarModulos.execute();
   }
 
   @Post()
+  @ApiOperation({
+    summary: 'Crear un módulo en el catálogo',
+    description: 'Solo super-admin.',
+  })
+  @ApiResponse({ status: 201, description: 'Módulo creado.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 409, description: 'El código de módulo ya existe.' })
   create(@Body() dto: CreateModuloDto, @CurrentUser() ctx: RequestContext) {
     return this.crearModulo.execute(dto, ctx.usuarioId);
   }
 
   @Patch(':id')
+  @ApiOperation({
+    summary: 'Actualizar un módulo del catálogo',
+    description: 'Solo super-admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Módulo actualizado.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 404, description: 'El módulo no existe.' })
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateModuloDto,
@@ -41,6 +91,17 @@ export class AdminModulesController {
   }
 
   @Patch(':id/estado')
+  @ApiOperation({
+    summary: 'Activar/desactivar un módulo en el catálogo global',
+    description: 'Solo super-admin.',
+  })
+  @ApiResponse({ status: 200, description: 'Estado actualizado.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'El usuario no es admin de plataforma.',
+  })
+  @ApiResponse({ status: 404, description: 'El módulo no existe.' })
   changeStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CambiarEstadoDto,

@@ -41,21 +41,33 @@ export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminR
         take: filtro.pageSize,
       }),
     ]);
-    return construirResultadoPaginado(organizaciones, total, filtro.page, filtro.pageSize);
+    return construirResultadoPaginado(
+      organizaciones,
+      total,
+      filtro.page,
+      filtro.pageSize,
+    );
   }
 
   obtenerPorId(id: string) {
     return this.prisma.organizacion.findUnique({ where: { id } });
   }
 
-  crearConModulosPorDefecto(input: CrearOrganizacionInput, usuarioCreacion: string) {
+  crearConModulosPorDefecto(
+    input: CrearOrganizacionInput,
+    usuarioCreacion: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
-      const organizacion = await tx.organizacion.create({ data: { ...input, usuarioCreacion } });
+      const organizacion = await tx.organizacion.create({
+        data: { ...input, usuarioCreacion },
+      });
       const catalogo = await tx.modulo.findMany({ where: { estado: 1 } });
 
       await tx.organizacionModulo.createMany({
         data: catalogo.map((modulo) => {
-          const habilitado = MODULOS_ENCENDIDOS_POR_DEFECTO.includes(modulo.codigo);
+          const habilitado = MODULOS_ENCENDIDOS_POR_DEFECTO.includes(
+            modulo.codigo,
+          );
           return {
             organizacionId: organizacion.id,
             moduloId: modulo.id,
@@ -70,8 +82,15 @@ export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminR
     });
   }
 
-  actualizar(id: string, data: ActualizarOrganizacionAdminInput, usuarioEdicion: string) {
-    return this.prisma.organizacion.update({ where: { id }, data: { ...data, usuarioEdicion } });
+  actualizar(
+    id: string,
+    data: ActualizarOrganizacionAdminInput,
+    usuarioEdicion: string,
+  ) {
+    return this.prisma.organizacion.update({
+      where: { id },
+      data: { ...data, usuarioEdicion },
+    });
   }
 
   desactivar(id: string, usuarioEdicion: string) {

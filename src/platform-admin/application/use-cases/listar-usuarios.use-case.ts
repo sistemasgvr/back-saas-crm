@@ -8,7 +8,10 @@ import { toUsuarioAdminResponse } from '../usuario-admin-response.mapper';
 
 @Injectable()
 export class ListarUsuariosUseCase {
-  constructor(@Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository) {}
+  constructor(
+    @Inject(USUARIOS_ADMIN_REPOSITORY)
+    private readonly usuarios: UsuariosAdminRepository,
+  ) {}
 
   async execute(filtro: FiltroListadoUsuarios) {
     const resultado = await this.usuarios.listar(filtro);

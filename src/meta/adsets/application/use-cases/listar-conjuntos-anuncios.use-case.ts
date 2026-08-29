@@ -10,6 +10,9 @@ export class ListarConjuntosAnunciosUseCase {
   ) {}
 
   execute(organizacionId: string, campanaId?: string) {
-    return this.conjuntosAnuncios.listarPorOrganizacion(organizacionId, campanaId);
+    return this.conjuntosAnuncios.listarPorOrganizacion(
+      organizacionId,
+      campanaId,
+    );
   }
 }

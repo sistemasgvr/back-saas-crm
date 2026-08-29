@@ -8,13 +8,16 @@ import type {
 @Injectable()
 export class CrearModuloUseCase {
   constructor(
-    @Inject(MODULOS_CATALOGO_REPOSITORY) private readonly modulos: ModulosCatalogoRepository,
+    @Inject(MODULOS_CATALOGO_REPOSITORY)
+    private readonly modulos: ModulosCatalogoRepository,
   ) {}
 
   async execute(input: CrearModuloInput, usuarioCreacion: string) {
     const existente = await this.modulos.obtenerPorCodigo(input.codigo);
     if (existente) {
-      throw new ConflictException(`Ya existe un módulo con código ${input.codigo}`);
+      throw new ConflictException(
+        `Ya existe un módulo con código ${input.codigo}`,
+      );
     }
     return this.modulos.crear(input, usuarioCreacion);
   }

@@ -35,8 +35,16 @@ export interface UsuariosAdminRepository {
   listar(filtro: FiltroListadoUsuarios): Promise<ResultadoPaginado<Usuario>>;
   obtenerPorId(id: string): Promise<UsuarioConMembresias | null>;
   buscarActivoPorEmail(email: string): Promise<Usuario | null>;
-  crear(input: CrearUsuarioInput, passwordHash: string, usuarioCreacion: string): Promise<Usuario>;
-  cambiarEstado(id: string, estado: 0 | 1, usuarioEdicion: string): Promise<Usuario>;
+  crear(
+    input: CrearUsuarioInput,
+    passwordHash: string,
+    usuarioCreacion: string,
+  ): Promise<Usuario>;
+  cambiarEstado(
+    id: string,
+    estado: 0 | 1,
+    usuarioEdicion: string,
+  ): Promise<Usuario>;
   /** Crea o reactiva la membresía (upsert) — un usuario puede pertenecer a varias organizaciones. */
   asignarAOrganizacion(
     usuarioId: string,

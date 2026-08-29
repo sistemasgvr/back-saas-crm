@@ -18,7 +18,9 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
     const q = filtro.q?.trim();
     const where: Prisma.UsuarioWhereInput = {
       ...(filtro.estado !== undefined ? { estado: filtro.estado } : {}),
-      ...(filtro.esAdminPlataforma !== undefined ? { esAdminPlataforma: filtro.esAdminPlataforma } : {}),
+      ...(filtro.esAdminPlataforma !== undefined
+        ? { esAdminPlataforma: filtro.esAdminPlataforma }
+        : {}),
       ...(q
         ? {
             OR: [
@@ -39,7 +41,12 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
         take: filtro.pageSize,
       }),
     ]);
-    return construirResultadoPaginado(usuarios, total, filtro.page, filtro.pageSize);
+    return construirResultadoPaginado(
+      usuarios,
+      total,
+      filtro.page,
+      filtro.pageSize,
+    );
   }
 
   async obtenerPorId(id: string): Promise<UsuarioConMembresias | null> {
@@ -65,7 +72,11 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
     return this.prisma.usuario.findFirst({ where: { email, estado: 1 } });
   }
 
-  crear(input: CrearUsuarioInput, passwordHash: string, usuarioCreacion: string) {
+  crear(
+    input: CrearUsuarioInput,
+    passwordHash: string,
+    usuarioCreacion: string,
+  ) {
     return this.prisma.usuario.create({
       data: {
         email: input.email,
@@ -80,7 +91,10 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   }
 
   cambiarEstado(id: string, estado: 0 | 1, usuarioEdicion: string) {
-    return this.prisma.usuario.update({ where: { id }, data: { estado, usuarioEdicion } });
+    return this.prisma.usuario.update({
+      where: { id },
+      data: { estado, usuarioEdicion },
+    });
   }
 
   async asignarAOrganizacion(
@@ -92,7 +106,12 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
     await this.prisma.organizacionUsuario.upsert({
       where: { organizacionId_usuarioId: { organizacionId, usuarioId } },
       update: { rol, estado: 1, usuarioEdicion },
-      create: { organizacionId, usuarioId, rol, usuarioCreacion: usuarioEdicion },
+      create: {
+        organizacionId,
+        usuarioId,
+        rol,
+        usuarioCreacion: usuarioEdicion,
+      },
     });
   }
 }

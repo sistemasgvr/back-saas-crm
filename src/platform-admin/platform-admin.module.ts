@@ -45,8 +45,14 @@ import { PrismaOrganizacionModulosAdminRepository } from './infrastructure/prism
     AsignarUsuarioAOrganizacionUseCase,
     ListarMatrizModulosOrganizacionUseCase,
     ToggleModuloOrganizacionUseCase,
-    { provide: ORGANIZACIONES_ADMIN_REPOSITORY, useClass: PrismaOrganizacionesAdminRepository },
-    { provide: USUARIOS_ADMIN_REPOSITORY, useClass: PrismaUsuariosAdminRepository },
+    {
+      provide: ORGANIZACIONES_ADMIN_REPOSITORY,
+      useClass: PrismaOrganizacionesAdminRepository,
+    },
+    {
+      provide: USUARIOS_ADMIN_REPOSITORY,
+      useClass: PrismaUsuariosAdminRepository,
+    },
     {
       provide: ORGANIZACION_MODULOS_ADMIN_REPOSITORY,
       useClass: PrismaOrganizacionModulosAdminRepository,

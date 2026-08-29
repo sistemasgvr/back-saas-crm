@@ -66,7 +66,10 @@ export class RefreshUseCase {
       esAdminPlataforma: usuario.esAdminPlataforma === 1,
     });
 
-    const nuevoRefresh = this.tokens.firmarRefreshToken({ sub: usuario.id, organizacionId });
+    const nuevoRefresh = this.tokens.firmarRefreshToken({
+      sub: usuario.id,
+      organizacionId,
+    });
     await this.tokensRefresco.crear({
       usuarioId: usuario.id,
       tokenHash: nuevoRefresh.tokenHash,

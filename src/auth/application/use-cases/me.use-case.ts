@@ -1,11 +1,17 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
-import type { RequestContext, RolOrganizacion } from '../../domain/request-context.interface';
+import type {
+  RequestContext,
+  RolOrganizacion,
+} from '../../domain/request-context.interface';
 import { USUARIOS_REPOSITORY } from '../ports/usuarios.repository.port';
 import type { UsuariosRepository } from '../ports/usuarios.repository.port';
 import { ORGANIZACION_USUARIOS_REPOSITORY } from '../ports/organizacion-usuarios.repository.port';
 import type { OrganizacionUsuariosRepository } from '../ports/organizacion-usuarios.repository.port';
 import { MODULOS_REPOSITORY } from '../ports/modulos.repository.port';
-import type { ModulosRepository, ModuloOrganizacion } from '../ports/modulos.repository.port';
+import type {
+  ModulosRepository,
+  ModuloOrganizacion,
+} from '../ports/modulos.repository.port';
 
 @Injectable()
 export class MeUseCase {
@@ -22,7 +28,8 @@ export class MeUseCase {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    let organizacion: { id: string; nombre: string; slug: string } | null = null;
+    let organizacion: { id: string; nombre: string; slug: string } | null =
+      null;
     let rol: RolOrganizacion | null = null;
     let modulosOrg: ModuloOrganizacion[] = [];
 
@@ -38,7 +45,9 @@ export class MeUseCase {
           slug: membresia.organizacionSlug,
         };
         rol = membresia.rol;
-        modulosOrg = await this.modulos.findModulosPorOrganizacion(membresia.organizacionId);
+        modulosOrg = await this.modulos.findModulosPorOrganizacion(
+          membresia.organizacionId,
+        );
       }
     }
 

@@ -8,7 +8,11 @@ const FORMATTER_LIMA = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-function parseFecha(fechaYYYYMMDD: string): { year: number; month: number; day: number } {
+function parseFecha(fechaYYYYMMDD: string): {
+  year: number;
+  month: number;
+  day: number;
+} {
   const [year, month, day] = fechaYYYYMMDD.split('-').map(Number);
   return { year, month, day };
 }
@@ -41,7 +45,11 @@ export function hoyLima(): string {
 export function siguienteDiaLima(fechaYYYYMMDD: string): string {
   const { year, month, day } = parseFecha(fechaYYYYMMDD);
   const fecha = new Date(Date.UTC(year, month - 1, day + 1));
-  return formatFecha(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, fecha.getUTCDate());
+  return formatFecha(
+    fecha.getUTCFullYear(),
+    fecha.getUTCMonth() + 1,
+    fecha.getUTCDate(),
+  );
 }
 
 /** Lunes de la semana calendario (Lima) que contiene la fecha dada. */
@@ -51,7 +59,11 @@ export function inicioSemanaLima(fechaYYYYMMDD: string): string {
   const diaSemana = fecha.getUTCDay(); // 0=domingo, 1=lunes, ...
   const diffAlLunes = diaSemana === 0 ? 6 : diaSemana - 1;
   fecha.setUTCDate(fecha.getUTCDate() - diffAlLunes);
-  return formatFecha(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, fecha.getUTCDate());
+  return formatFecha(
+    fecha.getUTCFullYear(),
+    fecha.getUTCMonth() + 1,
+    fecha.getUTCDate(),
+  );
 }
 
 /** Domingo de la semana calendario (Lima) que contiene la fecha dada. */
@@ -59,7 +71,11 @@ export function finSemanaLima(fechaYYYYMMDD: string): string {
   const inicio = inicioSemanaLima(fechaYYYYMMDD);
   const { year, month, day } = parseFecha(inicio);
   const fecha = new Date(Date.UTC(year, month - 1, day + 6));
-  return formatFecha(fecha.getUTCFullYear(), fecha.getUTCMonth() + 1, fecha.getUTCDate());
+  return formatFecha(
+    fecha.getUTCFullYear(),
+    fecha.getUTCMonth() + 1,
+    fecha.getUTCDate(),
+  );
 }
 
 /** Primer día del mes calendario (Lima) que contiene la fecha dada. */

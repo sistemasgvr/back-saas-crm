@@ -5,7 +5,10 @@ import { toUsuarioAdminDetalleResponse } from '../usuario-admin-response.mapper'
 
 @Injectable()
 export class ObtenerUsuarioUseCase {
-  constructor(@Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository) {}
+  constructor(
+    @Inject(USUARIOS_ADMIN_REPOSITORY)
+    private readonly usuarios: UsuariosAdminRepository,
+  ) {}
 
   async execute(id: string) {
     const usuario = await this.usuarios.obtenerPorId(id);

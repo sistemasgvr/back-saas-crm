@@ -58,9 +58,7 @@ function mensajePermisoFaltante(scopes: string[], mensajeMeta: string): string {
     );
   }
 
-  const detalle = scopes
-    .map((s) => `«${labelDeScope(s)}» (${s})`)
-    .join(', ');
+  const detalle = scopes.map((s) => `«${labelDeScope(s)}» (${s})`).join(', ');
 
   return (
     `Falta el permiso ${detalle}. ` +
@@ -73,8 +71,9 @@ function mensajePermisoFaltante(scopes: string[], mensajeMeta: string): string {
  * con uno de estos códigos en el body. Se usa para decidir reintentos en el cliente. */
 export function esRateLimitMeta(error: unknown): boolean {
   if (!(error instanceof AxiosError)) return false;
-  const code = (error.response?.data as { error?: MetaGraphErrorBody } | undefined)
-    ?.error?.code;
+  const code = (
+    error.response?.data as { error?: MetaGraphErrorBody } | undefined
+  )?.error?.code;
   return (
     error.response?.status === 429 ||
     code === 4 ||
@@ -97,7 +96,8 @@ export function excepcionDesdeErrorMeta(error: unknown): HttpException {
     );
   }
 
-  const body = error.response?.data as { error?: MetaGraphErrorBody } | undefined;
+  const body = error.response?.data as
+    { error?: MetaGraphErrorBody } | undefined;
   const graph = body?.error;
   const mensajeMeta =
     graph?.error_user_msg?.trim() ||

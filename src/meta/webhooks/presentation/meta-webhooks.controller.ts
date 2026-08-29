@@ -9,6 +9,7 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -25,6 +26,7 @@ import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/appli
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
+@ApiTags('Meta Webhooks')
 @Controller('meta/webhooks')
 export class MetaWebhooksController {
   private readonly logger = new Logger(MetaWebhooksController.name);
@@ -39,6 +41,40 @@ export class MetaWebhooksController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Verificación del webhook (handshake de Meta)',
+    description:
+      'Endpoint público que Meta llama al configurar la suscripción del webhook (leadgen o WhatsApp) para ' +
+      'confirmar que es dueño de la URL. Valida el `?token=` propio y el `hub.verify_token` de Meta, y si ' +
+      'ambos son correctos devuelve `hub.challenge` en texto plano.',
+  })
+  @ApiQuery({
+    name: 'token',
+    description:
+      'Token propio de esta URL de webhook (no confundir con hub.verify_token)',
+  })
+  @ApiQuery({
+    name: 'hub.mode',
+    description: 'Siempre "subscribe", enviado por Meta',
+  })
+  @ApiQuery({
+    name: 'hub.verify_token',
+    description: 'Token de verificación configurado en la app de Meta',
+  })
+  @ApiQuery({
+    name: 'hub.challenge',
+    description:
+      'Valor que Meta espera recibir de vuelta si la verificación es correcta',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Verificación correcta — devuelve hub.challenge en texto plano.',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Token de URL o verify_token incorrectos.',
+  })
   async verify(
     @Query('token') token: string,
     @Query('hub.mode') mode: string,
@@ -62,6 +98,28 @@ export class MetaWebhooksController {
 
   @Post()
   @HttpCode(200)
+  @ApiOperation({
+    summary: 'Recepción de eventos (leads y WhatsApp)',
+    description:
+      'Endpoint público que Meta invoca en tiempo real con los eventos suscritos. Un mismo endpoint recibe ' +
+      'dos tipos de payload, distinguidos por `object`: `"page"` con leads nuevos (leadgen) y ' +
+      '`"whatsapp_business_account"` con mensajes/estados de WhatsApp entrantes. Verifica el `?token=` propio ' +
+      'y la firma HMAC `X-Hub-Signature-256` del body crudo antes de procesar. Responde 200 de inmediato y ' +
+      'procesa el evento en segundo plano (ingesta idempotente) — Meta no reintenta por errores posteriores al ACK.',
+  })
+  @ApiQuery({
+    name: 'token',
+    description: 'Token propio de esta URL de webhook',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Evento aceptado (ACK inmediato; el procesamiento real es asíncrono).',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Token de URL incorrecto o firma HMAC inválida.',
+  })
   async receive(
     @Query('token') token: string,
     @Headers('x-hub-signature-256') signature: string,

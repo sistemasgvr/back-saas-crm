@@ -1,6 +1,14 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma.service';
-import type { RequestContext, RolOrganizacion } from '../../../auth/domain/request-context.interface';
+import type {
+  RequestContext,
+  RolOrganizacion,
+} from '../../../auth/domain/request-context.interface';
 
 /**
  * Revalida en vivo (no solo desde el JWT) que el usuario pertenece a la
@@ -13,11 +21,15 @@ export class OrgMembershipGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<{ user: RequestContext }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<{ user: RequestContext }>();
     const user = request.user;
 
     if (!user?.organizacionId) {
-      throw new ForbiddenException('No hay una organización activa en la sesión');
+      throw new ForbiddenException(
+        'No hay una organización activa en la sesión',
+      );
     }
 
     const membresia = await this.prisma.organizacionUsuario.findFirst({
@@ -30,7 +42,9 @@ export class OrgMembershipGuard implements CanActivate {
     });
 
     if (!membresia) {
-      throw new ForbiddenException('La organización no está activa o ya no perteneces a ella');
+      throw new ForbiddenException(
+        'La organización no está activa o ya no perteneces a ella',
+      );
     }
 
     request.user = { ...user, rol: membresia.rol as RolOrganizacion };

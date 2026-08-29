@@ -12,7 +12,11 @@ export class ActualizarOrganizacionAdminUseCase {
     private readonly organizaciones: OrganizacionesAdminRepository,
   ) {}
 
-  async execute(id: string, input: ActualizarOrganizacionAdminInput, usuarioEdicion: string) {
+  async execute(
+    id: string,
+    input: ActualizarOrganizacionAdminInput,
+    usuarioEdicion: string,
+  ) {
     const existente = await this.organizaciones.obtenerPorId(id);
     if (!existente) {
       throw new NotFoundException('Organización no encontrada');

@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma.service';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 
@@ -12,7 +17,9 @@ export class PlatformAdminGuard implements CanActivate {
   constructor(private readonly prisma: PrismaService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const { user } = context.switchToHttp().getRequest<{ user: RequestContext }>();
+    const { user } = context
+      .switchToHttp()
+      .getRequest<{ user: RequestContext }>();
 
     const usuario = user?.usuarioId
       ? await this.prisma.usuario.findFirst({
@@ -21,7 +28,9 @@ export class PlatformAdminGuard implements CanActivate {
       : null;
 
     if (!usuario) {
-      throw new ForbiddenException('Requiere permisos de administrador de plataforma');
+      throw new ForbiddenException(
+        'Requiere permisos de administrador de plataforma',
+      );
     }
 
     return true;

@@ -9,7 +9,8 @@ import { toUsuarioAdminDetalleResponse } from '../usuario-admin-response.mapper'
 @Injectable()
 export class AsignarUsuarioAOrganizacionUseCase {
   constructor(
-    @Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository,
+    @Inject(USUARIOS_ADMIN_REPOSITORY)
+    private readonly usuarios: UsuariosAdminRepository,
     @Inject(ORGANIZACIONES_ADMIN_REPOSITORY)
     private readonly organizaciones: OrganizacionesAdminRepository,
   ) {}
@@ -25,9 +26,15 @@ export class AsignarUsuarioAOrganizacionUseCase {
       this.organizaciones.obtenerPorId(organizacionId),
     ]);
     if (!usuario) throw new NotFoundException('Usuario no encontrado');
-    if (!organizacion) throw new NotFoundException('Organización no encontrada');
+    if (!organizacion)
+      throw new NotFoundException('Organización no encontrada');
 
-    await this.usuarios.asignarAOrganizacion(usuarioId, organizacionId, rol, usuarioEdicion);
+    await this.usuarios.asignarAOrganizacion(
+      usuarioId,
+      organizacionId,
+      rol,
+      usuarioEdicion,
+    );
 
     const actualizado = await this.usuarios.obtenerPorId(usuarioId);
     return toUsuarioAdminDetalleResponse(actualizado!);

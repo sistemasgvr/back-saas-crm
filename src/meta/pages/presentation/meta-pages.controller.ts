@@ -11,6 +11,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -30,6 +36,8 @@ import { ListarPaginasFiltroUseCase } from '../application/use-cases/listar-pagi
 import { VerificarSaludWebhookPaginaUseCase } from '../application/use-cases/verificar-salud-webhook-pagina.use-case';
 import { VincularPaginaDto } from './dto/vincular-pagina.dto';
 
+@ApiTags('Meta Pages')
+@ApiBearerAuth('JWT-auth')
 @Controller('meta/pages')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
 @Roles('PROPIETARIO', 'ADMINISTRADOR')
@@ -47,6 +55,17 @@ export class MetaPagesController {
   ) {}
 
   @Get()
+  @ApiOperation({
+    summary: 'Listar páginas vinculadas',
+    description:
+      'Páginas de Facebook ya vinculadas a la organización (paginado).',
+  })
+  @ApiResponse({ status: 200, description: 'Página de páginas vinculadas.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   findAll(
     @CurrentUser() ctx: RequestContext,
     @Query() query: PaginacionQueryDto,
@@ -59,6 +78,17 @@ export class MetaPagesController {
   }
 
   @Get('available')
+  @ApiOperation({
+    summary: 'Páginas disponibles para vincular',
+    description:
+      'Consulta en vivo a Graph API las páginas administradas por el usuario que aún no están vinculadas.',
+  })
+  @ApiResponse({ status: 200, description: 'Páginas disponibles.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   findAvailable(@CurrentUser() ctx: RequestContext) {
     return this.listarDisponibles.execute(ctx.organizacionId!);
   }
@@ -66,11 +96,33 @@ export class MetaPagesController {
   /** Sin restricción de rol — cualquier miembro con el módulo puede poblar el filtro de /leads. */
   @Get('filtro')
   @Roles()
+  @ApiOperation({
+    summary: 'Páginas para poblar el filtro de leads',
+    description:
+      'Lista liviana (id + nombre), accesible a cualquier rol con el módulo activo.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Páginas para el selector de filtro.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo META_LEADS no activo.' })
   findFiltro(@CurrentUser() ctx: RequestContext) {
     return this.listarFiltro.execute(ctx.organizacionId!);
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Obtener el perfil de una página vinculada' })
+  @ApiResponse({ status: 200, description: 'Perfil de la página.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La página no existe o no pertenece a la organización.',
+  })
   findOne(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -79,6 +131,17 @@ export class MetaPagesController {
   }
 
   @Post()
+  @ApiOperation({
+    summary: 'Vincular una página',
+    description:
+      'Suscribe la página al webhook de leadgen de Meta y la guarda como vinculada.',
+  })
+  @ApiResponse({ status: 201, description: 'Página vinculada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
   create(@CurrentUser() ctx: RequestContext, @Body() dto: VincularPaginaDto) {
     return this.vincular.execute(
       ctx.organizacionId!,
@@ -90,6 +153,17 @@ export class MetaPagesController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Desvincular una página' })
+  @ApiResponse({ status: 204, description: 'Página desvinculada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La página no existe o no pertenece a la organización.',
+  })
   async remove(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -98,6 +172,21 @@ export class MetaPagesController {
   }
 
   @Post(':id/resync-webhook')
+  @ApiOperation({
+    summary: 'Resuscribir el webhook de la página',
+    description:
+      'Vuelve a suscribir la página al webhook de leadgen en Meta (útil si dejó de recibir leads).',
+  })
+  @ApiResponse({ status: 200, description: 'Webhook resuscrito.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La página no existe o no pertenece a la organización.',
+  })
   resyncWebhook(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -110,6 +199,21 @@ export class MetaPagesController {
   }
 
   @Post(':id/health-check')
+  @ApiOperation({
+    summary: 'Verificar salud del webhook de la página',
+    description:
+      'Chequea contra Meta que la suscripción al webhook de leadgen siga activa.',
+  })
+  @ApiResponse({ status: 200, description: 'Resultado del chequeo de salud.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La página no existe o no pertenece a la organización.',
+  })
   healthCheck(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,

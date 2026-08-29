@@ -8,8 +8,16 @@ export interface UsuariosRepository {
   actualizarUltimoLogin(id: string): Promise<void>;
   actualizarPerfil(
     id: string,
-    data: { nombre?: string; apellido?: string | null; telefono?: string | null },
+    data: {
+      nombre?: string;
+      apellido?: string | null;
+      telefono?: string | null;
+    },
     usuarioEdicion: string,
   ): Promise<Usuario>;
-  actualizarPasswordHash(id: string, passwordHash: string, usuarioEdicion: string): Promise<void>;
+  actualizarPasswordHash(
+    id: string,
+    passwordHash: string,
+    usuarioEdicion: string,
+  ): Promise<void>;
 }

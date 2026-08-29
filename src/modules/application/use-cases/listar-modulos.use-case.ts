@@ -5,7 +5,8 @@ import type { ModulosCatalogoRepository } from '../ports/modulos-catalogo.reposi
 @Injectable()
 export class ListarModulosUseCase {
   constructor(
-    @Inject(MODULOS_CATALOGO_REPOSITORY) private readonly modulos: ModulosCatalogoRepository,
+    @Inject(MODULOS_CATALOGO_REPOSITORY)
+    private readonly modulos: ModulosCatalogoRepository,
   ) {}
 
   execute() {

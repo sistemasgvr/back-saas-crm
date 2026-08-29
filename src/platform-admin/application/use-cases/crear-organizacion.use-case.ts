@@ -25,32 +25,52 @@ export class CrearOrganizacionUseCase {
   constructor(
     @Inject(ORGANIZACIONES_ADMIN_REPOSITORY)
     private readonly organizaciones: OrganizacionesAdminRepository,
-    @Inject(USUARIOS_ADMIN_REPOSITORY) private readonly usuarios: UsuariosAdminRepository,
+    @Inject(USUARIOS_ADMIN_REPOSITORY)
+    private readonly usuarios: UsuariosAdminRepository,
     @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
   ) {}
 
   async execute(input: CrearOrganizacionUseCaseInput, usuarioCreacion: string) {
     const { primerUsuario, ...datosOrganizacion } = input;
 
-    const org = await this.organizaciones.crearConModulosPorDefecto(datosOrganizacion, usuarioCreacion);
+    const org = await this.organizaciones.crearConModulosPorDefecto(
+      datosOrganizacion,
+      usuarioCreacion,
+    );
 
     if (!primerUsuario) {
       return { organizacion: org, propietario: null };
     }
 
-    const existente = await this.usuarios.buscarActivoPorEmail(primerUsuario.email);
+    const existente = await this.usuarios.buscarActivoPorEmail(
+      primerUsuario.email,
+    );
     if (existente) {
-      throw new ConflictException(`Ya existe un usuario activo con el email ${primerUsuario.email}`);
+      throw new ConflictException(
+        `Ya existe un usuario activo con el email ${primerUsuario.email}`,
+      );
     }
 
     const passwordHash = await this.hasher.hash(primerUsuario.password);
     const usuario = await this.usuarios.crear(
-      { email: primerUsuario.email, nombre: primerUsuario.nombre, apellido: primerUsuario.apellido },
+      {
+        email: primerUsuario.email,
+        nombre: primerUsuario.nombre,
+        apellido: primerUsuario.apellido,
+      },
       passwordHash,
       usuarioCreacion,
     );
-    await this.usuarios.asignarAOrganizacion(usuario.id, org.id, 'PROPIETARIO', usuarioCreacion);
+    await this.usuarios.asignarAOrganizacion(
+      usuario.id,
+      org.id,
+      'PROPIETARIO',
+      usuarioCreacion,
+    );
 
-    return { organizacion: org, propietario: { id: usuario.id, email: usuario.email } };
+    return {
+      organizacion: org,
+      propietario: { id: usuario.id, email: usuario.email },
+    };
   }
 }

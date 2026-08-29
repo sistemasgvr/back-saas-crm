@@ -12,5 +12,11 @@ export function construirResultadoPaginado<T>(
   page: number,
   pageSize: number,
 ): ResultadoPaginado<T> {
-  return { data, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  return {
+    data,
+    total,
+    page,
+    pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
 }

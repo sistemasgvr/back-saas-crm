@@ -34,9 +34,15 @@ import { JwtAccessStrategy } from './infrastructure/jwt-access.strategy';
     ChangePasswordUseCase,
     JwtAccessStrategy,
     { provide: USUARIOS_REPOSITORY, useClass: PrismaUsuariosRepository },
-    { provide: ORGANIZACION_USUARIOS_REPOSITORY, useClass: PrismaOrganizacionUsuariosRepository },
+    {
+      provide: ORGANIZACION_USUARIOS_REPOSITORY,
+      useClass: PrismaOrganizacionUsuariosRepository,
+    },
     { provide: MODULOS_REPOSITORY, useClass: PrismaModulosRepository },
-    { provide: TOKENS_REFRESCO_REPOSITORY, useClass: PrismaTokensRefrescoRepository },
+    {
+      provide: TOKENS_REFRESCO_REPOSITORY,
+      useClass: PrismaTokensRefrescoRepository,
+    },
     { provide: PASSWORD_HASHER, useClass: BcryptPasswordHasher },
     { provide: TOKEN_SERVICE, useClass: JwtTokenService },
   ],

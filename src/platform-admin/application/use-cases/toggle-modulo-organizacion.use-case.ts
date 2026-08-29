@@ -11,7 +11,8 @@ export class ToggleModuloOrganizacionUseCase {
   constructor(
     @Inject(ORGANIZACIONES_ADMIN_REPOSITORY)
     private readonly organizaciones: OrganizacionesAdminRepository,
-    @Inject(MODULOS_CATALOGO_REPOSITORY) private readonly modulos: ModulosCatalogoRepository,
+    @Inject(MODULOS_CATALOGO_REPOSITORY)
+    private readonly modulos: ModulosCatalogoRepository,
     @Inject(ORGANIZACION_MODULOS_ADMIN_REPOSITORY)
     private readonly organizacionModulos: OrganizacionModulosAdminRepository,
   ) {}
@@ -26,10 +27,16 @@ export class ToggleModuloOrganizacionUseCase {
       this.organizaciones.obtenerPorId(organizacionId),
       this.modulos.obtenerPorId(moduloId),
     ]);
-    if (!organizacion) throw new NotFoundException('Organización no encontrada');
+    if (!organizacion)
+      throw new NotFoundException('Organización no encontrada');
     if (!modulo) throw new NotFoundException('Módulo no encontrado');
 
-    await this.organizacionModulos.toggle(organizacionId, moduloId, habilitado, usuarioEdicion);
+    await this.organizacionModulos.toggle(
+      organizacionId,
+      moduloId,
+      habilitado,
+      usuarioEdicion,
+    );
     return this.organizacionModulos.listarMatrizPorOrganizacion(organizacionId);
   }
 }
