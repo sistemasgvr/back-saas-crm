@@ -1,10 +1,15 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { EventoMensajeWhatsApp } from '../../../../meta/webhooks/domain/whatsapp-webhook-payload.interface';
 import { CrearNotificacionUseCase } from '../../../../notifications/application/use-cases/crear-notificacion.use-case';
+import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
+import type { MetaConexionesRepository } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
+import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
+import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
+import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -14,14 +19,29 @@ export interface ResultadoProcesarMensajeWhatsApp {
 
 /** Análogo a ProcesarLeadEntranteUseCase pero para mensajes WA — resuelve la
  * org por phone_number_id, crea/reusa la conversación, guarda el mensaje
- * (idempotente por wamid) y notifica al dueño del lead si hay uno. */
+ * (idempotente por wamid) y notifica al dueño del lead si hay uno.
+ *
+ * Si el mensaje trae un archivo, lo descarga de Meta y lo persiste en el
+ * mismo paso: el media_id que manda el webhook solo dura 7 días — si
+ * esperáramos a que alguien lo abra en el CRM, podría ya no estar
+ * disponible. Si la descarga falla (archivo muy viejo, Meta caído), el
+ * mensaje igual se guarda — con la referencia de Meta pero sin bytes, en
+ * vez de perder el mensaje entero. */
 @Injectable()
 export class ProcesarMensajeWhatsAppEntranteUseCase {
+  private readonly logger = new Logger(
+    ProcesarMensajeWhatsAppEntranteUseCase.name,
+  );
+
   constructor(
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
     private readonly conexiones: WhatsappConexionesRepository,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
+    @Inject(META_CONEXIONES_REPOSITORY)
+    private readonly conexionesMeta: MetaConexionesRepository,
+    @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
+    private readonly tokenEncryption: TokenEncryptionService,
     private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
@@ -43,6 +63,13 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         nombreContacto: evento.nombreContacto,
       });
 
+    const media = evento.media
+      ? await this.descargarMediaSiPosible(
+          conexion.organizacionId,
+          evento.media.mediaId,
+        )
+      : undefined;
+
     const { creado } = await this.conversaciones.registrarMensaje({
       organizacionId: conexion.organizacionId,
       whatsappConversacionId: conversacionId,
@@ -52,6 +79,13 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       texto: evento.texto,
       datosCrudos: evento.raw,
       fechaMensaje: evento.timestamp,
+      mediaId: evento.media?.mediaId,
+      mediaMimeType: media?.mimeType ?? evento.media?.mimeType,
+      mediaNombreArchivo: evento.media?.nombreArchivo,
+      mediaCaption: evento.media?.caption,
+      mediaEsVoz: evento.media?.esVoz,
+      mediaTamanoBytes: media?.buffer.length,
+      mediaBytes: media?.buffer,
     });
 
     if (!creado) {
@@ -96,5 +130,26 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       organizacionId: conexion.organizacionId,
       conversacionId,
     };
+  }
+
+  private async descargarMediaSiPosible(
+    organizacionId: string,
+    mediaId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string } | undefined> {
+    try {
+      const conexionMeta =
+        await this.conexionesMeta.findActivaPorOrganizacion(organizacionId);
+      if (!conexionMeta?.tokenCifrado) return undefined;
+      const accessToken = this.tokenEncryption.decrypt(
+        conexionMeta.tokenCifrado,
+      );
+      return await this.graph.descargarMediaWhatsApp(mediaId, accessToken);
+    } catch (error) {
+      this.logger.error(
+        `No se pudo descargar el media ${mediaId} de un mensaje entrante`,
+        error instanceof Error ? error.stack : error,
+      );
+      return undefined;
+    }
   }
 }

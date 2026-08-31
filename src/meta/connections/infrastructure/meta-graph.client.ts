@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
+import FormData from 'form-data';
 import { obtenerVersionGraph } from '../../../shared/infrastructure/meta-graph-version';
 import {
   esRateLimitMeta,
@@ -23,12 +24,16 @@ import type {
   MetaGraphClient,
   MetaInsightGraph,
   MetaLeadGraph,
+  MetaMediaDescargadoGraph,
+  MetaMediaSubidoGraph,
   MetaMensajeWhatsAppEnviado,
   MetaNumeroWhatsAppGraph,
   MetaPaginaGraph,
   MetaPlantillaWhatsAppGraph,
   MetaUsuario,
   PaginaLeadsDeForm,
+  ParametroPlantilla,
+  TipoMediaWhatsApp,
   TokenIntercambiado,
 } from '../application/ports/meta-graph-client.port';
 
@@ -731,9 +736,10 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       language: string;
       category: string;
       status: string;
+      parameter_format?: string;
       components?: { type: string; text?: string }[];
     }>(`/${wabaId}/message_templates`, {
-      fields: 'name,language,category,status,components',
+      fields: 'name,language,category,status,parameter_format,components',
       access_token: accessToken,
       limit: '100',
     });
@@ -744,6 +750,9 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       estado: t.status,
       cuerpoTexto: t.components?.find((c) => c.type === 'BODY')?.text,
       encabezadoTexto: t.components?.find((c) => c.type === 'HEADER')?.text,
+      // Meta usa 'positional' por defecto cuando el creador no especificó
+      // formato — mismo default documentado, para plantillas legacy sin el campo.
+      formatoParametros: t.parameter_format ?? 'POSITIONAL',
     }));
   }
 
@@ -758,16 +767,32 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         type: 'HEADER',
         format: 'TEXT',
         text: input.encabezado,
-        ...(input.ejemploEncabezado
-          ? { example: { header_text: [input.ejemploEncabezado] } }
+        ...(input.variableEncabezado
+          ? {
+              example: {
+                header_text_named_params: [
+                  {
+                    param_name: input.variableEncabezado.nombre,
+                    example: input.variableEncabezado.ejemplo,
+                  },
+                ],
+              },
+            }
           : {}),
       });
     }
     components.push({
       type: 'BODY',
       text: input.cuerpo,
-      ...(input.ejemplosCuerpo?.length
-        ? { example: { body_text: [input.ejemplosCuerpo] } }
+      ...(input.variablesCuerpo?.length
+        ? {
+            example: {
+              body_text_named_params: input.variablesCuerpo.map((v) => ({
+                param_name: v.nombre,
+                example: v.ejemplo,
+              })),
+            },
+          }
         : {}),
     });
     if (input.pie) {
@@ -780,6 +805,9 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         name: input.nombre,
         category: input.categoria,
         language: input.idioma,
+        // Siempre "named" — es lo único que ofrece la creación de plantillas
+        // de este CRM (WhatsApp Business Platform docs, vigente en v26).
+        parameter_format: 'named',
         components,
       },
       accessToken,
@@ -812,8 +840,14 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     para: string,
     nombrePlantilla: string,
     idioma: string,
-    parametros?: string[],
+    parametros?: ParametroPlantilla[],
+    formatoParametros?: string,
   ): Promise<MetaMensajeWhatsAppEnviado> {
+    // 'NAMED' (default, lo único que crea este CRM) manda parameter_name por
+    // cada valor; 'POSITIONAL' (plantillas legacy creadas fuera del CRM) los
+    // manda en orden, sin nombre — Meta rechaza el mensaje si no coincide
+    // con el parameter_format real de la plantilla aprobada.
+    const esPosicional = formatoParametros === 'POSITIONAL';
     const data = await this.postJson<{ messages: { id: string }[] }>(
       `/${phoneNumberId}/messages`,
       {
@@ -829,15 +863,110 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
                 components: [
                   {
                     type: 'body',
-                    parameters: parametros.map((texto) => ({
+                    parameters: parametros.map((p) => ({
                       type: 'text',
-                      text: texto,
+                      ...(esPosicional ? {} : { parameter_name: p.nombre }),
+                      text: p.valor,
                     })),
                   },
                 ],
               }
             : {}),
         },
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
+  async subirMediaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    buffer: Buffer,
+    mimeType: string,
+    nombreArchivo?: string,
+  ): Promise<MetaMediaSubidoGraph> {
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mimeType);
+    form.append('file', buffer, {
+      filename: nombreArchivo ?? 'archivo',
+      contentType: mimeType,
+    });
+    try {
+      const response = await firstValueFrom(
+        this.http.post<{ id: string }>(
+          `${this.graphBaseUrl}/${phoneNumberId}/media`,
+          form,
+          {
+            params: { access_token: accessToken },
+            headers: form.getHeaders(),
+            maxBodyLength: Infinity,
+            maxContentLength: Infinity,
+          },
+        ),
+      );
+      return { mediaId: response.data.id };
+    } catch (error) {
+      throw excepcionDesdeErrorMeta(error);
+    }
+  }
+
+  async descargarMediaWhatsApp(
+    mediaId: string,
+    accessToken: string,
+  ): Promise<MetaMediaDescargadoGraph> {
+    try {
+      // Paso 1: resolver la URL firmada (dura 5 minutos).
+      const resuelto = await firstValueFrom(
+        this.http.get<{ url: string; mime_type: string }>(
+          `${this.graphBaseUrl}/${mediaId}`,
+          { params: { access_token: accessToken } },
+        ),
+      );
+      // Paso 2: descargar los bytes de esa URL — Meta exige el MISMO access
+      // token, como Bearer, o la descarga falla ("If you omit your token,
+      // the request will fail").
+      const descarga = await firstValueFrom(
+        this.http.get<ArrayBuffer>(resuelto.data.url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          responseType: 'arraybuffer',
+        }),
+      );
+      return {
+        buffer: Buffer.from(descarga.data),
+        mimeType: resuelto.data.mime_type,
+      };
+    } catch (error) {
+      throw excepcionDesdeErrorMeta(error);
+    }
+  }
+
+  async enviarMediaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    tipo: TipoMediaWhatsApp,
+    mediaId: string,
+    opciones?: { caption?: string; filename?: string },
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    // Meta no admite caption en audio/sticker, y filename solo en document.
+    const objetoMedia: Record<string, unknown> = { id: mediaId };
+    if (opciones?.caption && tipo !== 'audio' && tipo !== 'sticker') {
+      objetoMedia.caption = opciones.caption;
+    }
+    if (opciones?.filename && tipo === 'document') {
+      objetoMedia.filename = opciones.filename;
+    }
+
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: tipo,
+        [tipo]: objetoMedia,
       },
       accessToken,
     );

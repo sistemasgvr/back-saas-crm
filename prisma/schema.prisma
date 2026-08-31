@@ -627,11 +627,27 @@ model WhatsappMensaje {
    */
   direccion       String   @db.VarChar(10)
   /**
-   * text | template | image | document | audio | video (arrancamos con text/template).
+   * text | template | image | document | audio | video | sticker.
    */
   tipo            String   @db.VarChar(20)
   texto           String?
   plantillaNombre String?  @map("plantilla_nombre") @db.VarChar(200)
+  /**
+   * Id de media en Meta — saliente: el que devuelve nuestro propio upload
+   * (válido 30 días, ya no lo necesitamos tras subir el archivo a
+   * WhatsappMensajeMedia). Entrante: el que trae el webhook (válido solo
+   * 7 días — por eso el archivo se descarga y persiste enseguida, no queda
+   * como referencia externa).
+   */
+  mediaId            String?  @map("media_id") @db.VarChar(128)
+  mediaMimeType      String?  @map("media_mime_type") @db.VarChar(100)
+  /** Nombre original del archivo — solo aplica a documentos. */
+  mediaNombreArchivo String?  @map("media_nombre_archivo")
+  /** Texto que Meta manda junto al media (no es el `texto` del mensaje). */
+  mediaCaption       String?  @map("media_caption")
+  /** true si es una nota de voz (audio.voice de Meta) vs. un archivo de audio normal. */
+  mediaEsVoz         Boolean? @map("media_es_voz")
+  mediaTamanoBytes   Int?     @map("media_tamano_bytes")
   /**
    * enviado | entregado | leido | fallido — solo aplica a salientes.
    */
@@ -647,8 +663,28 @@ model WhatsappMensaje {
   fechaCreacion   DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
   whatsappConversacion WhatsappConversacion @relation(fields: [whatsappConversacionId], references: [id])
+  media                WhatsappMensajeMedia?
 
   @@unique([organizacionId, wamid])
   @@index([whatsappConversacionId, fechaMensaje])
   @@map("whatsapp_mensajes")
+}
+
+/**
+ * Bytes del archivo, en una tabla aparte — así listar/leer mensajes (lo que
+ * pasa todo el tiempo) nunca arrastra binarios, y solo se leen al pedir la
+ * descarga puntual de un archivo (WhatsappChatsController GET .../media).
+ * v1 guarda en Postgres (Bytes) para no depender de un bucket externo que
+ * hoy no existe en el proyecto — si el volumen de archivos crece mucho,
+ * el paso natural es migrar a un object storage (S3/R2) manteniendo esta
+ * misma tabla como índice.
+ */
+model WhatsappMensajeMedia {
+  whatsappMensajeId String   @id @map("whatsapp_mensaje_id") @db.Uuid
+  bytes             Bytes    @map("bytes")
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  whatsappMensaje WhatsappMensaje @relation(fields: [whatsappMensajeId], references: [id])
+
+  @@map("whatsapp_mensajes_media")
 }

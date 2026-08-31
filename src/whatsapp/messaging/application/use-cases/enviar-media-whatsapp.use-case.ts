@@ -15,26 +15,25 @@ import type { WhatsappConexionesRepository } from '../../../connections/applicat
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
-import type { ParametroPlantilla } from '../../../../meta/connections/application/ports/meta-graph-client.port';
+import { validarArchivoWhatsApp } from '../limites-media-whatsapp';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
-export interface EnviarMensajeInput {
-  texto?: string;
-  plantillaNombre?: string;
-  plantillaIdioma?: string;
-  /** Nombre + valor por cada variable de la plantilla, en el orden en que
-   * aparecen — el front ya los conoce porque los pidió al usuario con el
-   * nombre real de cada {{variable}}. */
-  parametros?: ParametroPlantilla[];
-  /** 'NAMED' | 'POSITIONAL' de la plantilla elegida — el front lo trae de
-   * GET /whatsapp/chats/templates, así no hace falta una vuelta extra a
-   * Graph API solo para saber cómo armar el envío. */
-  plantillaFormatoParametros?: string;
+export interface EnviarMediaInput {
+  buffer: Buffer;
+  mimeType: string;
+  nombreArchivo?: string;
+  caption?: string;
 }
 
+/** Envía un archivo (imagen/video/audio/documento/sticker) a un chat —
+ * mismo flujo que texto: solo funciona DENTRO de la ventana de 24h, Meta no
+ * admite archivos libres fuera de ella (solo plantillas). Sube el archivo a
+ * Meta, lo manda, y guarda una copia propia en WhatsappMensajeMedia — el
+ * media_id de Meta para lo que subimos nosotros dura 30 días, no sirve como
+ * referencia permanente para mostrarlo después en el historial del chat. */
 @Injectable()
-export class EnviarMensajeWhatsAppUseCase {
+export class EnviarMediaWhatsAppUseCase {
   constructor(
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
@@ -49,9 +48,14 @@ export class EnviarMensajeWhatsAppUseCase {
   async execute(
     organizacionId: string,
     conversacionId: string,
-    input: EnviarMensajeInput,
+    input: EnviarMediaInput,
     ctx: { usuarioId: string; rol: RolOrganizacion },
-  ) {
+  ): Promise<void> {
+    const { categoria } = validarArchivoWhatsApp(
+      input.mimeType,
+      input.buffer.length,
+    );
+
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,
       conversacionId,
@@ -68,10 +72,18 @@ export class EnviarMensajeWhatsAppUseCase {
       );
     }
 
+    const dentroDeVentana =
+      conversacion.ventanaExpiraEn !== null &&
+      conversacion.ventanaExpiraEn.getTime() > Date.now();
+    if (!dentroDeVentana) {
+      throw new BadRequestException(
+        'Pasaron 24h desde el último mensaje del contacto — fuera de la ventana solo se pueden ' +
+          'enviar plantillas aprobadas, no archivos libres',
+      );
+    }
+
     const whatsappConexion =
       await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    // Solo hay 1 número por org en v1 (PLAN §3) — si en el futuro hay varios,
-    // aquí hace falta guardar a qué conexión pertenece cada conversación.
     const conexionActiva = whatsappConexion[0];
     if (!conexionActiva) {
       throw new NotFoundException(
@@ -88,56 +100,41 @@ export class EnviarMensajeWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
-    const dentroDeVentana =
-      conversacion.ventanaExpiraEn !== null &&
-      conversacion.ventanaExpiraEn.getTime() > Date.now();
-
-    let resultado: { wamid: string };
-    let tipo: string;
-
-    if (dentroDeVentana) {
-      if (!input.texto) {
-        throw new BadRequestException('Falta el texto del mensaje de sesión');
-      }
-      resultado = await this.graph.enviarMensajeTextoWhatsApp(
-        conexionActiva.phoneNumberId,
-        accessToken,
-        conversacion.waId,
-        input.texto,
-      );
-      tipo = 'text';
-    } else {
-      if (!input.plantillaNombre || !input.plantillaIdioma) {
-        throw new BadRequestException(
-          'La ventana de 24h expiró — hace falta enviar una plantilla aprobada (nombre + idioma)',
-        );
-      }
-      resultado = await this.graph.enviarMensajePlantillaWhatsApp(
-        conexionActiva.phoneNumberId,
-        accessToken,
-        conversacion.waId,
-        input.plantillaNombre,
-        input.plantillaIdioma,
-        input.parametros,
-        input.plantillaFormatoParametros,
-      );
-      tipo = 'template';
-    }
+    const subido = await this.graph.subirMediaWhatsApp(
+      conexionActiva.phoneNumberId,
+      accessToken,
+      input.buffer,
+      input.mimeType,
+      input.nombreArchivo,
+    );
+    const resultado = await this.graph.enviarMediaWhatsApp(
+      conexionActiva.phoneNumberId,
+      accessToken,
+      conversacion.waId,
+      categoria,
+      subido.mediaId,
+      { caption: input.caption, filename: input.nombreArchivo },
+    );
 
     await this.conversaciones.registrarMensaje({
       organizacionId,
       whatsappConversacionId: conversacionId,
       wamid: resultado.wamid,
       direccion: 'saliente',
-      tipo,
-      texto: input.texto,
-      plantillaNombre: input.plantillaNombre,
+      tipo: categoria,
+      texto: input.caption,
       estadoEntrega: 'enviado',
       datosCrudos: {
-        tipo,
-        texto: input.texto,
-        plantilla: input.plantillaNombre,
+        tipo: categoria,
+        caption: input.caption,
+        nombreArchivo: input.nombreArchivo,
       },
+      mediaId: subido.mediaId,
+      mediaMimeType: input.mimeType,
+      mediaNombreArchivo: input.nombreArchivo,
+      mediaCaption: input.caption,
+      mediaTamanoBytes: input.buffer.length,
+      mediaBytes: input.buffer,
       fechaMensaje: new Date(),
       usuarioCreacion: ctx.usuarioId,
     });

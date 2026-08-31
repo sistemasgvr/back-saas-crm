@@ -16,6 +16,11 @@ export interface WhatsappWebhookPayload {
           timestamp?: string;
           type?: string;
           text?: { body?: string };
+          image?: MetaMediaObjeto;
+          video?: MetaMediaObjeto;
+          audio?: MetaMediaObjeto & { voice?: boolean };
+          document?: MetaMediaObjeto & { filename?: string };
+          sticker?: MetaMediaObjeto & { animated?: boolean };
         }[];
         statuses?: {
           id?: string;
@@ -27,6 +32,23 @@ export interface WhatsappWebhookPayload {
   }[];
 }
 
+/** Objeto de media que manda Meta en un mensaje entrante — `id` solo dura 7
+ * días desde que llega el webhook, hay que descargarlo antes de que expire. */
+export interface MetaMediaObjeto {
+  id?: string;
+  mime_type?: string;
+  sha256?: string;
+  caption?: string;
+}
+
+export interface MediaEntranteWhatsApp {
+  mediaId: string;
+  mimeType?: string;
+  caption?: string;
+  nombreArchivo?: string;
+  esVoz?: boolean;
+}
+
 export interface EventoMensajeWhatsApp {
   phoneNumberId: string;
   waId: string;
@@ -35,6 +57,7 @@ export interface EventoMensajeWhatsApp {
   timestamp: Date;
   tipo: string;
   texto?: string;
+  media?: MediaEntranteWhatsApp;
   raw: unknown;
 }
 
@@ -69,6 +92,12 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
 
       for (const mensaje of value?.messages ?? []) {
         if (!mensaje.id || !mensaje.from) continue;
+        const objetoMedia =
+          mensaje.image ??
+          mensaje.video ??
+          mensaje.audio ??
+          mensaje.document ??
+          mensaje.sticker;
         mensajes.push({
           phoneNumberId,
           waId: mensaje.from,
@@ -77,6 +106,16 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
           timestamp: timestampADate(mensaje.timestamp),
           tipo: mensaje.type ?? 'unknown',
           texto: mensaje.text?.body,
+          media:
+            objetoMedia?.id !== undefined
+              ? {
+                  mediaId: objetoMedia.id,
+                  mimeType: objetoMedia.mime_type,
+                  caption: objetoMedia.caption,
+                  nombreArchivo: mensaje.document?.filename,
+                  esVoz: mensaje.audio?.voice,
+                }
+              : undefined,
           raw: mensaje,
         });
       }

@@ -95,28 +95,61 @@ export interface MetaPlantillaWhatsAppGraph {
   idioma: string;
   categoria: string;
   estado: string;
-  /** Texto crudo del BODY (con {{1}}, {{2}}… si los tiene) — el front cuenta
-   * variables desde acá para pedir sus valores antes de enviar. */
+  /** Texto crudo del BODY (con {{nombre}} o, en plantillas legacy creadas
+   * fuera de este CRM, {{1}}, {{2}}…) — el front extrae los nombres de acá
+   * para pedir sus valores antes de enviar. */
   cuerpoTexto?: string;
   encabezadoTexto?: string;
+  /** 'NAMED' | 'POSITIONAL' — cómo Meta espera los parámetros al enviar esta
+   * plantilla (`parameter_format`). Este CRM solo CREA plantillas 'NAMED',
+   * pero una plantilla creada fuera del CRM (ej. Meta Business Manager)
+   * puede ser 'POSITIONAL' — el envío debe respetar el formato real de cada
+   * plantilla, no asumir que todas son 'NAMED'. */
+  formatoParametros?: string;
 }
 
 export interface MetaMensajeWhatsAppEnviado {
   wamid: string;
 }
 
+export type TipoMediaWhatsApp =
+  'image' | 'video' | 'audio' | 'document' | 'sticker';
+
+export interface MetaMediaSubidoGraph {
+  /** Válido 30 días — se usa enseguida para enviar, no se guarda para después. */
+  mediaId: string;
+}
+
+export interface MetaMediaDescargadoGraph {
+  buffer: Buffer;
+  mimeType: string;
+}
+
+/** Un valor de ejemplo para una variable con nombre, en la creación de una plantilla. */
+export interface EjemploVariablePlantilla {
+  nombre: string;
+  ejemplo: string;
+}
+
+/** Un valor real para una variable, al enviar un mensaje de plantilla. */
+export interface ParametroPlantilla {
+  nombre: string;
+  valor: string;
+}
+
 export interface CrearPlantillaWhatsAppInput {
   nombre: string;
   categoria: 'AUTHENTICATION' | 'MARKETING' | 'UTILITY';
   idioma: string;
-  /** Puede incluir variables {{1}}, {{2}}… — si las tiene, `ejemplosCuerpo`
-   * debe traer un valor de muestra por cada una (Meta exige ejemplos para
-   * revisar la plantilla). */
+  /** Puede incluir variables con nombre {{nombre_cliente}}… — si las tiene,
+   * `variablesCuerpo` debe traer un ejemplo por cada una (Meta exige
+   * ejemplos para revisar la plantilla). Siempre se crea con
+   * parameter_format: "named". */
   cuerpo: string;
-  ejemplosCuerpo?: string[];
+  variablesCuerpo?: EjemploVariablePlantilla[];
   encabezado?: string;
-  /** Solo admite UNA variable {{1}} — límite de Meta para el header. */
-  ejemploEncabezado?: string;
+  /** Solo admite UNA variable — límite de Meta para el header. */
+  variableEncabezado?: EjemploVariablePlantilla;
   pie?: string;
 }
 
@@ -294,8 +327,41 @@ export interface MetaGraphClient {
     para: string,
     nombrePlantilla: string,
     idioma: string,
-    /** Valores para {{1}}, {{2}}… del BODY, en orden — vacío/omitido si la
-     * plantilla no tiene variables. */
-    parametros?: string[],
+    /** Valores para las variables del BODY — vacío/omitido si la plantilla
+     * no tiene variables. */
+    parametros?: ParametroPlantilla[],
+    /** 'NAMED' (default) envía `parameter_name` por cada parámetro;
+     * 'POSITIONAL' los envía en orden, sin nombre — para plantillas legacy
+     * creadas fuera de este CRM. */
+    formatoParametros?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado>;
+
+  /** POST /{phone-number-id}/media (multipart) — subir el archivo es
+   * obligatorio antes de poder enviarlo; el media_id que devuelve dura
+   * 30 días (WhatsApp Business Platform, Media API, vigente v26). */
+  subirMediaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    buffer: Buffer,
+    mimeType: string,
+    nombreArchivo?: string,
+  ): Promise<MetaMediaSubidoGraph>;
+  /** GET /{media-id} para resolver la URL firmada (dura 5 minutos) + la
+   * descarga en la misma llamada — no tiene sentido exponer la URL firmada
+   * sola, expira casi enseguida. */
+  descargarMediaWhatsApp(
+    mediaId: string,
+    accessToken: string,
+  ): Promise<MetaMediaDescargadoGraph>;
+  /** POST /{phone-number-id}/messages type=image|video|audio|document|sticker
+   * — la plantilla no aplica acá: los mensajes de media libres solo se
+   * pueden mandar DENTRO de la ventana de 24h (igual que el texto). */
+  enviarMediaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    tipo: TipoMediaWhatsApp,
+    mediaId: string,
+    opciones?: { caption?: string; filename?: string },
   ): Promise<MetaMensajeWhatsAppEnviado>;
 }

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
   ConversacionResumen,
   FiltroVisibilidadChats,
+  MediaMensaje,
   MensajeRow,
   RegistrarMensajeInput,
   WhatsappConversacionesRepository,
@@ -106,6 +107,12 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       plantillaNombre: m.plantillaNombre,
       estadoEntrega: m.estadoEntrega,
       fechaMensaje: m.fechaMensaje,
+      tieneMedia: m.mediaId !== null,
+      mediaMimeType: m.mediaMimeType,
+      mediaNombreArchivo: m.mediaNombreArchivo,
+      mediaCaption: m.mediaCaption,
+      mediaEsVoz: m.mediaEsVoz,
+      mediaTamanoBytes: m.mediaTamanoBytes,
     }));
   }
 
@@ -190,9 +197,36 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
         fechaMensaje: input.fechaMensaje,
         usuarioCreacion: input.usuarioCreacion,
+        mediaId: input.mediaId,
+        mediaMimeType: input.mediaMimeType,
+        mediaNombreArchivo: input.mediaNombreArchivo,
+        mediaCaption: input.mediaCaption,
+        mediaEsVoz: input.mediaEsVoz,
+        mediaTamanoBytes: input.mediaTamanoBytes,
+        ...(input.mediaBytes
+          ? { media: { create: { bytes: input.mediaBytes } } }
+          : {}),
       },
     });
     return { id: mensaje.id, creado: true };
+  }
+
+  async obtenerMedia(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MediaMensaje | null> {
+    const mensaje = await this.prisma.whatsappMensaje.findFirst({
+      where: { id: mensajeId, organizacionId },
+      include: { media: true },
+    });
+    if (!mensaje?.media) return null;
+    return {
+      // Prisma mapea Bytes a Uint8Array, no a Buffer — Buffer.from() sobre un
+      // Uint8Array no copia los bytes, solo envuelve el mismo buffer.
+      bytes: Buffer.from(mensaje.media.bytes),
+      mimeType: mensaje.mediaMimeType ?? 'application/octet-stream',
+      nombreArchivo: mensaje.mediaNombreArchivo,
+    };
   }
 
   async actualizarTrasEntrante(

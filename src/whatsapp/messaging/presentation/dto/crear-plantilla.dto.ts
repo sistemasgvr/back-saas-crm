@@ -28,7 +28,9 @@ export class CrearPlantillaDto {
 
   @ApiProperty({
     enum: CATEGORIAS,
-    description: 'Categoría de la plantilla exigida por Meta',
+    description:
+      'Categoría exigida por Meta: AUTHENTICATION (códigos OTP), MARKETING (promociones/retargeting) o ' +
+      'UTILITY (seguimiento de una acción del usuario — confirmaciones, alertas de cuenta).',
   })
   @IsIn(CATEGORIAS)
   categoria: (typeof CATEGORIAS)[number];
@@ -45,10 +47,12 @@ export class CrearPlantillaDto {
 
   @ApiProperty({
     example:
-      'Hola {{1}}, gracias por tu interés en {{2}}. ¿En qué te podemos ayudar?',
+      'Hola {{nombre_cliente}}, gracias por tu interés en {{nombre_proyecto}}. ¿En qué te podemos ayudar?',
     maxLength: 1024,
     description:
-      'Texto del cuerpo del mensaje. Puede incluir variables posicionales {{1}}, {{2}}, … en orden secuencial.',
+      'Texto del cuerpo del mensaje. Puede incluir variables CON NOMBRE {{nombre_cliente}}, {{numero_pedido}}… ' +
+      '(minúsculas, números y guiones bajos, empezando con letra) — el nombre le dice a quien crea la plantilla ' +
+      'qué valor va ahí, sin tener que adivinar qué es {{1}} o {{2}}.',
   })
   @IsString()
   @MaxLength(1024)
@@ -56,10 +60,10 @@ export class CrearPlantillaDto {
 
   @ApiPropertyOptional({
     type: [String],
-    example: ['Juan', 'Domaria Torre Sur'],
+    example: ['Juan', 'Torre Sur'],
     description:
-      'Un valor de ejemplo por cada {{n}} en `cuerpo`, en el mismo orden — Meta exige un ejemplo por ' +
-      'variable para revisar y aprobar la plantilla.',
+      'Un valor de ejemplo por cada variable de `cuerpo`, en el mismo orden en que aparecen por primera vez ' +
+      '(no por nombre) — Meta exige un ejemplo por variable para revisar y aprobar la plantilla.',
   })
   @IsOptional()
   @IsArray()
@@ -68,10 +72,10 @@ export class CrearPlantillaDto {
   ejemplosCuerpo?: string[];
 
   @ApiPropertyOptional({
-    example: '¡Hola {{1}}!',
+    example: '¡Hola {{nombre_cliente}}!',
     maxLength: 60,
     description:
-      'Texto del encabezado (opcional). Admite como máximo una variable {{1}} — límite de Meta.',
+      'Texto del encabezado (opcional). Admite como máximo una variable con nombre — límite de Meta.',
   })
   @IsOptional()
   @IsString()
@@ -82,7 +86,7 @@ export class CrearPlantillaDto {
     example: 'Juan',
     maxLength: 60,
     description:
-      'Valor de ejemplo para la variable {{1}} del encabezado, si `encabezado` la usa (requerido por Meta en ese caso).',
+      'Valor de ejemplo para la variable del encabezado, si `encabezado` tiene una (requerido por Meta en ese caso).',
   })
   @IsOptional()
   @IsString()

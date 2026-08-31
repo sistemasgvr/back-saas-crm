@@ -7,6 +7,8 @@ import { WhatsappChatsController } from './presentation/whatsapp-chats.controlle
 import { ListarConversacionesUseCase } from './application/use-cases/listar-conversaciones.use-case';
 import { ObtenerConversacionUseCase } from './application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from './application/use-cases/enviar-mensaje-whatsapp.use-case';
+import { EnviarMediaWhatsAppUseCase } from './application/use-cases/enviar-media-whatsapp.use-case';
+import { ObtenerMediaMensajeUseCase } from './application/use-cases/obtener-media-mensaje.use-case';
 import { ListarPlantillasUseCase } from './application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from './application/use-cases/crear-plantilla.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
@@ -27,6 +29,8 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ListarConversacionesUseCase,
     ObtenerConversacionUseCase,
     EnviarMensajeWhatsAppUseCase,
+    EnviarMediaWhatsAppUseCase,
+    ObtenerMediaMensajeUseCase,
     ListarPlantillasUseCase,
     CrearPlantillaUseCase,
     ProcesarMensajeWhatsAppEntranteUseCase,

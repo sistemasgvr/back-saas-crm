@@ -27,6 +27,20 @@ export interface MensajeRow {
   plantillaNombre: string | null;
   estadoEntrega: string | null;
   fechaMensaje: Date;
+  /** true si este mensaje tiene un archivo asociado — el front pide los
+   * bytes aparte, vía GET .../messages/:id/media, solo cuando hace falta. */
+  tieneMedia: boolean;
+  mediaMimeType: string | null;
+  mediaNombreArchivo: string | null;
+  mediaCaption: string | null;
+  mediaEsVoz: boolean | null;
+  mediaTamanoBytes: number | null;
+}
+
+export interface MediaMensaje {
+  bytes: Buffer;
+  mimeType: string;
+  nombreArchivo: string | null;
 }
 
 /** Ve todo (modo 'todos') o solo conversaciones cuyo lead está asignado a él
@@ -46,6 +60,17 @@ export interface RegistrarMensajeInput {
   datosCrudos: unknown;
   fechaMensaje: Date;
   usuarioCreacion?: string;
+  mediaId?: string;
+  mediaMimeType?: string;
+  mediaNombreArchivo?: string;
+  mediaCaption?: string;
+  mediaEsVoz?: boolean;
+  mediaTamanoBytes?: number;
+  /** Si viene, se persiste en la tabla aparte WhatsappMensajeMedia en la
+   * misma escritura — entrante: ya descargado de Meta al llegar el webhook
+   * (el media_id de Meta solo dura 7 días). Saliente: los bytes que el
+   * usuario subió, antes de mandarlos a Meta. */
+  mediaBytes?: Buffer;
 }
 
 export interface WhatsappConversacionesRepository {
@@ -80,6 +105,13 @@ export interface WhatsappConversacionesRepository {
   registrarMensaje(
     input: RegistrarMensajeInput,
   ): Promise<{ id: string; creado: boolean }>;
+
+  /** Bytes de un mensaje con archivo — null si el mensaje no existe, no
+   * pertenece a la organización, o no tiene media asociado. */
+  obtenerMedia(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MediaMensaje | null>;
 
   actualizarTrasEntrante(
     conversacionId: string,

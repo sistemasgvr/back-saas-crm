@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -7,14 +8,22 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
   ApiOperation,
+  ApiParam,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -26,11 +35,19 @@ import { RequireModule } from '../../../shared/presentation/decorators/require-m
 import { ListarConversacionesUseCase } from '../application/use-cases/listar-conversaciones.use-case';
 import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
+import { EnviarMediaWhatsAppUseCase } from '../application/use-cases/enviar-media-whatsapp.use-case';
+import { ObtenerMediaMensajeUseCase } from '../application/use-cases/obtener-media-mensaje.use-case';
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from '../application/use-cases/crear-plantilla.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from '../application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
+import { SubirMediaDto } from './dto/subir-media.dto';
+
+// El límite real por tipo lo valida validarArchivoWhatsApp() en el use-case
+// (5MB imagen / 16MB audio-video / 100MB documento) — este es solo el tope
+// del interceptor, generoso para no rechazar antes de dar el mensaje claro.
+const LIMITE_MULTER_BYTES = 100 * 1024 * 1024;
 
 @ApiTags('WhatsApp Chats')
 @ApiBearerAuth('JWT-auth')
@@ -42,6 +59,8 @@ export class WhatsappChatsController {
     private readonly listarConversaciones: ListarConversacionesUseCase,
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
+    private readonly enviarMedia: EnviarMediaWhatsAppUseCase,
+    private readonly obtenerMedia: ObtenerMediaMensajeUseCase,
     private readonly listarPlantillas: ListarPlantillasUseCase,
     private readonly crearPlantilla: CrearPlantillaUseCase,
     private readonly iniciarDesdeLead: IniciarConversacionDesdeLeadUseCase,
@@ -101,7 +120,7 @@ export class WhatsappChatsController {
     summary: 'Crear una plantilla de mensaje',
     description:
       'Envía la plantilla a Meta para revisión (queda PENDING hasta que Meta la aprueba/rechaza). Si el ' +
-      'cuerpo o el encabezado usan variables {{1}}, {{2}}…, hace falta un ejemplo por cada una.',
+      'cuerpo o el encabezado usan variables {{nombre}}, hace falta un ejemplo con contenido por cada una.',
   })
   @ApiResponse({ status: 204, description: 'Plantilla enviada a revisión.' })
   @ApiResponse({
@@ -169,11 +188,11 @@ export class WhatsappChatsController {
   @Post(':id/messages')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
-    summary: 'Enviar un mensaje',
+    summary: 'Enviar un mensaje de texto o plantilla',
     description:
       'Dentro de la ventana de 24h desde el último mensaje del cliente, envía texto libre (`texto`). Fuera de ' +
       'la ventana, requiere una plantilla aprobada (`plantillaNombre` + `plantillaIdioma`, y `parametros` si ' +
-      'la plantilla usa variables).',
+      'la plantilla usa variables). Para enviar un archivo, usar POST :id/media en su lugar.',
   })
   @ApiResponse({ status: 204, description: 'Mensaje enviado.' })
   @ApiResponse({
@@ -197,5 +216,104 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  @Post(':id/media')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseInterceptors(
+    FileInterceptor('archivo', { limits: { fileSize: LIMITE_MULTER_BYTES } }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        archivo: { type: 'string', format: 'binary' },
+        caption: { type: 'string' },
+      },
+      required: ['archivo'],
+    },
+  })
+  @ApiOperation({
+    summary: 'Enviar un archivo (imagen, video, audio o documento)',
+    description:
+      'Solo funciona dentro de la ventana de 24h (igual que el texto libre) — fuera de ella, WhatsApp solo permite ' +
+      'plantillas aprobadas, sin archivos. Sube el archivo a Meta, lo envía, y guarda una copia propia para poder ' +
+      'mostrarlo después en el historial (el media_id de Meta no dura para siempre).',
+  })
+  @ApiResponse({ status: 204, description: 'Archivo enviado.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Archivo faltante, tipo no soportado por WhatsApp, tamaño excedido, o fuera de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description:
+      'La conversación no existe o el rol no puede escribir en ella.',
+  })
+  sendMedia(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @UploadedFile() archivo: Express.Multer.File | undefined,
+    @Body() dto: SubirMediaDto,
+  ) {
+    if (!archivo) {
+      throw new BadRequestException('Falta el archivo');
+    }
+    return this.enviarMedia.execute(
+      ctx.organizacionId!,
+      id,
+      {
+        buffer: archivo.buffer,
+        mimeType: archivo.mimetype,
+        nombreArchivo: archivo.originalname,
+        caption: dto.caption,
+      },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
+  @Get(':id/messages/:mensajeId/media')
+  @ApiParam({ name: 'id', description: 'Id de la conversación' })
+  @ApiParam({ name: 'mensajeId', description: 'Id del mensaje con archivo' })
+  @ApiOperation({
+    summary: 'Descargar el archivo de un mensaje',
+    description:
+      'Sirve los bytes guardados del archivo (entrante o saliente). Entrante: descargado de Meta apenas llegó el ' +
+      'webhook, porque la referencia de Meta solo dura 7 días. Saliente: guardado al momento de enviarlo.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Bytes del archivo, con el Content-Type real.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description: 'La conversación, el mensaje, o el archivo no existen.',
+  })
+  async getMedia(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('mensajeId', ParseUUIDPipe) mensajeId: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const media = await this.obtenerMedia.execute(
+      ctx.organizacionId!,
+      id,
+      mensajeId,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+    res.set({
+      'Content-Type': media.mimeType,
+      'Content-Disposition': media.nombreArchivo
+        ? `inline; filename="${encodeURIComponent(media.nombreArchivo)}"`
+        : 'inline',
+      'Cache-Control': 'private, max-age=86400',
+    });
+    res.send(media.bytes);
   }
 }

@@ -1,11 +1,38 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
+  ValidateNested,
 } from 'class-validator';
+
+export class ParametroPlantillaDto {
+  @ApiProperty({
+    description:
+      'Nombre de la variable, tal como aparece en la plantilla (sin las llaves), ej. "nombre_cliente"',
+    example: 'nombre_cliente',
+  })
+  @IsString()
+  @Matches(/^[a-z][a-z0-9_]*$/, {
+    message:
+      'nombre de variable inválido — minúsculas, números y guiones bajos, empezando con letra',
+  })
+  @MaxLength(60)
+  nombre: string;
+
+  @ApiProperty({
+    description: 'Valor real a enviar para esa variable',
+    example: 'Juan',
+  })
+  @IsString()
+  @MaxLength(1024)
+  valor: string;
+}
 
 export class EnviarMensajeDto {
   @ApiPropertyOptional({
@@ -40,14 +67,24 @@ export class EnviarMensajeDto {
   plantillaIdioma?: string;
 
   @ApiPropertyOptional({
-    type: [String],
-    example: ['Juan', 'Domaria Torre Sur'],
+    type: [ParametroPlantillaDto],
     description:
-      'Valores para {{1}}, {{2}}… del cuerpo de la plantilla, en el mismo orden en que aparecen.',
+      'Nombre + valor de cada variable de la plantilla — el front los toma de GET /whatsapp/chats/templates.',
   })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
-  @IsString({ each: true })
-  parametros?: string[];
+  @ValidateNested({ each: true })
+  @Type(() => ParametroPlantillaDto)
+  parametros?: ParametroPlantillaDto[];
+
+  @ApiPropertyOptional({
+    enum: ['NAMED', 'POSITIONAL'],
+    description:
+      'Formato de parámetros de la plantilla elegida (campo `formatoParametros` de la plantilla). Por defecto NAMED — ' +
+      'usar POSITIONAL solo para plantillas legacy creadas fuera de este CRM.',
+  })
+  @IsOptional()
+  @IsIn(['NAMED', 'POSITIONAL'])
+  plantillaFormatoParametros?: string;
 }
