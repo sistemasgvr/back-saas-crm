@@ -274,9 +274,27 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     wamid: string,
     estado: string,
   ): Promise<void> {
-    await this.prisma.whatsappMensaje.updateMany({
-      where: { organizacionId, wamid },
-      data: { estadoEntrega: estado },
-    });
+    // Meta no garantiza el orden de los webhooks de estado — puede llegar
+    // "read" antes que "delivered" (documentado por Meta). Sin esto, un
+    // "delivered" tardío pisaría un "leido" ya guardado y el check volvería
+    // a verse gris. "fallido"/"eliminado" son terminales y siempre se
+    // aplican, sin importar el orden.
+    await this.prisma.$executeRaw`
+      UPDATE whatsapp_mensajes
+      SET estado_entrega = ${estado}
+      WHERE organizacion_id = ${organizacionId}::uuid
+        AND wamid = ${wamid}
+        AND (
+          ${estado} IN ('fallido', 'eliminado')
+          OR estado_entrega IS NULL
+          OR COALESCE(
+               CASE estado_entrega WHEN 'enviado' THEN 1 WHEN 'entregado' THEN 2 WHEN 'leido' THEN 3 ELSE 0 END,
+               0
+             ) <= COALESCE(
+               CASE ${estado} WHEN 'enviado' THEN 1 WHEN 'entregado' THEN 2 WHEN 'leido' THEN 3 ELSE 0 END,
+               0
+             )
+        )
+    `;
   }
 }

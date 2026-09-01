@@ -64,12 +64,32 @@ export interface EventoMensajeWhatsApp {
 export interface EventoEstadoWhatsApp {
   phoneNumberId: string;
   wamid: string;
+  /** Ya traducido al vocabulario propio (enviado/entregado/leido/fallido/
+   * eliminado) — ver traducirEstadoWhatsApp(). El resto del sistema (BD,
+   * front) nunca ve el valor crudo en inglés de Meta. */
   status: string;
   timestamp: Date;
 }
 
 function timestampADate(timestamp?: string): Date {
   return timestamp ? new Date(Number(timestamp) * 1000) : new Date();
+}
+
+/** Meta manda el status en inglés (sent/delivered/read/failed/deleted) — se
+ * traduce acá, en el borde, para que el resto del sistema (columna en BD,
+ * iconos del front) trabaje siempre con el mismo vocabulario en español que
+ * ya usa `EnviarMensajeWhatsAppUseCase` al crear el mensaje ("enviado").
+ * https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples#message-status-updates */
+const TRADUCCION_ESTADO: Record<string, string> = {
+  sent: 'enviado',
+  delivered: 'entregado',
+  read: 'leido',
+  failed: 'fallido',
+  deleted: 'eliminado',
+};
+
+export function traducirEstadoWhatsApp(statusMeta: string): string {
+  return TRADUCCION_ESTADO[statusMeta] ?? statusMeta;
 }
 
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
@@ -125,7 +145,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
         estados.push({
           phoneNumberId,
           wamid: status.id,
-          status: status.status,
+          status: traducirEstadoWhatsApp(status.status),
           timestamp: timestampADate(status.timestamp),
         });
       }
