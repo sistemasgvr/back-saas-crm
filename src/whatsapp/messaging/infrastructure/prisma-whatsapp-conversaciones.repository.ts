@@ -38,7 +38,11 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         lead: { select: { id: true, nombre: true, asignadoUsuarioId: true } },
         mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
       },
-      orderBy: { ultimoMensajeEn: 'desc' },
+      // Postgres pone los NULL primero en un ORDER BY ... DESC por defecto —
+      // sin "nulls: 'last'" las conversaciones sin ningún mensaje todavía
+      // (ultimoMensajeEn null) se colaban arriba de todo, antes que chats
+      // con actividad reciente real.
+      orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
     });
 
     return conversaciones.map((c) => ({
@@ -63,15 +67,17 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     organizacionId: string,
     filtro: FiltroVisibilidadChats,
   ): Promise<number> {
-    const resultado = await this.prisma.whatsappConversacion.aggregate({
+    // Cantidad de CHATS con algo pendiente, no la suma de mensajes de cada
+    // uno — mismo criterio que el badge de WhatsApp: un chat con 6 mensajes
+    // sin leer cuenta 1, no 6.
+    return this.prisma.whatsappConversacion.count({
       where: {
         organizacionId,
         estado: 1,
+        noLeidos: { gt: 0 },
         ...this.whereVisibilidad(filtro),
       },
-      _sum: { noLeidos: true },
     });
-    return resultado._sum.noLeidos ?? 0;
   }
 
   async findPorId(

@@ -5,6 +5,7 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { LeadsModule } from '../../leads/leads.module';
 import { WhatsappChatsController } from './presentation/whatsapp-chats.controller';
 import { ListarConversacionesUseCase } from './application/use-cases/listar-conversaciones.use-case';
+import { ContarNoLeidosWhatsAppUseCase } from './application/use-cases/contar-no-leidos-whatsapp.use-case';
 import { ObtenerConversacionUseCase } from './application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from './application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { EnviarMediaWhatsAppUseCase } from './application/use-cases/enviar-media-whatsapp.use-case';
@@ -27,6 +28,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
   controllers: [WhatsappChatsController],
   providers: [
     ListarConversacionesUseCase,
+    ContarNoLeidosWhatsAppUseCase,
     ObtenerConversacionUseCase,
     EnviarMensajeWhatsAppUseCase,
     EnviarMediaWhatsAppUseCase,

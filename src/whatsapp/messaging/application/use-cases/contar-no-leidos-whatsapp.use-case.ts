@@ -8,9 +8,10 @@ import type { RolOrganizacion } from '../../../../auth/domain/request-context.in
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
-/** GET /whatsapp/chats/unread-count — total de mensajes sin leer entre las
- * conversaciones que el usuario puede ver, para el badge del ítem "Chats"
- * en el sidebar (mismo criterio de visibilidad que ListarConversacionesUseCase). */
+/** GET /whatsapp/chats/unread-count — cantidad de conversaciones con algo
+ * pendiente entre las que el usuario puede ver (1 por chat, no la suma de
+ * sus mensajes), para el badge del ítem "Chats" en el sidebar (mismo
+ * criterio de visibilidad que ListarConversacionesUseCase). */
 @Injectable()
 export class ContarNoLeidosWhatsAppUseCase {
   constructor(

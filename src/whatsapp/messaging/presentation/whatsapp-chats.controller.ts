@@ -33,6 +33,7 @@ import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { ListarConversacionesUseCase } from '../application/use-cases/listar-conversaciones.use-case';
+import { ContarNoLeidosWhatsAppUseCase } from '../application/use-cases/contar-no-leidos-whatsapp.use-case';
 import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { EnviarMediaWhatsAppUseCase } from '../application/use-cases/enviar-media-whatsapp.use-case';
@@ -57,6 +58,7 @@ const LIMITE_MULTER_BYTES = 100 * 1024 * 1024;
 export class WhatsappChatsController {
   constructor(
     private readonly listarConversaciones: ListarConversacionesUseCase,
+    private readonly contarNoLeidos: ContarNoLeidosWhatsAppUseCase,
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
     private readonly enviarMedia: EnviarMediaWhatsAppUseCase,
@@ -80,6 +82,26 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  /** Antes de :id — si no, Nest lo confunde con un id de conversación. */
+  @Get('unread-count')
+  @ApiOperation({
+    summary: 'Conteo de chats con mensajes sin leer',
+    description:
+      'Cantidad de conversaciones visibles para el usuario con al menos un mensaje sin leer (no la suma de ' +
+      'mensajes de cada una) — para el badge de "Chats" en el sidebar.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Conteo de chats con mensajes sin leer.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  unreadCount(@CurrentUser() ctx: RequestContext) {
+    return this.contarNoLeidos
+      .execute(ctx.organizacionId!, { usuarioId: ctx.usuarioId, rol: ctx.rol! })
+      .then((count) => ({ count }));
   }
 
   @Get('templates')
