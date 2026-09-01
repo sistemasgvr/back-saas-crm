@@ -59,6 +59,21 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     }));
   }
 
+  async contarNoLeidos(
+    organizacionId: string,
+    filtro: FiltroVisibilidadChats,
+  ): Promise<number> {
+    const resultado = await this.prisma.whatsappConversacion.aggregate({
+      where: {
+        organizacionId,
+        estado: 1,
+        ...this.whereVisibilidad(filtro),
+      },
+      _sum: { noLeidos: true },
+    });
+    return resultado._sum.noLeidos ?? 0;
+  }
+
   async findPorId(
     organizacionId: string,
     id: string,

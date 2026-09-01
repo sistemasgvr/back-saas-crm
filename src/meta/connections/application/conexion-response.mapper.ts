@@ -21,5 +21,6 @@ export function toConexionResponse(
     cuentasActivas,
     tokenExpiraEn: conexion.tokenExpiraEn,
     fechaCreacion: conexion.fechaCreacion,
+    capiDatasetId: conexion.capiDatasetId,
   };
 }

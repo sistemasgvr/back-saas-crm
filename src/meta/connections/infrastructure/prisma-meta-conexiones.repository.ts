@@ -113,4 +113,15 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
       data: { featuresDeseadas, usuarioEdicion },
     });
   }
+
+  async actualizarCapiDatasetId(
+    organizacionId: string,
+    capiDatasetId: string | null,
+    usuarioEdicion: string,
+  ): Promise<void> {
+    await this.prisma.metaConexion.updateMany({
+      where: { organizacionId, estado: 1 },
+      data: { capiDatasetId, usuarioEdicion },
+    });
+  }
 }

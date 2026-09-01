@@ -14,6 +14,7 @@ import { DesconectarUseCase } from './application/use-cases/desconectar.use-case
 import { GuardarCredencialesAppUseCase } from './application/use-cases/guardar-credenciales-app.use-case';
 import { ObtenerSaludPermisosMetaUseCase } from './application/use-cases/obtener-salud-permisos-meta.use-case';
 import { TogglearFeaturePermisoUseCase } from './application/use-cases/togglear-feature-permiso.use-case';
+import { GuardarCapiDatasetUseCase } from './application/use-cases/guardar-capi-dataset.use-case';
 import { META_CONEXIONES_REPOSITORY } from './application/ports/meta-conexiones.repository.port';
 import { PrismaMetaConexionesRepository } from './infrastructure/prisma-meta-conexiones.repository';
 import { META_GRAPH_CLIENT } from './application/ports/meta-graph-client.port';
@@ -39,6 +40,7 @@ import { JwtMetaOAuthStateService } from './infrastructure/jwt-meta-oauth-state.
     DesconectarUseCase,
     ObtenerSaludPermisosMetaUseCase,
     TogglearFeaturePermisoUseCase,
+    GuardarCapiDatasetUseCase,
     {
       provide: META_CONEXIONES_REPOSITORY,
       useClass: PrismaMetaConexionesRepository,

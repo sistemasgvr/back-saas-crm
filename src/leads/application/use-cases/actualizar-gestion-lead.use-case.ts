@@ -1,0 +1,205 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
+import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
+import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
+import { EnviarEventoConversionLeadUseCase } from './enviar-evento-conversion-lead.use-case';
+import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
+import {
+  esEstadoTerminal,
+  esReaperturaValida,
+  esTransicionValida,
+  estadoAlCambiarTipo,
+  estadosPorTipo,
+  MOTIVOS_DESCARTE,
+  MOTIVOS_PERDIDO,
+  motivosGanado,
+  requiereTipoLeadDefinido,
+} from '../../../shared/domain/pipeline-inmobiliaria';
+
+const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+
+export interface ActualizarGestionInput {
+  tipoLead?: string;
+  estadoGestion?: string;
+  motivoCierre?: string | null;
+  notaCierre?: string | null;
+}
+
+function motivosValidosParaEstado(
+  estadoGestion: string,
+  tipoLead: string | null,
+): readonly string[] | null {
+  if (estadoGestion === 'DESCARTADO') return MOTIVOS_DESCARTE;
+  if (estadoGestion === 'CERRADO_PERDIDO') return MOTIVOS_PERDIDO;
+  if (estadoGestion === 'CERRADO_GANADO') return motivosGanado(tipoLead);
+  return null;
+}
+
+/** PATCH /leads/:id/gestion — tipoLead + estadoGestion + motivo/nota de
+ * cierre, todo opcional y validado contra la máquina de estados de
+ * PLAN-PIPELINE-INMOBILIARIA.md. Reemplaza a la vieja ActualizarTipoLeadUseCase
+ * (G2), que no conocía el pipeline todavía. */
+@Injectable()
+export class ActualizarGestionLeadUseCase {
+  constructor(
+    @Inject(LEADS_GESTION_REPOSITORY)
+    private readonly leads: LeadsGestionRepository,
+    private readonly enviarEventoCapi: EnviarEventoConversionLeadUseCase,
+  ) {}
+
+  async execute(
+    organizacionId: string,
+    leadId: string,
+    input: ActualizarGestionInput,
+    ctx: { usuarioId: string; rol: RolOrganizacion },
+  ): Promise<void> {
+    if (
+      input.tipoLead !== undefined &&
+      !TIPOS_LEAD_INMOBILIARIA.includes(input.tipoLead as never)
+    ) {
+      throw new BadRequestException(
+        `tipoLead debe ser uno de: ${TIPOS_LEAD_INMOBILIARIA.join(', ')}`,
+      );
+    }
+
+    const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
+    if (!lead) {
+      throw new NotFoundException('Lead no encontrado');
+    }
+
+    const esDueno = lead.asignadoUsuarioId === ctx.usuarioId;
+    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    if (!esDueno && !esAdmin) {
+      throw new ForbiddenException(
+        'Solo el dueño del lead o un administrador puede gestionar este lead',
+      );
+    }
+
+    // tipoLead efectivo tras este request (el nuevo si viene, si no el actual)
+    // — determina qué matriz de transiciones aplica.
+    const tipoLeadEfectivo = input.tipoLead ?? lead.tipoLead;
+
+    let estadoGestionFinal = lead.estadoGestion;
+
+    // 1) Cambio de tipoLead sin tocar estadoGestion explícitamente: reacomoda
+    // el estado según la regla §4.1.5 (se conserva si es común a los tres
+    // embudos, si no vuelve a CONTACTADO).
+    if (input.tipoLead !== undefined && input.tipoLead !== lead.tipoLead) {
+      if (input.estadoGestion === undefined) {
+        estadoGestionFinal = estadoAlCambiarTipo(lead.estadoGestion);
+      }
+    }
+
+    // 2) Cambio explícito de estadoGestion — valida transición o reapertura.
+    if (input.estadoGestion !== undefined) {
+      const estadosValidos = estadosPorTipo(tipoLeadEfectivo);
+      if (!estadosValidos.includes(input.estadoGestion)) {
+        throw new BadRequestException(
+          `estadoGestion inválido para este tipo de lead: ${input.estadoGestion}`,
+        );
+      }
+
+      if (esEstadoTerminal(lead.estadoGestion)) {
+        // Reabrir un lead cerrado — solo PROPIETARIO/ADMINISTRADOR, y solo
+        // hacia CONTACTADO o CALIFICADO (§4.1.4).
+        if (!esAdmin) {
+          throw new ForbiddenException(
+            'Solo un propietario o administrador puede reabrir un lead cerrado',
+          );
+        }
+        if (!esReaperturaValida(lead.estadoGestion, input.estadoGestion)) {
+          throw new BadRequestException(
+            'Un lead cerrado solo puede reabrirse hacia Contactado o Calificado',
+          );
+        }
+      } else {
+        if (
+          requiereTipoLeadDefinido(input.estadoGestion) &&
+          !tipoLeadEfectivo
+        ) {
+          throw new ConflictException(
+            'Define primero si el lead es de Compra o Venta para avanzar el pipeline más allá de Contactado',
+          );
+        }
+        if (
+          !esTransicionValida(
+            tipoLeadEfectivo,
+            lead.estadoGestion,
+            input.estadoGestion,
+          )
+        ) {
+          throw new BadRequestException(
+            `No se puede pasar de ${lead.estadoGestion} a ${input.estadoGestion}`,
+          );
+        }
+      }
+      estadoGestionFinal = input.estadoGestion;
+    }
+
+    // 3) Motivo de cierre obligatorio (y válido) al entrar a un estado terminal.
+    const motivosValidos = motivosValidosParaEstado(
+      estadoGestionFinal,
+      tipoLeadEfectivo,
+    );
+    if (motivosValidos && estadoGestionFinal !== lead.estadoGestion) {
+      const motivo = input.motivoCierre;
+      if (!motivo || !motivosValidos.includes(motivo)) {
+        throw new BadRequestException(
+          `Hace falta un motivo válido para pasar a ${estadoGestionFinal}: ${motivosValidos.join(', ')}`,
+        );
+      }
+    }
+
+    // Solo un cambio de ESTADO es una fila de historial válida — el
+    // historial es una línea de tiempo de transiciones de pipeline, no de
+    // cualquier cambio. Un tipoLead nuevo que no mueve el estado (porque ya
+    // era uno común a los tres embudos, regla §4.1.5) no genera fila: si no,
+    // quedaría un renglón sin sentido tipo "Contactado → Contactado".
+    const huboCambioDeEstado = estadoGestionFinal !== lead.estadoGestion;
+    // Generado acá (no por Prisma) para poder usarlo también como event_id
+    // de deduplicación al mandar el evento a Conversions API, sin depender
+    // de lo que devuelva la transacción.
+    const historialId = randomUUID();
+
+    await this.leads.actualizarGestion(
+      organizacionId,
+      leadId,
+      {
+        tipoLead: input.tipoLead,
+        estadoGestion: huboCambioDeEstado ? estadoGestionFinal : undefined,
+        motivoCierre: input.motivoCierre,
+        notaCierre: input.notaCierre,
+      },
+      ctx.usuarioId,
+      huboCambioDeEstado
+        ? {
+            id: historialId,
+            organizacionId,
+            leadId,
+            tipoLead: tipoLeadEfectivo,
+            desde: lead.estadoGestion,
+            hacia: estadoGestionFinal,
+            motivoCierre: input.motivoCierre,
+            nota: input.notaCierre,
+            usuarioId: ctx.usuarioId,
+          }
+        : undefined,
+    );
+
+    // Fire-and-forget: un evento de Conversions API que falla o tarda nunca
+    // debe frenar ni fallar el cambio de estado real en el CRM.
+    if (huboCambioDeEstado) {
+      void this.enviarEventoCapi
+        .execute(organizacionId, leadId, estadoGestionFinal, historialId)
+        .catch(() => undefined);
+    }
+  }
+}

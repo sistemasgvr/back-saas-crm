@@ -15,6 +15,7 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -31,12 +32,15 @@ import { ObtenerLeadUseCase } from '../application/use-cases/obtener-lead.use-ca
 import { TomarLeadUseCase } from '../application/use-cases/tomar-lead.use-case';
 import { AsignarLeadUseCase } from '../application/use-cases/asignar-lead.use-case';
 import { LiberarLeadUseCase } from '../application/use-cases/liberar-lead.use-case';
-import { ActualizarTipoLeadUseCase } from '../application/use-cases/actualizar-tipo-lead.use-case';
+import { ActualizarGestionLeadUseCase } from '../application/use-cases/actualizar-gestion-lead.use-case';
+import { ObtenerHistorialLeadUseCase } from '../application/use-cases/obtener-historial-lead.use-case';
+import { ObtenerMetaPipelineUseCase } from '../application/use-cases/obtener-meta-pipeline.use-case';
+import { ListarTableroLeadsUseCase } from '../application/use-cases/listar-tablero-leads.use-case';
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../application/ports/leads-lectura.repository.port';
 import { ListarLeadsQueryDto } from './dto/listar-leads.query.dto';
 import { AsignarLeadDto } from './dto/asignar-lead.dto';
-import { ActualizarTipoLeadDto } from './dto/actualizar-tipo-lead.dto';
+import { ActualizarGestionLeadDto } from './dto/actualizar-gestion-lead.dto';
 
 @ApiTags('Leads')
 @ApiBearerAuth('JWT-auth')
@@ -50,7 +54,10 @@ export class LeadsController {
     private readonly tomarLead: TomarLeadUseCase,
     private readonly asignarLead: AsignarLeadUseCase,
     private readonly liberarLead: LiberarLeadUseCase,
-    private readonly actualizarTipoLead: ActualizarTipoLeadUseCase,
+    private readonly actualizarGestion: ActualizarGestionLeadUseCase,
+    private readonly obtenerHistorial: ObtenerHistorialLeadUseCase,
+    private readonly obtenerMetaPipeline: ObtenerMetaPipelineUseCase,
+    private readonly listarTablero: ListarTableroLeadsUseCase,
     @Inject(LEADS_LECTURA_REPOSITORY)
     private readonly leadsLectura: LeadsLecturaRepository,
   ) {}
@@ -60,8 +67,8 @@ export class LeadsController {
     summary: 'Listar leads',
     description:
       'Lista paginada de leads de la organización con filtros por campaña/anuncio/página/cuenta/formulario, ' +
-      'rango de fechas, búsqueda libre y asignación. La visibilidad se acota por rol: un VENDEDOR solo ve ' +
-      'sin-asignar + los suyos; PROPIETARIO/ADMINISTRADOR ven todos.',
+      'rango de fechas, búsqueda libre, asignación y estado del pipeline. La visibilidad se acota por rol: un ' +
+      'VENDEDOR solo ve sin-asignar + los suyos; PROPIETARIO/ADMINISTRADOR ven todos.',
   })
   @ApiResponse({ status: 200, description: 'Página de leads.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
@@ -92,9 +99,63 @@ export class LeadsController {
     return this.leadsLectura.listarMiembrosAsignables(ctx.organizacionId!);
   }
 
+  /** Antes de :id — mismo motivo que /asignables. */
+  @Get('pipeline/meta')
+  @ApiOperation({
+    summary: 'Catálogo del pipeline (estados, transiciones, motivos)',
+    description:
+      'Estados válidos, sus próximos pasos y los motivos de cierre para un tipoLead dado — el front pinta ' +
+      'el copy correcto (Captación vs Visita agendada) sin hardcodear nada (PLAN-PIPELINE-INMOBILIARIA.md §8.3).',
+  })
+  @ApiQuery({
+    name: 'tipoLead',
+    required: false,
+    enum: ['COMPRA', 'VENTA', 'OTRO'],
+    description: 'Si se omite, usa el embudo corto (igual al de OTRO).',
+  })
+  @ApiResponse({ status: 200, description: 'Catálogo del pipeline.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  metaPipeline(@Query('tipoLead') tipoLead?: string) {
+    return this.obtenerMetaPipeline.execute(tipoLead);
+  }
+
+  /** Antes de :id — mismo motivo que /asignables. */
+  @Get('pipeline/tablero')
+  @ApiOperation({
+    summary: 'Tablero kanban del pipeline',
+    description:
+      'Todos los leads del tipo pedido (tope 300, más recientes primero), agrupados por columna de estado. ' +
+      'Mover una tarjeta usa el mismo PATCH .../gestion que la vista de detalle — misma validación de transición.',
+  })
+  @ApiQuery({
+    name: 'tipoLead',
+    required: false,
+    enum: ['COMPRA', 'VENTA', 'OTRO'],
+  })
+  @ApiQuery({
+    name: 'asignado',
+    required: false,
+    description: '"mios" | "sin_asignar" | UUID de un usuario puntual',
+  })
+  @ApiResponse({ status: 200, description: 'Columnas con sus leads.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  tablero(
+    @CurrentUser() ctx: RequestContext,
+    @Query('tipoLead') tipoLead?: string,
+    @Query('asignado') asignado?: string,
+  ) {
+    return this.listarTablero.execute(ctx.organizacionId!, tipoLead, asignado, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un lead por id' })
-  @ApiResponse({ status: 200, description: 'Detalle del lead.' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalle del lead, incluyendo estado del pipeline.',
+  })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   @ApiResponse({
     status: 404,
@@ -106,6 +167,28 @@ export class LeadsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.obtenerLead.execute(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Get(':id/historial-estados')
+  @ApiOperation({
+    summary: 'Timeline de cambios de pipeline',
+    description:
+      'Historial cronológico de cambios de tipoLead/estadoGestion — quién, cuándo, desde/hacia, motivo.',
+  })
+  @ApiResponse({ status: 200, description: 'Historial de cambios.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 404,
+    description: 'El lead no existe o el rol no puede verlo.',
+  })
+  historialEstados(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.obtenerHistorial.execute(ctx.organizacionId!, id, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
@@ -181,25 +264,41 @@ export class LeadsController {
   @Patch(':id/gestion')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
-    summary: 'Actualizar el tipo de lead (gestión)',
-    description: 'Marca la intención comercial del lead (COMPRA/VENTA/OTRO).',
+    summary: 'Gestionar el pipeline del lead',
+    description:
+      'Cambia tipoLead y/o estadoGestion (con motivo/nota de cierre si corresponde). Valida la transición ' +
+      'contra la matriz de estados del tipo vigente — ver GET /leads/pipeline/meta. Reabrir un lead cerrado ' +
+      'requiere PROPIETARIO/ADMINISTRADOR.',
   })
-  @ApiResponse({ status: 204, description: 'Tipo de lead actualizado.' })
+  @ApiResponse({ status: 204, description: 'Gestión actualizada.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Transición de estado inválida, o falta un motivo de cierre válido.',
+  })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description:
+      'No eres el dueño del lead ni admin, o intentas reabrir sin ser admin.',
+  })
   @ApiResponse({
     status: 404,
     description: 'El lead no existe o el rol no puede gestionarlo.',
   })
+  @ApiResponse({
+    status: 409,
+    description:
+      'El estado destino exige tipoLead definido (Compra/Venta) y todavía no lo tiene.',
+  })
   gestion(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: ActualizarTipoLeadDto,
+    @Body() dto: ActualizarGestionLeadDto,
   ) {
-    return this.actualizarTipoLead.execute(
-      ctx.organizacionId!,
-      id,
-      dto.tipoLead,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
-    );
+    return this.actualizarGestion.execute(ctx.organizacionId!, id, dto, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
   }
 }

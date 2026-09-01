@@ -19,6 +19,9 @@ export interface FiltroLeads {
   fechaDesde?: Date;
   fechaHasta?: Date;
   asignacion: FiltroAsignacion;
+  tipoLead?: string;
+  /** Código exacto (ej. "NEGOCIACION") o "ABIERTOS" (no terminales) / "CERRADOS" (terminales) — §8.1. */
+  estadoGestion?: string;
   page: number;
   pageSize: number;
 }
@@ -38,6 +41,7 @@ export interface LeadResumen {
   anuncio: ReferenciaNombrada | null;
   tipoLead: string | null;
   asignado: ReferenciaNombrada | null;
+  estadoGestion: string;
 }
 
 export interface LeadDetalle extends LeadResumen {
@@ -46,6 +50,22 @@ export interface LeadDetalle extends LeadResumen {
   idExterno: string;
   datosCrudos: unknown;
   fechaCreacion: Date;
+  estadoGestionEn: Date | null;
+  motivoCierre: string | null;
+  notaCierre: string | null;
+}
+
+/** Fila liviana para una tarjeta de tablero kanban — no trae todo lo que
+ * trae LeadResumen porque una tarjeta muestra mucho menos que una fila de
+ * tabla. */
+export interface LeadTableroRow {
+  id: string;
+  nombre: string | null;
+  telefono: string | null;
+  email: string | null;
+  asignado: ReferenciaNombrada | null;
+  estadoGestion: string;
+  fechaLead: Date | null;
 }
 
 export interface ListaLeadsResultado {
@@ -66,4 +86,12 @@ export interface LeadsLecturaRepository {
   listarMiembrosAsignables(
     organizacionId: string,
   ): Promise<ReferenciaNombrada[]>;
+  /** Todos los leads del tipo pedido (tope 300, más recientes primero) para
+   * armar el tablero kanban — sin paginar, el front agrupa por columna.
+   * tipoLead null trae COMPRA/VENTA/OTRO/sin-clasificar según venga en el
+   * filtro (PLAN-PIPELINE-INMOBILIARIA.md §20.4). */
+  listarParaTablero(
+    organizacionId: string,
+    filtro: { tipoLead: string | null; asignacion: FiltroAsignacion },
+  ): Promise<LeadTableroRow[]>;
 }

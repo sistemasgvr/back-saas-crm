@@ -879,6 +879,37 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return { wamid: data.messages[0].id };
   }
 
+  async enviarEventoConversionLead(
+    datasetId: string,
+    accessToken: string,
+    evento: {
+      nombreEvento: string;
+      fechaEvento: Date;
+      eventoId: string;
+      leadIdMeta: string;
+    },
+  ): Promise<void> {
+    // action_source: 'system_generated' — el evento lo dispara un cambio de
+    // estado en el CRM, sin sesión de navegador de por medio (a diferencia
+    // del evento inicial "Lead", que sí viene con sesión/pixel).
+    await this.postJson(
+      `/${datasetId}/events`,
+      {
+        data: [
+          {
+            event_name: evento.nombreEvento,
+            event_time: Math.floor(evento.fechaEvento.getTime() / 1000),
+            event_id: evento.eventoId,
+            action_source: 'system_generated',
+            lead_event_source: 'SAAS CRM',
+            user_data: { lead_id: evento.leadIdMeta },
+          },
+        ],
+      },
+      accessToken,
+    );
+  }
+
   async subirMediaWhatsApp(
     phoneNumberId: string,
     accessToken: string,

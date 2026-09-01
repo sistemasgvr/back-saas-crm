@@ -40,4 +40,11 @@ export interface MetaConexionesRepository {
     featuresDeseadas: string[],
     usuarioEdicion: string,
   ): Promise<void>;
+  /** Dataset de Conversions API para Conversion Leads — null desactiva el
+   * envío de eventos (PLAN-PIPELINE-INMOBILIARIA.md §20.5). */
+  actualizarCapiDatasetId(
+    organizacionId: string,
+    capiDatasetId: string | null,
+    usuarioEdicion: string,
+  ): Promise<void>;
 }

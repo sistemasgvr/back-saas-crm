@@ -37,6 +37,7 @@ model Usuario {
   notificacionesUsuario NotificacionUsuario[]
   leadsAsignados        Lead[]                @relation("LeadAsignado")
   leadsAsignadosPor     Lead[]                @relation("LeadAsignadoPor")
+  leadEstadoHistorial   LeadEstadoHistorial[]
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -212,6 +213,18 @@ model Lead {
    */
   asignadoPorUsuarioId String?   @map("asignado_por_usuario_id") @db.Uuid
 
+  /**
+   * Pipeline de gestión (PLAN-PIPELINE-INMOBILIARIA.md §5.1) — códigos
+   * UPPER_SNAKE definidos en shared/domain/pipeline-inmobiliaria.ts, distinto
+   * catálogo/transiciones según tipoLead (COMPRA/VENTA/OTRO).
+   */
+  estadoGestion             String    @default("NUEVO") @map("estado_gestion") @db.VarChar(40)
+  estadoGestionEn           DateTime? @map("estado_gestion_en") @db.Timestamptz
+  estadoGestionPorUsuarioId String?   @map("estado_gestion_por_usuario_id") @db.Uuid
+  /** Catálogo corto en código — ver MOTIVOS_DESCARTE/PERDIDO/GANADO. */
+  motivoCierre              String?   @map("motivo_cierre") @db.VarChar(80)
+  notaCierre                String?   @map("nota_cierre") @db.VarChar(500)
+
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
   usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
@@ -226,6 +239,7 @@ model Lead {
   asignadoUsuario        Usuario?               @relation("LeadAsignado", fields: [asignadoUsuarioId], references: [id])
   asignadoPorUsuario     Usuario?               @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
   whatsappConversaciones WhatsappConversacion[]
+  estadoHistorial        LeadEstadoHistorial[]
 
   @@unique([organizacionId, idExterno])
   @@index([email])
@@ -237,7 +251,39 @@ model Lead {
   @@index([estado])
   @@index([asignadoUsuarioId])
   @@index([tipoLead])
+  @@index([estadoGestion])
+  @@index([organizacionId, estadoGestion])
+  @@index([organizacionId, tipoLead, estadoGestion])
   @@map("leads")
+}
+
+/**
+ * Timeline inmutable de cambios de estadoGestion/tipoLead — un lead puede
+ * tener muchas filas, nunca se editan ni se borran (PLAN-PIPELINE-INMOBILIARIA.md §5.2).
+ */
+model LeadEstadoHistorial {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  leadId         String @map("lead_id") @db.Uuid
+
+  /** Snapshot del tipo de lead al momento del cambio — no sigue al lead si cambia después. */
+  tipoLead     String? @map("tipo_lead") @db.VarChar(40)
+  /** Null = alta (primera fila del lead). */
+  desde        String? @db.VarChar(40)
+  hacia        String  @db.VarChar(40)
+  motivoCierre String? @map("motivo_cierre") @db.VarChar(80)
+  nota         String? @db.VarChar(500)
+  /** Null = cambio hecho por el sistema (ej. alta automática al ingestar el lead). */
+  usuarioId String? @map("usuario_id") @db.Uuid
+
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  lead    Lead     @relation(fields: [leadId], references: [id])
+  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+
+  @@index([leadId, fechaCreacion])
+  @@index([organizacionId])
+  @@map("lead_estado_historial")
 }
 
 model MetaConexion {
@@ -266,6 +312,15 @@ model MetaConexion {
   featuresDeseadas Json?     @map("features_deseadas")
 
   webhookVerifyToken String @map("webhook_verify_token") @db.VarChar(128)
+
+  /**
+   * Conversions API — dataset de Meta Events Manager dedicado a eventos CRM
+   * (distinto del dataset/pixel de sitio web). Lo crea el usuario a mano en
+   * Meta Events Manager; acá solo se guarda el id para poder mandar eventos.
+   * Null = CAPI Conversion Leads desactivado para esta organización
+   * (PLAN-PIPELINE-INMOBILIARIA.md §20.5 / Oleada C).
+   */
+  capiDatasetId String? @map("capi_dataset_id") @db.VarChar(64)
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid

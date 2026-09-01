@@ -336,6 +336,25 @@ export interface MetaGraphClient {
     formatoParametros?: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
 
+  /**
+   * POST /{dataset-id}/events — Conversions API para CRM (Conversion Leads).
+   * Manda el resultado de un lead (ganado/perdido/descartado) de vuelta a
+   * Meta para que optimice la entrega de Lead Ads por calidad real, no solo
+   * por volumen (PLAN-PIPELINE-INMOBILIARIA.md §20.5 / Oleada C).
+   * `eventoId` debe ser único y estable por evento (se usa el id de la fila
+   * de lead_estado_historial) — Meta lo usa para deduplicar reintentos.
+   */
+  enviarEventoConversionLead(
+    datasetId: string,
+    accessToken: string,
+    evento: {
+      nombreEvento: string;
+      fechaEvento: Date;
+      eventoId: string;
+      leadIdMeta: string;
+    },
+  ): Promise<void>;
+
   /** POST /{phone-number-id}/media (multipart) — subir el archivo es
    * obligatorio antes de poder enviarlo; el media_id que devuelve dura
    * 30 días (WhatsApp Business Platform, Media API, vigente v26). */

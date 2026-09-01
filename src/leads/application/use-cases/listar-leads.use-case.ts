@@ -23,6 +23,8 @@ export interface ListarLeadsInput {
   fechaHasta?: string;
   /** "mios" | "sin_asignar" | un usuarioId puntual (solo admin puede ver el de otro). */
   asignado?: string;
+  tipoLead?: string;
+  estadoGestion?: string;
   page: number;
   pageSize: number;
 }
@@ -79,6 +81,8 @@ export class ListarLeadsUseCase {
         ? finDiaLimaUtc(input.fechaHasta)
         : undefined,
       asignacion: this.resolverAsignacion(input, ctx),
+      tipoLead: input.tipoLead,
+      estadoGestion: input.estadoGestion,
       page: input.page,
       pageSize: input.pageSize,
     });

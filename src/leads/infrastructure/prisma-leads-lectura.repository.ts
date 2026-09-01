@@ -1,15 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { ESTADOS_TERMINALES } from '../../shared/domain/pipeline-inmobiliaria';
 import type {
   FiltroAsignacion,
   FiltroLeads,
   LeadDetalle,
   LeadResumen,
   LeadsLecturaRepository,
+  LeadTableroRow,
   ListaLeadsResultado,
   ReferenciaNombrada,
 } from '../application/ports/leads-lectura.repository.port';
+
+/** Tope de seguridad para el tablero — no pagina, así que hace falta un
+ * límite duro para no traer miles de filas de una organización con mucho volumen. */
+const TOPE_TABLERO = 300;
 
 type LeadConRelaciones = Prisma.LeadGetPayload<{
   include: {
@@ -51,7 +57,18 @@ function toResumen(lead: LeadConRelaciones): LeadResumen {
     anuncio: refOpcional(lead.anuncio),
     tipoLead: lead.tipoLead,
     asignado: nombreUsuario(lead.asignadoUsuario),
+    estadoGestion: lead.estadoGestion,
   };
+}
+
+function whereDeEstadoGestion(estadoGestion: string): Prisma.LeadWhereInput {
+  if (estadoGestion === 'ABIERTOS') {
+    return { estadoGestion: { notIn: [...ESTADOS_TERMINALES] } };
+  }
+  if (estadoGestion === 'CERRADOS') {
+    return { estadoGestion: { in: [...ESTADOS_TERMINALES] } };
+  }
+  return { estadoGestion };
 }
 
 function whereDeAsignacion(
@@ -92,6 +109,10 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
         ? { campana: { metaCuentaPublicitariaId: filtro.metaCuentaId } }
         : {}),
       ...(filtro.formularioId ? { formularioId: filtro.formularioId } : {}),
+      ...(filtro.tipoLead ? { tipoLead: filtro.tipoLead } : {}),
+      ...(filtro.estadoGestion
+        ? whereDeEstadoGestion(filtro.estadoGestion)
+        : {}),
       ...(filtro.fechaDesde || filtro.fechaHasta
         ? {
             fechaLead: {
@@ -184,6 +205,9 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       idExterno: lead.idExterno,
       datosCrudos: lead.datosCrudos,
       fechaCreacion: lead.fechaCreacion,
+      estadoGestionEn: lead.estadoGestionEn,
+      motivoCierre: lead.motivoCierre,
+      notaCierre: lead.notaCierre,
     };
   }
 
@@ -198,5 +222,37 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
     return miembros
       .map((m) => nombreUsuario(m.usuario))
       .filter((ref): ref is ReferenciaNombrada => ref !== null);
+  }
+
+  async listarParaTablero(
+    organizacionId: string,
+    filtro: { tipoLead: string | null; asignacion: FiltroAsignacion },
+  ): Promise<LeadTableroRow[]> {
+    const whereTipo: Prisma.LeadWhereInput =
+      filtro.tipoLead === null
+        ? { OR: [{ tipoLead: 'OTRO' }, { tipoLead: null }] }
+        : { tipoLead: filtro.tipoLead };
+
+    const leads = await this.prisma.lead.findMany({
+      where: {
+        organizacionId,
+        estado: 1,
+        ...whereTipo,
+        AND: [whereDeAsignacion(filtro.asignacion)],
+      },
+      include: { asignadoUsuario: true },
+      orderBy: { fechaLead: 'desc' },
+      take: TOPE_TABLERO,
+    });
+
+    return leads.map((lead) => ({
+      id: lead.id,
+      nombre: lead.nombre,
+      telefono: lead.telefono,
+      email: lead.email,
+      asignado: nombreUsuario(lead.asignadoUsuario),
+      estadoGestion: lead.estadoGestion,
+      fechaLead: lead.fechaLead,
+    }));
   }
 }

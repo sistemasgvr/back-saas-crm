@@ -78,6 +78,12 @@ export interface WhatsappConversacionesRepository {
     organizacionId: string,
     filtro: FiltroVisibilidadChats,
   ): Promise<ConversacionResumen[]>;
+  /** Suma de `noLeidos` de las conversaciones visibles — para el badge del
+   * sidebar, sin traer la lista completa solo para contar. */
+  contarNoLeidos(
+    organizacionId: string,
+    filtro: FiltroVisibilidadChats,
+  ): Promise<number>;
   findPorId(
     organizacionId: string,
     id: string,

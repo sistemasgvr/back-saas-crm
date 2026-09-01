@@ -1108,11 +1108,12 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Selector multi-organización
 - Billing / `subscriptions/`
 - Redis, BullMQ, workers
-- **Pipeline de estados** del lead (`NUEVO → CONTACTADO → EN_GESTION → CERRADO | DESCARTADO`) y tareas/oportunidades
+- **Pipeline de estados** del lead → **subplan activo:** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md) (embudos COMPRA / VENTA)
 - Otros rubros distintos de inmobiliaria
 - App móvil
 
-**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
+**Pipeline inmobiliario:** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md).
 
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**
 
@@ -1219,7 +1220,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada cambio termina con `npm run build` en el repo tocado.
 4. Meta/WhatsApp en producción: smoke test E2E.
 
-**Siguiente paso concreto:** smoke Meta + WhatsApp real en prod · pipeline de estados del lead · u Oleada C (CAPI) según [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).
+**Siguiente paso concreto:** smoke Meta + WhatsApp en prod · **implementar** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md) (Fase 20) · u Oleada C (CAPI) después del pipeline.
 
 ---
 

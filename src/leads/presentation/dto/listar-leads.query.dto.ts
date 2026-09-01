@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -7,6 +8,14 @@ import {
   MaxLength,
 } from 'class-validator';
 import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.query.dto';
+import { TODOS_LOS_ESTADOS_GESTION } from '../../../shared/domain/pipeline-inmobiliaria';
+import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
+
+const FILTROS_ESTADO_GESTION = [
+  ...TODOS_LOS_ESTADOS_GESTION,
+  'ABIERTOS',
+  'CERRADOS',
+] as const;
 
 export class ListarLeadsQueryDto extends PaginacionQueryDto {
   @ApiPropertyOptional({
@@ -84,4 +93,21 @@ export class ListarLeadsQueryDto extends PaginacionQueryDto {
   @IsString()
   @MaxLength(40)
   asignado?: string;
+
+  @ApiPropertyOptional({
+    enum: FILTROS_ESTADO_GESTION,
+    description:
+      'Código exacto del pipeline (ej. "NEGOCIACION"), o "ABIERTOS" (no terminales) / "CERRADOS" (terminales).',
+  })
+  @IsOptional()
+  @IsIn(FILTROS_ESTADO_GESTION)
+  estadoGestion?: string;
+
+  @ApiPropertyOptional({
+    enum: TIPOS_LEAD_INMOBILIARIA,
+    description: 'Filtra por intención (Compra/Venta/Otro).',
+  })
+  @IsOptional()
+  @IsIn(TIPOS_LEAD_INMOBILIARIA)
+  tipoLead?: string;
 }

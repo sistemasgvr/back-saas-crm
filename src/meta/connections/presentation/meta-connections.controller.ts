@@ -30,8 +30,10 @@ import { DesconectarUseCase } from '../application/use-cases/desconectar.use-cas
 import { GuardarCredencialesAppUseCase } from '../application/use-cases/guardar-credenciales-app.use-case';
 import { ObtenerSaludPermisosMetaUseCase } from '../application/use-cases/obtener-salud-permisos-meta.use-case';
 import { TogglearFeaturePermisoUseCase } from '../application/use-cases/togglear-feature-permiso.use-case';
+import { GuardarCapiDatasetUseCase } from '../application/use-cases/guardar-capi-dataset.use-case';
 import { GuardarCredencialesDto } from './dto/guardar-credenciales.dto';
 import { PatchFeaturePermisoDto } from './dto/patch-feature-permiso.dto';
+import { GuardarCapiDatasetDto } from './dto/guardar-capi-dataset.dto';
 
 @ApiTags('Meta Connections')
 @ApiBearerAuth('JWT-auth')
@@ -48,6 +50,7 @@ export class MetaConnectionsController {
     private readonly desconectar: DesconectarUseCase,
     private readonly obtenerSaludPermisos: ObtenerSaludPermisosMetaUseCase,
     private readonly togglearFeature: TogglearFeaturePermisoUseCase,
+    private readonly guardarCapiDataset: GuardarCapiDatasetUseCase,
   ) {}
 
   @Get('current')
@@ -211,6 +214,36 @@ export class MetaConnectionsController {
   selectAdAccount(): never {
     throw new GoneException(
       'Usa POST /meta/ad-accounts — esta organización ahora puede vincular varias cuentas.',
+    );
+  }
+
+  @Patch('capi-dataset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Configurar el dataset de Conversion Leads (CAPI)',
+    description:
+      'Guarda el id del dataset de Meta Events Manager al que se mandan los eventos de resultado de lead ' +
+      '(ganado/perdido/descartado) — creado a mano en Meta, acá solo se guarda la referencia. Mandar sin ' +
+      'capiDatasetId desactiva el envío.',
+  })
+  @ApiResponse({ status: 204, description: 'Dataset guardado.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo META_LEADS no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No hay una sesión de Meta conectada.',
+  })
+  saveCapiDataset(
+    @CurrentUser() ctx: RequestContext,
+    @Body() dto: GuardarCapiDatasetDto,
+  ) {
+    return this.guardarCapiDataset.execute(
+      ctx.organizacionId!,
+      dto.capiDatasetId || null,
+      ctx.usuarioId,
     );
   }
 
