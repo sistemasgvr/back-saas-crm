@@ -9,3 +9,13 @@ export function ultimosDigitos(telefono: string): string {
   const soloDigitos = telefono.replace(/\D/g, '');
   return soloDigitos.slice(-DIGITOS_SIGNIFICATIVOS);
 }
+
+/** Convierte Lead.telefono a wa_id candidato (E.164 sin '+'): si ya trae código
+ * de país (>= 11 dígitos) se usa tal cual; si son 9 dígitos (celular Perú) se
+ * antepone "51". */
+export function telefonoAWaId(telefono: string): string | null {
+  const digitos = telefono.replace(/\D/g, '');
+  if (digitos.length >= 11) return digitos;
+  if (digitos.length === 9) return `51${digitos}`;
+  return null;
+}

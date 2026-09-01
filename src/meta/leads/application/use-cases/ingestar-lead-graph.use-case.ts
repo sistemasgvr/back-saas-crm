@@ -13,6 +13,7 @@ import type { AnunciosRepository } from '../../../ads/application/ports/anuncios
 import { LEADS_REPOSITORY } from '../ports/leads.repository.port';
 import type { LeadsRepository } from '../ports/leads.repository.port';
 import { extraerContactoLead } from '../extraer-contacto-lead';
+import { VincularLeadConversacionesWhatsAppUseCase } from '../../../../whatsapp/messaging/application/use-cases/vincular-lead-conversaciones-whatsapp.use-case';
 
 export interface ResultadoIngestarLead {
   leadId: string;
@@ -31,6 +32,7 @@ export class IngestarLeadGraphUseCase {
     private readonly conjuntos: ConjuntosAnunciosRepository,
     @Inject(ANUNCIOS_REPOSITORY) private readonly anuncios: AnunciosRepository,
     @Inject(LEADS_REPOSITORY) private readonly leads: LeadsRepository,
+    private readonly vincularConversaciones: VincularLeadConversacionesWhatsAppUseCase,
   ) {}
 
   async execute(
@@ -50,6 +52,7 @@ export class IngestarLeadGraphUseCase {
       lead.leadgenId,
     );
     if (idExistente) {
+      await this.vincularConversaciones.execute(organizacionId, idExistente);
       return { leadId: idExistente, creado: false };
     }
 
@@ -113,6 +116,12 @@ export class IngestarLeadGraphUseCase {
       datosCrudos: lead.raw,
       fechaLead: lead.createdTime,
     });
+
+    await this.vincularConversaciones.execute(
+      organizacionId,
+      resultado.id,
+      contacto.telefono,
+    );
 
     return { leadId: resultado.id, creado: resultado.creado };
   }

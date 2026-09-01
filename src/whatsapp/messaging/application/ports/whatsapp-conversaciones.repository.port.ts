@@ -95,6 +95,15 @@ export interface WhatsappConversacionesRepository {
   ): Promise<MensajeRow[]>;
   marcarLeida(id: string): Promise<void>;
 
+  /** Vincula conversaciones existentes sin lead cuyo wa_id coincide con el
+   * teléfono del lead (heurística de sufijo / E.164). No pisa un lead_id ya
+   * asignado. Devuelve cuántas filas se actualizaron. */
+  vincularLeadPorTelefono(
+    organizacionId: string,
+    leadId: string,
+    telefono: string,
+  ): Promise<number>;
+
   /** Crea la conversación si no existe (por wa_id). Si `leadIdConocido` viene
    * dado (CTA "Iniciar chat" desde una ficha de lead puntual), se vincula
    * directo a ese lead; si no, intenta emparejar por teléfono (heurística,

@@ -10,17 +10,7 @@ import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
-
-/** Convierte Lead.telefono a un wa_id candidato: si ya trae código de país
- * (>= 11 dígitos) se usa tal cual; si son 9 dígitos (celular local Perú) se
- * antepone "51". Heurística MVP — igual que el emparejamiento del webhook,
- * documentada como limitación en PLAN-GESTION-LEADS-WHATSAPP.md §9. */
-function telefonoAWaId(telefono: string): string | null {
-  const digitos = telefono.replace(/\D/g, '');
-  if (digitos.length >= 11) return digitos;
-  if (digitos.length === 9) return `51${digitos}`;
-  return null;
-}
+import { telefonoAWaId } from '../../infrastructure/normalizar-telefono';
 
 /** CTA "Iniciar chat" desde la ficha del lead — crea (o reusa) la
  * conversación aunque el lead nunca haya escrito por WhatsApp; el primer

@@ -9,7 +9,7 @@ import type {
   RegistrarMensajeInput,
   WhatsappConversacionesRepository,
 } from '../application/ports/whatsapp-conversaciones.repository.port';
-import { ultimosDigitos } from './normalizar-telefono';
+import { ultimosDigitos, telefonoAWaId } from './normalizar-telefono';
 
 const VENTANA_HORAS = 24;
 
@@ -144,6 +144,30 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
   }
 
+  async vincularLeadPorTelefono(
+    organizacionId: string,
+    leadId: string,
+    telefono: string,
+  ): Promise<number> {
+    const sufijo = ultimosDigitos(telefono);
+    if (!sufijo) return 0;
+
+    const waIdExacto = telefonoAWaId(telefono);
+    const resultado = await this.prisma.whatsappConversacion.updateMany({
+      where: {
+        organizacionId,
+        estado: 1,
+        leadId: null,
+        OR: [
+          { waId: { endsWith: sufijo } },
+          ...(waIdExacto ? [{ waId: waIdExacto }] : []),
+        ],
+      },
+      data: { leadId },
+    });
+    return resultado.count;
+  }
+
   async findOCrearConversacion(input: {
     organizacionId: string;
     whatsappConexionId: string;
@@ -159,7 +183,15 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         },
       },
     });
-    if (existente) return { id: existente.id, esNueva: false };
+    if (existente) {
+      if (input.leadIdConocido && !existente.leadId) {
+        await this.prisma.whatsappConversacion.update({
+          where: { id: existente.id },
+          data: { leadId: input.leadIdConocido },
+        });
+      }
+      return { id: existente.id, esNueva: false };
+    }
 
     // Si viene un lead conocido (CTA "Iniciar chat" desde su ficha) se usa
     // directo — evita el riesgo de que la heurística de sufijo empareje con

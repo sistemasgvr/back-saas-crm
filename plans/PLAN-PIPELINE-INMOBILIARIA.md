@@ -322,23 +322,29 @@ Heurística opcional: palabras en preguntas (`presupuesto`, `visita` → COMPRA;
 ## 13. Checklist de cierre
 
 ### 20.1
-- [ ] Migración campos + historial
-- [ ] Defaults en ingest + backfill
-- [ ] Dominio matrices compra/venta/otro
+- [x] Migración campos + historial
+- [x] Defaults en ingest + backfill
+- [x] Dominio matrices compra/venta/otro
 
 ### 20.2
-- [ ] PATCH gestión con validación
-- [ ] Historial + meta pipeline
-- [ ] Tests de transiciones
-- [ ] `npm run build` back
+- [x] PATCH gestión con validación
+- [x] Historial + meta pipeline
+- [x] Tests de transiciones (22 tests)
+- [x] `npm run build` back
 
 ### 20.3
-- [ ] UI listado (tipo + estado + filtros)
-- [ ] UI detalle (próximos estados + motivos + timeline)
-- [ ] `npm run build` front
+- [x] UI listado (tipo + estado + filtros)
+- [x] UI detalle (próximos estados + motivos + timeline)
+- [x] `npm run build` front
 
 ### 20.4 / 20.5
-- [ ] Opcional kanban / CAPI
+- [x] Tablero kanban (`/leads/tablero`, drag → mismo PATCH gestión)
+- [x] CAPI en código (`EnviarEventoConversionLeadUseCase` — requiere dataset CAPI configurado en org)
+
+### Operativo pendiente
+- [ ] `prisma migrate deploy` en producción (migraciones `20260829140000`, `20260829141500`)
+- [ ] Smoke: mover lead COMPRA y VENTA por UI + ver historial
+- [ ] Heurística opcional `tipo_lead` desde `field_data` (no bloqueante)
 
 ---
 
@@ -350,4 +356,4 @@ Heurística opcional: palabras en preguntas (`presupuesto`, `visita` → COMPRA;
 
 ---
 
-*Plan profesional inmobiliario: embudos COMPRA y VENTA sobre un motor común de estados + historial. Implementar 20.1 → 20.3 antes de CAPI o kanban.*
+*Plan profesional inmobiliario: embudos COMPRA y VENTA sobre un motor común de estados + historial. **Código 20.1–20.5 cerrado** — pendiente deploy migraciones + smoke en prod.*

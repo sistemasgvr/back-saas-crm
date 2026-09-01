@@ -1108,7 +1108,7 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Selector multi-organización
 - Billing / `subscriptions/`
 - Redis, BullMQ, workers
-- **Pipeline de estados** del lead → **subplan activo:** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md) (embudos COMPRA / VENTA)
+- Dashboard KPIs de embudo (tiempo en etapa, conversión por tipo) — datos ya en BD; vista pendiente
 - Otros rubros distintos de inmobiliaria
 - App móvil
 
@@ -1205,6 +1205,15 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 - [x] Módulo `WHATSAPP` opt-in + conexiones + inbox `/chats` + webhook mensajes
 - [x] CTA chat desde ficha lead; plantillas + sesión 24h
 
+### Pipeline inmobiliario (fase 20)
+
+- [x] Dominio COMPRA / VENTA / OTRO + matrices de transición + motivos de cierre
+- [x] Migración `estado_gestion*` + `lead_estado_historial` + backfill
+- [x] API: `PATCH gestion`, `GET pipeline/meta`, `GET historial-estados`, `GET pipeline/tablero`
+- [x] UI: listado con filtros, detalle con stepper + timeline, tablero kanban `/leads/tablero`
+- [x] CAPI Conversion Leads en cierre terminal (fire-and-forget; requiere dataset CAPI en org)
+- [ ] Deploy migraciones pipeline en prod + smoke gestión de estados
+
 ### Operativo pendiente
 
 - [ ] Rotar `SEED_ADMIN_PASSWORD` (si aún es el seed)
@@ -1220,7 +1229,7 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 3. Cada cambio termina con `npm run build` en el repo tocado.
 4. Meta/WhatsApp en producción: smoke test E2E.
 
-**Siguiente paso concreto:** smoke Meta + WhatsApp en prod · **implementar** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md) (Fase 20) · u Oleada C (CAPI) después del pipeline.
+**Siguiente paso concreto:** deploy migraciones pipeline en prod · smoke Meta + WhatsApp + gestión de estados E2E · dashboard KPIs de embudo (opcional).
 
 ---
 

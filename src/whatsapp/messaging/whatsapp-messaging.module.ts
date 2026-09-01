@@ -15,6 +15,7 @@ import { CrearPlantillaUseCase } from './application/use-cases/crear-plantilla.u
 import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from './application/use-cases/procesar-estado-whatsapp.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from './application/use-cases/iniciar-conversacion-desde-lead.use-case';
+import { VincularLeadConversacionesWhatsAppUseCase } from './application/use-cases/vincular-lead-conversaciones-whatsapp.use-case';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
 import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-whatsapp-conversaciones.repository';
 
@@ -38,6 +39,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEstadoWhatsAppUseCase,
     IniciarConversacionDesdeLeadUseCase,
+    VincularLeadConversacionesWhatsAppUseCase,
     {
       provide: WHATSAPP_CONVERSACIONES_REPOSITORY,
       useClass: PrismaWhatsappConversacionesRepository,
@@ -46,6 +48,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
   exports: [
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEstadoWhatsAppUseCase,
+    VincularLeadConversacionesWhatsAppUseCase,
   ],
 })
 export class WhatsappMessagingModule {}
