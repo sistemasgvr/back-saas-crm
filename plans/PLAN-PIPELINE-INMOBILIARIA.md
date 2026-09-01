@@ -171,7 +171,8 @@ Default al **ingestar** desde Meta: `estado_gestion = 'NUEVO'`.
 | `desde` | VARCHAR nullable (null = alta) |
 | `hacia` | VARCHAR NOT NULL |
 | `motivo_cierre` | nullable |
-| `nota` | nullable |
+| `nota` | nullable — nota de transición o de cierre |
+| `metadata` | JSONB nullable — datos estructurados (visita, calificación, etc.) |
 | `usuario_id` | quién cambió (null = sistema) |
 | auditoría estándar | `estado`, fechas, etc. |
 
@@ -206,8 +207,8 @@ Misma visibilidad de listado que Fase 18.
 | GET | `/leads` | `estadoGestion`, `tipoLead`, … | Filtros embudo |
 | GET | `/leads/:id` | — | Incluye estado + últimos cambios |
 | GET | `/leads/:id/historial-estados` | — | Timeline |
-| PATCH | `/leads/:id/gestion` | Extender: `tipoLead?`, `estadoGestion?`, `motivoCierre?`, `notaCierre?` | Valida matriz |
-| GET | `/leads/pipeline/meta` | — | Catálogo estados/motivos/transiciones para el front (según rubro + tipo) |
+| PATCH | `/leads/:id/gestion` | `tipoLead?`, `estadoGestion?`, `motivoCierre?`, `notaCierre?`, `notaTransicion?`, `metadata?` | Valida matriz + campos por estado destino |
+| GET | `/leads/pipeline/meta` | `tipoLead?` | Catálogo estados/motivos/transiciones + `camposAlEntrar` por estado |
 
 Errores claros: `400` transición inválida, `403` no dueño, `409` si se exige tipo y falta.
 
@@ -234,11 +235,73 @@ Errores claros: `400` transición inválida, `403` no dueño, `409` si se exige 
 
 El front pide `/leads/pipeline/meta?tipoLead=COMPRA|VENTA` y pinta etiquetas correctas (`Captación` vs `Visita agendada`).
 
-### 8.4 Fuera de v1 UI
+### 8.4 Fuera de v1 UI (histórico)
 
-- Kanban drag & drop.
 - SLA / colores por días estancado.
-- Campos de inmueble (m², precio pedido) — fase datos de captación posterior.
+- Catálogo de inmuebles vinculado (m², precio pedido en entidad Property).
+
+### 8.5 Campos por transición (Fase 21 — implementado)
+
+Al avanzar el pipeline, el asesor completa un formulario según el **estado destino**. El catálogo vive en `shared/domain/campos-transicion-pipeline.ts` (no en BD). El front lo obtiene de `GET /leads/pipeline/meta` → `estados[].camposAlEntrar`.
+
+**Principios (alineados con CRMs inmobiliarios — HubSpot stage conditions, Pipedrive, etc.):**
+
+1. Cada transición relevante deja **nota** en `lead_estado_historial.nota`.
+2. Datos estructurados (fecha visita, inmueble, resultado) van en `metadata` JSONB.
+3. El backend **rechaza** el PATCH si faltan campos obligatorios o la transición/tipoLead no es válida.
+4. Estados terminales siguen usando `motivoCierre` + `notaCierre` (sin metadata obligatoria).
+
+#### Matriz COMPRA — campos al entrar
+
+| Estado destino | Obligatorio | Opcional |
+|----------------|-------------|----------|
+| `CONTACTADO` | — | canal de contacto, nota |
+| `CALIFICADO` | nota | presupuesto, zona, tipo inmueble |
+| `VISITA_AGENDADA` | fecha/hora visita, inmueble/proyecto | modalidad (presencial/virtual), nota |
+| `VISITA_REALIZADA` | resultado (asistió / no-show / cancelada), nota | — |
+| `NEGOCIACION`, `SEPARACION` | nota | monto referencia |
+
+#### Matriz VENTA — campos al entrar
+
+| Estado destino | Obligatorio | Opcional |
+|----------------|-------------|----------|
+| `CONTACTADO` | — | canal, nota |
+| `CALIFICADO` | nota | tipo propiedad, zona, precio esperado |
+| `CAPTACION` | nota | dirección, precio pedido |
+| `EN_COMERCIALIZACION` | nota | — |
+| `NEGOCIACION`, `SEPARACION` | nota | monto referencia |
+
+#### Matriz OTRO
+
+| Estado destino | Obligatorio | Opcional |
+|----------------|-------------|----------|
+| `CONTACTADO` | — | canal, nota |
+| `CALIFICADO` | nota | — |
+
+#### UI
+
+- Detalle `/leads/[id]`: modal al elegir próximo estado (y al reabrir).
+- Tablero `/leads/tablero`: mismo modal al soltar en columna.
+- Timeline muestra nota + metadata legible.
+
+#### Arquitectura de datos (profesional)
+
+| Capa | Tabla | Rol |
+|------|-------|-----|
+| Auditoría | `lead_estado_historial` | Quién/cuándo/desde→hacia + nota breve + metadata ligera (canal, monto ref.) |
+| Agenda | **`lead_visitas`** | Fuente de verdad para calendario, recordatorios, show-rate |
+| Calificación | **`lead_calificaciones`** | Snapshots de presupuesto/zona/tipo al calificar |
+| Futuro | `lead_actividades` | Tareas con fecha (Fase 23) |
+| Futuro | `inmuebles` / `listings` | Catálogo de propiedades (Fase 24) |
+
+Al pasar a `VISITA_AGENDADA` se crea fila en `lead_visitas` (no solo JSON).  
+API agenda: `GET /leads/visitas/agenda?desde=&hasta=&asignado=`.
+
+#### Fases futuras
+
+- **Fase 23:** UI calendario `/agenda` + recordatorios WhatsApp.
+- **Fase 24:** `LeadActividad` + próxima acción.
+- **Fase 25:** catálogo de inmuebles (`Property` / `Listing`).
 
 ---
 
@@ -277,6 +340,25 @@ El front pide `/leads/pipeline/meta?tipoLead=COMPRA|VENTA` y pinta etiquetas cor
 
 - Mapear `CERRADO_GANADO` / `CERRADO_PERDIDO` / `DESCARTADO` → eventos Conversion Leads.  
   Requiere [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) Oleada C.
+
+### Fase 22 — Entidades estructuradas (visitas + calificaciones)
+
+- Tablas `lead_visitas`, `lead_calificaciones`.
+- Crear/cerrar visita al transicionar pipeline (misma transacción que historial).
+- APIs: `GET /leads/visitas/agenda`, `GET /leads/:id/visitas`.
+- UI: panel “Visitas y agenda” en detalle del lead.
+
+**Done:** código + migración `20260901183000`.
+
+### Fase 21 — Campos por transición + notas de seguimiento
+
+- Dominio `campos-transicion-pipeline.ts` + validación en `ActualizarGestionLeadUseCase`.
+- Migración `metadata JSONB` en `lead_estado_historial`.
+- DTO: `notaTransicion`, `metadata`.
+- Meta API: `camposAlEntrar` por estado + `camposReapertura`.
+- UI: modal en detalle y kanban; timeline con metadata.
+
+**Done:** build back + front; tests dominio campos-transicion.
 
 ---
 
@@ -341,8 +423,21 @@ Heurística opcional: palabras en preguntas (`presupuesto`, `visita` → COMPRA;
 - [x] Tablero kanban (`/leads/tablero`, drag → mismo PATCH gestión)
 - [x] CAPI en código (`EnviarEventoConversionLeadUseCase` — requiere dataset CAPI configurado en org)
 
+### 21 — Campos por transición
+- [x] Dominio + validación PATCH gestión
+- [x] Migración `metadata` historial
+- [x] Meta API `camposAlEntrar`
+- [x] UI modal detalle + kanban + timeline
+- [x] `npm run build` back + front
+
+### 22 — Visitas y calificaciones (tablas)
+- [x] `lead_visitas` + `lead_calificaciones`
+- [x] Sincronización al cambiar estado pipeline
+- [x] API agenda + listado por lead
+- [x] Panel visitas en detalle lead
+
 ### Operativo pendiente
-- [ ] `prisma migrate deploy` en producción (migraciones `20260829140000`, `20260829141500`)
+- [ ] `prisma migrate deploy` en producción (incl. `20260901181500`, `20260901183000`)
 - [ ] Smoke: mover lead COMPRA y VENTA por UI + ver historial
 - [ ] Heurística opcional `tipo_lead` desde `field_data` (no bloqueante)
 
@@ -356,4 +451,4 @@ Heurística opcional: palabras en preguntas (`presupuesto`, `visita` → COMPRA;
 
 ---
 
-*Plan profesional inmobiliario: embudos COMPRA y VENTA sobre un motor común de estados + historial. **Código 20.1–20.5 cerrado** — pendiente deploy migraciones + smoke en prod.*
+*Plan profesional inmobiliario: embudos COMPRA y VENTA sobre un motor común de estados + historial. **Código 20.1–21 cerrado** — pendiente deploy migraciones + smoke en prod.*

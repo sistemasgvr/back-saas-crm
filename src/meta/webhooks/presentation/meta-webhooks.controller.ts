@@ -104,8 +104,10 @@ export class MetaWebhooksController {
       'Endpoint público que Meta invoca en tiempo real con los eventos suscritos. Un mismo endpoint recibe ' +
       'dos tipos de payload, distinguidos por `object`: `"page"` con leads nuevos (leadgen) y ' +
       '`"whatsapp_business_account"` con mensajes/estados de WhatsApp entrantes. Verifica el `?token=` propio ' +
-      'y la firma HMAC `X-Hub-Signature-256` del body crudo antes de procesar. Responde 200 de inmediato y ' +
-      'procesa el evento en segundo plano (ingesta idempotente) — Meta no reintenta por errores posteriores al ACK.',
+      'y la firma HMAC `X-Hub-Signature-256` del body crudo, y procesa el evento (ingesta idempotente) antes ' +
+      'de responder 200 — en un runtime serverless, código lanzado después de responder no tiene garantía de ' +
+      'terminar. Meta no reintenta por errores posteriores al ACK, así que un fallo puntual se resuelve vía ' +
+      'backfill manual, no reintento automático.',
   })
   @ApiQuery({
     name: 'token',
@@ -113,8 +115,7 @@ export class MetaWebhooksController {
   })
   @ApiResponse({
     status: 200,
-    description:
-      'Evento aceptado (ACK inmediato; el procesamiento real es asíncrono).',
+    description: 'Evento procesado.',
   })
   @ApiResponse({
     status: 403,
@@ -145,26 +146,33 @@ export class MetaWebhooksController {
       return;
     }
 
-    // ACK inmediato: Meta CRM guidance prefiera 200 rápido + ingest async.
-    // Tradeoff: ya no podemos devolver 5xx para que Meta reintente Graph failures;
-    // confiamos en ingest idempotente + backfill manual.
-    res.status(200).send('OK');
-
+    // Se espera a que termine el procesamiento ANTES de responder — en un
+    // runtime serverless (Vercel) el código async lanzado después de mandar
+    // la respuesta no tiene garantía de terminar: la función puede
+    // congelarse/matarse apenas el response sale, cortando el trabajo a
+    // mitad de camino. Así estuvieron perdiéndose leads en silencio: nunca
+    // tiraban error (no hay nada que loguear si el proceso se congela antes
+    // de llegar al catch), simplemente no terminaban de guardarse. Meta
+    // tolera unos segundos de latencia en el ACK — perder eventos por
+    // ahorrarse ese margen no vale la pena. El procesamiento interno ya es
+    // idempotente y loguea sus propios errores, así que esto nunca tira.
+    //
     // Mismo endpoint/firma para "page" (leadgen) y "whatsapp_business_account"
     // (Fase G3) — Meta permite apuntar ambas suscripciones a la misma URL;
     // se distingue por payload.object (PLAN-GESTION-LEADS-WHATSAPP.md §4.3).
     if (payload.object === 'whatsapp_business_account') {
-      void this.procesarEventosWhatsAppEnBackground(
+      await this.procesarEventosWhatsApp(
         payload as unknown as WhatsappWebhookPayload,
       );
-      return;
+    } else {
+      const eventos = extraerEventosLeadgen(payload);
+      await this.procesarEventosLeadgen(eventos);
     }
 
-    const eventos = extraerEventosLeadgen(payload);
-    void this.procesarEventosEnBackground(eventos);
+    res.status(200).send('OK');
   }
 
-  private async procesarEventosWhatsAppEnBackground(
+  private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
   ): Promise<void> {
     const { mensajes, estados } = extraerEventosWhatsApp(payload);
@@ -192,7 +200,7 @@ export class MetaWebhooksController {
     }
   }
 
-  private async procesarEventosEnBackground(
+  private async procesarEventosLeadgen(
     eventos: ReturnType<typeof extraerEventosLeadgen>,
   ): Promise<void> {
     let procesados = 0;

@@ -56,7 +56,10 @@ export class ProcesarLeadEntranteUseCase {
       throw new PageSinConexionError(pageId);
     }
 
-    // Puede lanzar BadGatewayException — el caller (controller) responde 5xx para que Meta reintente.
+    // Puede lanzar BadGatewayException — el controller ya no la deja escapar
+    // como 5xx (siempre ACK 200 una vez validada la firma), la captura y
+    // loguea; un fallo puntual acá se recupera con el backfill manual, no
+    // con reintento automático de Meta.
     const lead = await this.graph.obtenerLead(leadgenId, pageToken);
 
     // User token preferido para enriquecer nombres (ads_read); Page token como fallback.

@@ -38,6 +38,9 @@ model Usuario {
   leadsAsignados        Lead[]                @relation("LeadAsignado")
   leadsAsignadosPor     Lead[]                @relation("LeadAsignadoPor")
   leadEstadoHistorial   LeadEstadoHistorial[]
+  leadVisitasAsignadas  LeadVisita[]          @relation("LeadVisitaAsignado")
+  leadVisitasCreadas    LeadVisita[]          @relation("LeadVisitaCreadoPor")
+  leadCalificaciones    LeadCalificacion[]    @relation("LeadCalificacionUsuario")
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -240,6 +243,8 @@ model Lead {
   asignadoPorUsuario     Usuario?               @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
   whatsappConversaciones WhatsappConversacion[]
   estadoHistorial        LeadEstadoHistorial[]
+  visitas                LeadVisita[]
+  calificaciones         LeadCalificacion[]
 
   @@unique([organizacionId, idExterno])
   @@index([email])
@@ -273,17 +278,95 @@ model LeadEstadoHistorial {
   hacia        String  @db.VarChar(40)
   motivoCierre String? @map("motivo_cierre") @db.VarChar(80)
   nota         String? @db.VarChar(500)
+  /** Contexto ligero (canal, monto ref.) — visitas/calificaciones viven en sus tablas. */
+  metadata     Json?
   /** Null = cambio hecho por el sistema (ej. alta automática al ingestar el lead). */
   usuarioId String? @map("usuario_id") @db.Uuid
 
   fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
-  lead    Lead     @relation(fields: [leadId], references: [id])
-  usuario Usuario? @relation(fields: [usuarioId], references: [id])
+  lead              Lead                 @relation(fields: [leadId], references: [id])
+  usuario           Usuario?             @relation(fields: [usuarioId], references: [id])
+  visitaAgendo      LeadVisita?          @relation("VisitaHistorialAgendo")
+  visitaCierra      LeadVisita?          @relation("VisitaHistorialCierra")
+  calificacion      LeadCalificacion?    @relation("CalificacionHistorial")
 
   @@index([leadId, fechaCreacion])
   @@index([organizacionId])
   @@map("lead_estado_historial")
+}
+
+/**
+ * Cita / visita a inmueble — fuente de verdad para agenda y recordatorios (Fase 22).
+ * Se crea al pasar a VISITA_AGENDADA y se cierra al pasar a VISITA_REALIZADA.
+ */
+model LeadVisita {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  leadId         String @map("lead_id") @db.Uuid
+
+  programadaEn       DateTime @map("programada_en") @db.Timestamptz
+  referenciaInmueble String   @map("referencia_inmueble") @db.VarChar(300)
+  direccion          String?  @db.VarChar(300)
+  modalidad          String   @default("PRESENCIAL") @db.VarChar(20)
+  puntoEncuentro     String?  @map("punto_encuentro") @db.VarChar(300)
+
+  /** PROGRAMADA | REALIZADA | NO_SHOW | CANCELADA */
+  estado    String  @default("PROGRAMADA") @db.VarChar(20)
+  /** ASISTIO | NO_SHOW | CANCELADA — al cerrar la visita */
+  resultado String? @db.VarChar(20)
+  nota      String? @db.VarChar(500)
+  feedback  String? @db.VarChar(500)
+
+  historialAgendoId String? @unique @map("historial_agendo_id") @db.Uuid
+  historialCierraId String? @unique @map("historial_cierra_id") @db.Uuid
+
+  asignadoUsuarioId  String? @map("asignado_usuario_id") @db.Uuid
+  creadoPorUsuarioId String? @map("creado_por_usuario_id") @db.Uuid
+
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  lead            Lead                 @relation(fields: [leadId], references: [id])
+  historialAgendo LeadEstadoHistorial? @relation("VisitaHistorialAgendo", fields: [historialAgendoId], references: [id])
+  historialCierra LeadEstadoHistorial? @relation("VisitaHistorialCierra", fields: [historialCierraId], references: [id])
+  asignadoUsuario Usuario?             @relation("LeadVisitaAsignado", fields: [asignadoUsuarioId], references: [id])
+  creadoPorUsuario Usuario?            @relation("LeadVisitaCreadoPor", fields: [creadoPorUsuarioId], references: [id])
+
+  @@index([organizacionId, programadaEn])
+  @@index([leadId, programadaEn])
+  @@index([asignadoUsuarioId, programadaEn])
+  @@index([organizacionId, estado, programadaEn])
+  @@map("lead_visitas")
+}
+
+/**
+ * Snapshot de calificación comercial — al pasar a CALIFICADO (Fase 22).
+ */
+model LeadCalificacion {
+  id             String  @id @default(uuid()) @db.Uuid
+  organizacionId String  @map("organizacion_id") @db.Uuid
+  leadId         String  @map("lead_id") @db.Uuid
+  tipoLead       String? @map("tipo_lead") @db.VarChar(40)
+
+  presupuesto      String? @db.VarChar(120)
+  zona             String? @db.VarChar(120)
+  tipoInmueble     String? @map("tipo_inmueble") @db.VarChar(120)
+  tipoPropiedad    String? @map("tipo_propiedad") @db.VarChar(120)
+  precioReferencia String? @map("precio_referencia") @db.VarChar(120)
+  nota             String  @db.VarChar(500)
+
+  historialId String? @unique @map("historial_id") @db.Uuid
+  usuarioId   String? @map("usuario_id") @db.Uuid
+  fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  lead      Lead                 @relation(fields: [leadId], references: [id])
+  historial LeadEstadoHistorial? @relation("CalificacionHistorial", fields: [historialId], references: [id])
+  usuario   Usuario?             @relation("LeadCalificacionUsuario", fields: [usuarioId], references: [id])
+
+  @@index([leadId, fechaCreacion])
+  @@index([organizacionId])
+  @@map("lead_calificaciones")
 }
 
 model MetaConexion {

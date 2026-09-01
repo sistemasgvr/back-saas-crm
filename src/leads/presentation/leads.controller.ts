@@ -36,6 +36,8 @@ import { ActualizarGestionLeadUseCase } from '../application/use-cases/actualiza
 import { ObtenerHistorialLeadUseCase } from '../application/use-cases/obtener-historial-lead.use-case';
 import { ObtenerMetaPipelineUseCase } from '../application/use-cases/obtener-meta-pipeline.use-case';
 import { ListarTableroLeadsUseCase } from '../application/use-cases/listar-tablero-leads.use-case';
+import { ListarAgendaVisitasUseCase } from '../application/use-cases/listar-agenda-visitas.use-case';
+import { ListarVisitasLeadUseCase } from '../application/use-cases/listar-visitas-lead.use-case';
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../application/ports/leads-lectura.repository.port';
 import { ListarLeadsQueryDto } from './dto/listar-leads.query.dto';
@@ -58,6 +60,8 @@ export class LeadsController {
     private readonly obtenerHistorial: ObtenerHistorialLeadUseCase,
     private readonly obtenerMetaPipeline: ObtenerMetaPipelineUseCase,
     private readonly listarTablero: ListarTableroLeadsUseCase,
+    private readonly listarAgendaVisitas: ListarAgendaVisitasUseCase,
+    private readonly listarVisitasLead: ListarVisitasLeadUseCase,
     @Inject(LEADS_LECTURA_REPOSITORY)
     private readonly leadsLectura: LeadsLecturaRepository,
   ) {}
@@ -150,6 +154,28 @@ export class LeadsController {
     });
   }
 
+  @Get('visitas/agenda')
+  @ApiOperation({
+    summary: 'Agenda de visitas (calendario)',
+    description:
+      'Lista visitas programadas en un rango de fechas — fuente de verdad para vista calendario y recordatorios.',
+  })
+  @ApiQuery({ name: 'desde', required: true, description: 'ISO 8601 inicio del rango' })
+  @ApiQuery({ name: 'hasta', required: true, description: 'ISO 8601 fin del rango' })
+  @ApiQuery({ name: 'asignado', required: false, description: '"mios" o UUID de asesor (admin)' })
+  agendaVisitas(
+    @CurrentUser() ctx: RequestContext,
+    @Query('desde') desde: string,
+    @Query('hasta') hasta: string,
+    @Query('asignado') asignado?: string,
+  ) {
+    return this.listarAgendaVisitas.execute(
+      ctx.organizacionId!,
+      { desde, hasta, asignado },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Obtener un lead por id' })
   @ApiResponse({
@@ -189,6 +215,21 @@ export class LeadsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.obtenerHistorial.execute(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Get(':id/visitas')
+  @ApiOperation({
+    summary: 'Visitas de un lead',
+    description: 'Historial de citas/visitas estructuradas — para detalle y seguimiento.',
+  })
+  visitasLead(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.listarVisitasLead.execute(ctx.organizacionId!, id, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });

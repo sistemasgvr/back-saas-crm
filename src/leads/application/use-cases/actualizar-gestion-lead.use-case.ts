@@ -23,6 +23,16 @@ import {
   motivosGanado,
   requiereTipoLeadDefinido,
 } from '../../../shared/domain/pipeline-inmobiliaria';
+import {
+  extraerMetadataTransicion,
+  validarTransicionPipeline,
+} from '../../../shared/domain/campos-transicion-pipeline';
+import {
+  construirCalificacionDesdeMetadata,
+  construirCierreVisitaDesdeMetadata,
+  construirVisitaDesdeMetadata,
+  metadataHistorialLigera,
+} from '../../../shared/domain/entidades-transicion-pipeline';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -31,6 +41,8 @@ export interface ActualizarGestionInput {
   estadoGestion?: string;
   motivoCierre?: string | null;
   notaCierre?: string | null;
+  notaTransicion?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function motivosValidosParaEstado(
@@ -149,7 +161,9 @@ export class ActualizarGestionLeadUseCase {
       estadoGestionFinal,
       tipoLeadEfectivo,
     );
-    if (motivosValidos && estadoGestionFinal !== lead.estadoGestion) {
+    const huboCambioDeEstado = estadoGestionFinal !== lead.estadoGestion;
+
+    if (motivosValidos && huboCambioDeEstado) {
       const motivo = input.motivoCierre;
       if (!motivo || !motivosValidos.includes(motivo)) {
         throw new BadRequestException(
@@ -158,15 +172,95 @@ export class ActualizarGestionLeadUseCase {
       }
     }
 
+    // 4) Campos de transición (nota + metadata) según estado destino.
+    let esReapertura = false;
+    if (
+      huboCambioDeEstado &&
+      input.estadoGestion !== undefined &&
+      esEstadoTerminal(lead.estadoGestion)
+    ) {
+      esReapertura = true;
+    }
+
+    if (huboCambioDeEstado && !motivosValidos) {
+      const validacion = validarTransicionPipeline(
+        tipoLeadEfectivo,
+        estadoGestionFinal,
+        {
+          notaTransicion: input.notaTransicion,
+          metadata: input.metadata,
+        },
+        { esReapertura },
+      );
+      if (!validacion.valido) {
+        throw new BadRequestException(validacion.errores.join('. '));
+      }
+    }
+
+    const metadataExtraida =
+      huboCambioDeEstado && !motivosValidos
+        ? extraerMetadataTransicion(
+            tipoLeadEfectivo,
+            estadoGestionFinal,
+            input.metadata,
+            { esReapertura },
+          )
+        : null;
+
+    const metadataHistorial =
+      huboCambioDeEstado && !motivosValidos
+        ? metadataHistorialLigera(estadoGestionFinal, metadataExtraida)
+        : null;
+
+    const crearVisita =
+      huboCambioDeEstado && estadoGestionFinal === 'VISITA_AGENDADA'
+        ? construirVisitaDesdeMetadata(metadataExtraida, {
+            asignadoUsuarioId: lead.asignadoUsuarioId,
+            creadoPorUsuarioId: ctx.usuarioId,
+            notaTransicion: input.notaTransicion,
+          })
+        : null;
+
+    if (huboCambioDeEstado && estadoGestionFinal === 'VISITA_AGENDADA' && !crearVisita) {
+      throw new BadRequestException(
+        'No se pudo registrar la visita — revisa fecha/hora e inmueble',
+      );
+    }
+
+    const cerrarVisita =
+      huboCambioDeEstado && estadoGestionFinal === 'VISITA_REALIZADA'
+        ? construirCierreVisitaDesdeMetadata(metadataExtraida, input.notaTransicion)
+        : null;
+
+    if (huboCambioDeEstado && estadoGestionFinal === 'VISITA_REALIZADA' && !cerrarVisita) {
+      throw new BadRequestException('Falta el resultado de la visita');
+    }
+
+    const crearCalificacion =
+      huboCambioDeEstado && estadoGestionFinal === 'CALIFICADO'
+        ? construirCalificacionDesdeMetadata(
+            tipoLeadEfectivo,
+            metadataExtraida,
+            input.notaTransicion,
+            ctx.usuarioId,
+          )
+        : null;
+
+    if (huboCambioDeEstado && estadoGestionFinal === 'CALIFICADO' && !crearCalificacion) {
+      throw new BadRequestException('Falta la nota de calificación');
+    }
+
+    const notaHistorial = huboCambioDeEstado
+      ? motivosValidos
+        ? (input.notaCierre ?? null)
+        : (input.notaTransicion ?? null)
+      : null;
+
     // Solo un cambio de ESTADO es una fila de historial válida — el
     // historial es una línea de tiempo de transiciones de pipeline, no de
     // cualquier cambio. Un tipoLead nuevo que no mueve el estado (porque ya
     // era uno común a los tres embudos, regla §4.1.5) no genera fila: si no,
     // quedaría un renglón sin sentido tipo "Contactado → Contactado".
-    const huboCambioDeEstado = estadoGestionFinal !== lead.estadoGestion;
-    // Generado acá (no por Prisma) para poder usarlo también como event_id
-    // de deduplicación al mandar el evento a Conversions API, sin depender
-    // de lo que devuelva la transacción.
     const historialId = randomUUID();
 
     await this.leads.actualizarGestion(
@@ -188,8 +282,12 @@ export class ActualizarGestionLeadUseCase {
             desde: lead.estadoGestion,
             hacia: estadoGestionFinal,
             motivoCierre: input.motivoCierre,
-            nota: input.notaCierre,
+            nota: notaHistorial,
+            metadata: metadataHistorial,
             usuarioId: ctx.usuarioId,
+            crearVisita: crearVisita ?? undefined,
+            cerrarVisita: cerrarVisita ?? undefined,
+            crearCalificacion: crearCalificacion ?? undefined,
           }
         : undefined,
     );

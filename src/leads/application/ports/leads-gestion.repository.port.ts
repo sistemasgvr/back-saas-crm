@@ -26,7 +26,32 @@ export interface RegistrarHistorialInput {
   hacia: string;
   motivoCierre?: string | null;
   nota?: string | null;
+  metadata?: Record<string, string> | null;
   usuarioId?: string;
+  crearVisita?: {
+    id: string;
+    programadaEn: Date;
+    referenciaInmueble: string;
+    modalidad: string;
+    nota?: string | null;
+    asignadoUsuarioId: string | null;
+    creadoPorUsuarioId: string;
+  };
+  cerrarVisita?: {
+    resultado: string;
+    feedback?: string | null;
+  };
+  crearCalificacion?: {
+    id: string;
+    tipoLead: string | null;
+    presupuesto?: string | null;
+    zona?: string | null;
+    tipoInmueble?: string | null;
+    tipoPropiedad?: string | null;
+    precioReferencia?: string | null;
+    nota: string;
+    usuarioId: string;
+  };
 }
 
 export interface HistorialEstadoRow {
@@ -36,6 +61,24 @@ export interface HistorialEstadoRow {
   hacia: string;
   motivoCierre: string | null;
   nota: string | null;
+  metadata: Record<string, string> | null;
+  visita: {
+    id: string;
+    programadaEn: Date;
+    referenciaInmueble: string;
+    modalidad: string;
+    estado: string;
+    resultado: string | null;
+  } | null;
+  calificacion: {
+    id: string;
+    presupuesto: string | null;
+    zona: string | null;
+    tipoInmueble: string | null;
+    tipoPropiedad: string | null;
+    precioReferencia: string | null;
+    nota: string;
+  } | null;
   usuario: { id: string; nombre: string } | null;
   fechaCreacion: Date;
 }

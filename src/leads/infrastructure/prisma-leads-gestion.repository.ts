@@ -93,8 +93,8 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     usuarioEdicion: string,
     historial?: RegistrarHistorialInput,
   ): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.lead.updateMany({
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lead.updateMany({
         where: { id, organizacionId, estado: 1 },
         data: {
           ...(cambios.tipoLead !== undefined
@@ -115,25 +115,93 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
             : {}),
           usuarioEdicion,
         },
-      }),
-      ...(historial
-        ? [
-            this.prisma.leadEstadoHistorial.create({
-              data: {
-                id: historial.id,
-                organizacionId: historial.organizacionId,
-                leadId: historial.leadId,
-                tipoLead: historial.tipoLead,
-                desde: historial.desde,
-                hacia: historial.hacia,
-                motivoCierre: historial.motivoCierre,
-                nota: historial.nota,
-                usuarioId: historial.usuarioId,
-              },
-            }),
-          ]
-        : []),
-    ]);
+      });
+
+      if (!historial) return;
+
+      await tx.leadEstadoHistorial.create({
+        data: {
+          id: historial.id,
+          organizacionId: historial.organizacionId,
+          leadId: historial.leadId,
+          tipoLead: historial.tipoLead,
+          desde: historial.desde,
+          hacia: historial.hacia,
+          motivoCierre: historial.motivoCierre,
+          nota: historial.nota,
+          metadata: historial.metadata ?? undefined,
+          usuarioId: historial.usuarioId,
+        },
+      });
+
+      if (historial.crearVisita) {
+        const v = historial.crearVisita;
+        await tx.leadVisita.create({
+          data: {
+            id: v.id,
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            programadaEn: v.programadaEn,
+            referenciaInmueble: v.referenciaInmueble,
+            modalidad: v.modalidad,
+            nota: v.nota,
+            estado: 'PROGRAMADA',
+            historialAgendoId: historial.id,
+            asignadoUsuarioId: v.asignadoUsuarioId,
+            creadoPorUsuarioId: v.creadoPorUsuarioId,
+          },
+        });
+      }
+
+      if (historial.crearCalificacion) {
+        const c = historial.crearCalificacion;
+        await tx.leadCalificacion.create({
+          data: {
+            id: c.id,
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            tipoLead: c.tipoLead,
+            presupuesto: c.presupuesto,
+            zona: c.zona,
+            tipoInmueble: c.tipoInmueble,
+            tipoPropiedad: c.tipoPropiedad,
+            precioReferencia: c.precioReferencia,
+            nota: c.nota,
+            historialId: historial.id,
+            usuarioId: c.usuarioId,
+          },
+        });
+      }
+
+      if (historial.cerrarVisita) {
+        const visitaAbierta = await tx.leadVisita.findFirst({
+          where: {
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            estado: 'PROGRAMADA',
+          },
+          orderBy: { programadaEn: 'desc' },
+        });
+        if (visitaAbierta) {
+          const resultado = historial.cerrarVisita.resultado;
+          const estado =
+            resultado === 'ASISTIO'
+              ? 'REALIZADA'
+              : resultado === 'NO_SHOW'
+                ? 'NO_SHOW'
+                : 'CANCELADA';
+          await tx.leadVisita.update({
+            where: { id: visitaAbierta.id },
+            data: {
+              estado,
+              resultado,
+              feedback: historial.cerrarVisita.feedback,
+              historialCierraId: historial.id,
+            },
+          });
+        }
+      }
+    });
   }
 
   async listarHistorial(
@@ -144,6 +212,27 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
       where: { organizacionId, leadId },
       include: {
         usuario: { select: { id: true, nombre: true, apellido: true } },
+        visitaAgendo: {
+          select: {
+            id: true,
+            programadaEn: true,
+            referenciaInmueble: true,
+            modalidad: true,
+            estado: true,
+            resultado: true,
+          },
+        },
+        calificacion: {
+          select: {
+            id: true,
+            presupuesto: true,
+            zona: true,
+            tipoInmueble: true,
+            tipoPropiedad: true,
+            precioReferencia: true,
+            nota: true,
+          },
+        },
       },
       orderBy: { fechaCreacion: 'asc' },
     });
@@ -154,6 +243,14 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
       hacia: f.hacia,
       motivoCierre: f.motivoCierre,
       nota: f.nota,
+      metadata:
+        f.metadata &&
+        typeof f.metadata === 'object' &&
+        !Array.isArray(f.metadata)
+          ? (f.metadata as Record<string, string>)
+          : null,
+      visita: f.visitaAgendo,
+      calificacion: f.calificacion,
       usuario: f.usuario
         ? {
             id: f.usuario.id,

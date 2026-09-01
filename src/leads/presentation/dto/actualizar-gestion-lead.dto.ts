@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
 import {
   TODOS_LOS_ESTADOS_GESTION,
@@ -43,4 +43,25 @@ export class ActualizarGestionLeadDto {
   @IsString()
   @MaxLength(500)
   notaCierre?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 500,
+    description:
+      'Nota de seguimiento al avanzar a un estado no terminal (calificado, visita, negociación, etc.).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notaTransicion?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Datos estructurados según el estado destino (fecha de visita, inmueble, resultado, etc.). ' +
+      'Ver GET /leads/pipeline/meta → camposAlEntrar por estado.',
+    type: 'object',
+    additionalProperties: true,
+  })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }
