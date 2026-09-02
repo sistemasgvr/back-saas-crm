@@ -36,12 +36,14 @@ import { ListarConversacionesUseCase } from '../application/use-cases/listar-con
 import { ContarNoLeidosWhatsAppUseCase } from '../application/use-cases/contar-no-leidos-whatsapp.use-case';
 import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-conversacion.use-case';
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
+import { EnviarReaccionWhatsAppUseCase } from '../application/use-cases/enviar-reaccion-whatsapp.use-case';
 import { EnviarMediaWhatsAppUseCase } from '../application/use-cases/enviar-media-whatsapp.use-case';
 import { ObtenerMediaMensajeUseCase } from '../application/use-cases/obtener-media-mensaje.use-case';
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from '../application/use-cases/crear-plantilla.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from '../application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
+import { EnviarReaccionDto } from './dto/enviar-reaccion.dto';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { SubirMediaDto } from './dto/subir-media.dto';
 
@@ -61,6 +63,7 @@ export class WhatsappChatsController {
     private readonly contarNoLeidos: ContarNoLeidosWhatsAppUseCase,
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
+    private readonly enviarReaccion: EnviarReaccionWhatsAppUseCase,
     private readonly enviarMedia: EnviarMediaWhatsAppUseCase,
     private readonly obtenerMedia: ObtenerMediaMensajeUseCase,
     private readonly listarPlantillas: ListarPlantillasUseCase,
@@ -238,6 +241,39 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  @Post(':id/messages/:mensajeId/reaction')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Reaccionar (o sacar la reacción) a un mensaje',
+    description:
+      'Manda un emoji como reacción sobre un mensaje ya enviado/recibido en esta conversación. Mandar `emoji` ' +
+      'vacío ("") saca la reacción que ya estuviera puesta — es el mismo endpoint para poner y sacar.',
+  })
+  @ApiParam({ name: 'id', description: 'Id de la conversación' })
+  @ApiParam({ name: 'mensajeId', description: 'Id del mensaje a reaccionar' })
+  @ApiResponse({ status: 204, description: 'Reacción aplicada.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description:
+      'La conversación o el mensaje no existen, o el rol no puede escribir en ella.',
+  })
+  reaccionar(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('mensajeId', ParseUUIDPipe) mensajeId: string,
+    @Body() dto: EnviarReaccionDto,
+  ) {
+    return this.enviarReaccion.execute(
+      ctx.organizacionId!,
+      id,
+      mensajeId,
+      dto.emoji,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
   }
 
   @Post(':id/media')

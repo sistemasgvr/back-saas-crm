@@ -319,6 +319,15 @@ export interface MetaGraphClient {
     para: string,
     texto: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
+  /** POST /{phone-number-id}/messages type=reaction — emoji vacío ("") saca
+   * la reacción que ya estuviera puesta, no hace falta un endpoint aparte. */
+  enviarReaccionWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    wamidObjetivo: string,
+    emoji: string,
+  ): Promise<void>;
   /** POST /{phone-number-id}/messages type=template — primer contacto o fuera
    * de la ventana 24h; requiere plantilla ya aprobada por Meta. */
   enviarMensajePlantillaWhatsApp(

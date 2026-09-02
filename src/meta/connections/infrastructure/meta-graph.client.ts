@@ -834,6 +834,26 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return { wamid: data.messages[0].id };
   }
 
+  async enviarReaccionWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    wamidObjetivo: string,
+    emoji: string,
+  ): Promise<void> {
+    await this.postJson(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'reaction',
+        reaction: { message_id: wamidObjetivo, emoji },
+      },
+      accessToken,
+    );
+  }
+
   async enviarMensajePlantillaWhatsApp(
     phoneNumberId: string,
     accessToken: string,

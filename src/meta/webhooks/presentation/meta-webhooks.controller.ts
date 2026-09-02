@@ -23,6 +23,7 @@ import { VerificarWebhookMetaUseCase } from '../application/use-cases/verificar-
 import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
+import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
@@ -38,6 +39,7 @@ export class MetaWebhooksController {
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly procesarMensajeWhatsApp: ProcesarMensajeWhatsAppEntranteUseCase,
     private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
+    private readonly procesarReaccionWhatsApp: ProcesarReaccionWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -175,7 +177,7 @@ export class MetaWebhooksController {
   private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
   ): Promise<void> {
-    const { mensajes, estados } = extraerEventosWhatsApp(payload);
+    const { mensajes, estados, reacciones } = extraerEventosWhatsApp(payload);
 
     for (const evento of mensajes) {
       try {
@@ -194,6 +196,17 @@ export class MetaWebhooksController {
       } catch (error) {
         this.logger.error(
           `Error procesando estado WhatsApp ${evento.wamid}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
+    for (const evento of reacciones) {
+      try {
+        await this.procesarReaccionWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando reacción WhatsApp sobre ${evento.wamidObjetivo}`,
           error instanceof Error ? error.stack : error,
         );
       }

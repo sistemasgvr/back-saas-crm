@@ -791,6 +791,14 @@ model WhatsappMensaje {
    */
   estadoEntrega   String?  @map("estado_entrega") @db.VarChar(20)
   errorMensaje    String?  @map("error_mensaje")
+  /**
+   * Reacción (emoji) que puso el agente/nuestra org sobre este mensaje —
+   * null si ninguna. Vacía-string no se guarda: quitar una reacción deja
+   * este campo en null otra vez, igual que "sin reaccionar".
+   */
+  reaccionAgente  String?  @map("reaccion_agente") @db.VarChar(20)
+  /** Reacción que puso el contacto sobre este mensaje — mismo criterio. */
+  reaccionCliente String?  @map("reaccion_cliente") @db.VarChar(20)
   datosCrudos     Json     @map("datos_crudos")
   /**
    * Timestamp real de Meta (puede diferir de fechaCreacion si el webhook llega tarde).

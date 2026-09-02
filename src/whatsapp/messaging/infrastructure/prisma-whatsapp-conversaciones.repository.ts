@@ -5,6 +5,7 @@ import type {
   ConversacionResumen,
   FiltroVisibilidadChats,
   MediaMensaje,
+  MensajeParaReaccion,
   MensajeRow,
   RegistrarMensajeInput,
   WhatsappConversacionesRepository,
@@ -134,7 +135,42 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       mediaCaption: m.mediaCaption,
       mediaEsVoz: m.mediaEsVoz,
       mediaTamanoBytes: m.mediaTamanoBytes,
+      reaccionAgente: m.reaccionAgente,
+      reaccionCliente: m.reaccionCliente,
     }));
+  }
+
+  async buscarMensajeParaReaccion(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MensajeParaReaccion | null> {
+    const mensaje = await this.prisma.whatsappMensaje.findFirst({
+      where: { id: mensajeId, organizacionId },
+      select: { id: true, wamid: true, whatsappConversacionId: true },
+    });
+    return mensaje;
+  }
+
+  async actualizarReaccionAgente(
+    organizacionId: string,
+    mensajeId: string,
+    emoji: string | null,
+  ): Promise<void> {
+    await this.prisma.whatsappMensaje.updateMany({
+      where: { id: mensajeId, organizacionId },
+      data: { reaccionAgente: emoji },
+    });
+  }
+
+  async actualizarReaccionCliente(
+    organizacionId: string,
+    wamidObjetivo: string,
+    emoji: string | null,
+  ): Promise<void> {
+    await this.prisma.whatsappMensaje.updateMany({
+      where: { organizacionId, wamid: wamidObjetivo },
+      data: { reaccionCliente: emoji },
+    });
   }
 
   async marcarLeida(id: string): Promise<void> {

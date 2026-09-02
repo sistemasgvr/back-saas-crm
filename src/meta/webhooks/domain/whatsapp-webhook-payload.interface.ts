@@ -21,6 +21,10 @@ export interface WhatsappWebhookPayload {
           audio?: MetaMediaObjeto & { voice?: boolean };
           document?: MetaMediaObjeto & { filename?: string };
           sticker?: MetaMediaObjeto & { animated?: boolean };
+          /** Solo presente cuando type === 'reaction' — message_id apunta
+           * al wamid del mensaje NUESTRO que el contacto reaccionó, no al
+           * id de este evento. emoji vacío significa que sacó la reacción. */
+          reaction?: { message_id?: string; emoji?: string };
         }[];
         statuses?: {
           id?: string;
@@ -61,6 +65,14 @@ export interface EventoMensajeWhatsApp {
   raw: unknown;
 }
 
+export interface EventoReaccionWhatsApp {
+  phoneNumberId: string;
+  /** wamid del mensaje NUESTRO que fue reaccionado, no de este evento. */
+  wamidObjetivo: string;
+  /** Vacío = el contacto sacó su reacción. */
+  emoji: string;
+}
+
 export interface EventoEstadoWhatsApp {
   phoneNumberId: string;
   wamid: string;
@@ -95,9 +107,11 @@ export function traducirEstadoWhatsApp(statusMeta: string): string {
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   mensajes: EventoMensajeWhatsApp[];
   estados: EventoEstadoWhatsApp[];
+  reacciones: EventoReaccionWhatsApp[];
 } {
   const mensajes: EventoMensajeWhatsApp[] = [];
   const estados: EventoEstadoWhatsApp[] = [];
+  const reacciones: EventoReaccionWhatsApp[] = [];
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -112,6 +126,21 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
 
       for (const mensaje of value?.messages ?? []) {
         if (!mensaje.id || !mensaje.from) continue;
+
+        // Una reacción no es un mensaje de chat nuevo — es metadata que se
+        // pega sobre un mensaje NUESTRO ya existente (reaction.message_id).
+        // Va a un array aparte, no a `mensajes`.
+        if (mensaje.type === 'reaction') {
+          if (mensaje.reaction?.message_id) {
+            reacciones.push({
+              phoneNumberId,
+              wamidObjetivo: mensaje.reaction.message_id,
+              emoji: mensaje.reaction.emoji ?? '',
+            });
+          }
+          continue;
+        }
+
         const objetoMedia =
           mensaje.image ??
           mensaje.video ??
@@ -152,5 +181,5 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
     }
   }
 
-  return { mensajes, estados };
+  return { mensajes, estados, reacciones };
 }

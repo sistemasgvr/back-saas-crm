@@ -35,6 +35,16 @@ export interface MensajeRow {
   mediaCaption: string | null;
   mediaEsVoz: boolean | null;
   mediaTamanoBytes: number | null;
+  /** Emoji que puso nuestra org sobre este mensaje — null si ninguno. */
+  reaccionAgente: string | null;
+  /** Emoji que puso el contacto sobre este mensaje — null si ninguno. */
+  reaccionCliente: string | null;
+}
+
+export interface MensajeParaReaccion {
+  id: string;
+  wamid: string;
+  whatsappConversacionId: string;
 }
 
 export interface MediaMensaje {
@@ -139,5 +149,27 @@ export interface WhatsappConversacionesRepository {
     organizacionId: string,
     wamid: string,
     estado: string,
+  ): Promise<void>;
+
+  /** Para resolver el wamid real (lo que pide Graph API) a partir del id
+   * propio del mensaje — con chequeo de organización incluido. */
+  buscarMensajeParaReaccion(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MensajeParaReaccion | null>;
+
+  /** Reacción que PONEMOS nosotros sobre un mensaje — emoji null = sin reacción. */
+  actualizarReaccionAgente(
+    organizacionId: string,
+    mensajeId: string,
+    emoji: string | null,
+  ): Promise<void>;
+
+  /** Reacción que puso el CONTACTO — se busca por wamid porque el webhook
+   * solo conoce el id de Meta, no el id propio de la fila. */
+  actualizarReaccionCliente(
+    organizacionId: string,
+    wamidObjetivo: string,
+    emoji: string | null,
   ): Promise<void>;
 }
