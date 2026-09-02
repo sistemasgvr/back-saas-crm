@@ -799,6 +799,17 @@ model WhatsappMensaje {
   reaccionAgente  String?  @map("reaccion_agente") @db.VarChar(20)
   /** Reacción que puso el contacto sobre este mensaje — mismo criterio. */
   reaccionCliente String?  @map("reaccion_cliente") @db.VarChar(20)
+  /**
+   * Respuesta contextual (citar un mensaje anterior) — PLAN Fase reacciones/
+   * respuestas. Null si el mensaje no responde a nada. Se resuelve al id
+   * PROPIO del mensaje citado (no al wamid) para poder traer su contenido
+   * con un include, sin una segunda consulta. Si el mensaje citado no está
+   * en nuestra base (muy viejo, o Meta no mandó el wamid), queda null — el
+   * mensaje igual se guarda, solo sin la cita visual.
+   */
+  respondeAMensajeId String?           @map("responde_a_mensaje_id") @db.Uuid
+  respondeA          WhatsappMensaje?  @relation("RespuestaAMensaje", fields: [respondeAMensajeId], references: [id])
+  respuestas         WhatsappMensaje[] @relation("RespuestaAMensaje")
   datosCrudos     Json     @map("datos_crudos")
   /**
    * Timestamp real de Meta (puede diferir de fechaCreacion si el webhook llega tarde).

@@ -31,6 +31,10 @@ export interface EnviarMensajeInput {
    * GET /whatsapp/chats/templates, así no hace falta una vuelta extra a
    * Graph API solo para saber cómo armar el envío. */
   plantillaFormatoParametros?: string;
+  /** Id PROPIO (no wamid) del mensaje al que este responde — "Responder" del
+   * chat, como citar un mensaje en WhatsApp. Solo aplica al camino de texto
+   * de sesión; Meta no soporta cita al responder con plantilla. */
+  respondeAMensajeId?: string;
 }
 
 @Injectable()
@@ -99,11 +103,27 @@ export class EnviarMensajeWhatsAppUseCase {
       if (!input.texto) {
         throw new BadRequestException('Falta el texto del mensaje de sesión');
       }
+
+      let respondeAWamid: string | undefined;
+      if (input.respondeAMensajeId) {
+        const citado = await this.conversaciones.buscarMensajePorId(
+          organizacionId,
+          input.respondeAMensajeId,
+        );
+        if (!citado || citado.whatsappConversacionId !== conversacionId) {
+          throw new NotFoundException(
+            'El mensaje citado no existe en esta conversación',
+          );
+        }
+        respondeAWamid = citado.wamid;
+      }
+
       resultado = await this.graph.enviarMensajeTextoWhatsApp(
         conexionActiva.phoneNumberId,
         accessToken,
         conversacion.waId,
         input.texto,
+        respondeAWamid,
       );
       tipo = 'text';
     } else {
@@ -140,6 +160,9 @@ export class EnviarMensajeWhatsAppUseCase {
       },
       fechaMensaje: new Date(),
       usuarioCreacion: ctx.usuarioId,
+      respondeAMensajeId: dentroDeVentana
+        ? input.respondeAMensajeId
+        : undefined,
     });
   }
 }

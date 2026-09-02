@@ -819,6 +819,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     accessToken: string,
     para: string,
     texto: string,
+    respondeAWamid?: string,
   ): Promise<MetaMensajeWhatsAppEnviado> {
     const data = await this.postJson<{ messages: { id: string }[] }>(
       `/${phoneNumberId}/messages`,
@@ -828,6 +829,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         to: para,
         type: 'text',
         text: { body: texto },
+        ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),
       },
       accessToken,
     );
@@ -999,7 +1001,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     para: string,
     tipo: TipoMediaWhatsApp,
     mediaId: string,
-    opciones?: { caption?: string; filename?: string },
+    opciones?: { caption?: string; filename?: string; respondeAWamid?: string },
   ): Promise<MetaMensajeWhatsAppEnviado> {
     // Meta no admite caption en audio/sticker, y filename solo en document.
     const objetoMedia: Record<string, unknown> = { id: mediaId };
@@ -1018,6 +1020,9 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         to: para,
         type: tipo,
         [tipo]: objetoMedia,
+        ...(opciones?.respondeAWamid
+          ? { context: { message_id: opciones.respondeAWamid } }
+          : {}),
       },
       accessToken,
     );

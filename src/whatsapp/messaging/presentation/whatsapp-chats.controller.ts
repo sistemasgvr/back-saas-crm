@@ -329,6 +329,7 @@ export class WhatsappChatsController {
         mimeType: archivo.mimetype,
         nombreArchivo: archivo.originalname,
         caption: dto.caption,
+        respondeAMensajeId: dto.respondeAMensajeId,
       },
       { usuarioId: ctx.usuarioId, rol: ctx.rol! },
     );

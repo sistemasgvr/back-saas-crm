@@ -25,6 +25,9 @@ export interface WhatsappWebhookPayload {
            * al wamid del mensaje NUESTRO que el contacto reaccionó, no al
            * id de este evento. emoji vacío significa que sacó la reacción. */
           reaction?: { message_id?: string; emoji?: string };
+          /** Presente cuando este mensaje es una respuesta contextual —
+           * "citó" otro mensaje. `id` es el wamid del mensaje citado. */
+          context?: { from?: string; id?: string };
         }[];
         statuses?: {
           id?: string;
@@ -62,6 +65,9 @@ export interface EventoMensajeWhatsApp {
   tipo: string;
   texto?: string;
   media?: MediaEntranteWhatsApp;
+  /** wamid del mensaje que este citó al responder — resolver a nuestro id
+   * propio queda del lado del use-case, acá solo se extrae el dato crudo. */
+  respondeAWamid?: string;
   raw: unknown;
 }
 
@@ -155,6 +161,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
           timestamp: timestampADate(mensaje.timestamp),
           tipo: mensaje.type ?? 'unknown',
           texto: mensaje.text?.body,
+          respondeAWamid: mensaje.context?.id,
           media:
             objetoMedia?.id !== undefined
               ? {

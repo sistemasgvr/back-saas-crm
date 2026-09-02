@@ -39,9 +39,21 @@ export interface MensajeRow {
   reaccionAgente: string | null;
   /** Emoji que puso el contacto sobre este mensaje — null si ninguno. */
   reaccionCliente: string | null;
+  /** Mensaje citado (respuesta contextual) — null si este mensaje no responde a nada. */
+  respondeA: MensajeCitado | null;
 }
 
-export interface MensajeParaReaccion {
+/** Vista chica del mensaje citado — lo justo para pintar la burbujita de cita. */
+export interface MensajeCitado {
+  id: string;
+  direccion: string;
+  tipo: string;
+  texto: string | null;
+  tieneMedia: boolean;
+  mediaCaption: string | null;
+}
+
+export interface MensajeResuelto {
   id: string;
   wamid: string;
   whatsappConversacionId: string;
@@ -81,6 +93,9 @@ export interface RegistrarMensajeInput {
    * (el media_id de Meta solo dura 7 días). Saliente: los bytes que el
    * usuario subió, antes de mandarlos a Meta. */
   mediaBytes?: Buffer;
+  /** Id PROPIO (no wamid) del mensaje que este responde/cita — ya resuelto
+   * por el use-case antes de llamar acá. */
+  respondeAMensajeId?: string;
 }
 
 export interface WhatsappConversacionesRepository {
@@ -152,11 +167,19 @@ export interface WhatsappConversacionesRepository {
   ): Promise<void>;
 
   /** Para resolver el wamid real (lo que pide Graph API) a partir del id
-   * propio del mensaje — con chequeo de organización incluido. */
-  buscarMensajeParaReaccion(
+   * propio del mensaje — con chequeo de organización incluido. Se usa tanto
+   * para reaccionar como para responder/citar un mensaje saliente. */
+  buscarMensajePorId(
     organizacionId: string,
     mensajeId: string,
-  ): Promise<MensajeParaReaccion | null>;
+  ): Promise<MensajeResuelto | null>;
+
+  /** La dirección inversa — el webhook entrante solo conoce el wamid del
+   * mensaje citado, hace falta el id propio para guardar la relación. */
+  buscarIdPorWamid(
+    organizacionId: string,
+    wamid: string,
+  ): Promise<string | null>;
 
   /** Reacción que PONEMOS nosotros sobre un mensaje — emoji null = sin reacción. */
   actualizarReaccionAgente(

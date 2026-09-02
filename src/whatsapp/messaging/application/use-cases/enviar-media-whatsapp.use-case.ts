@@ -24,6 +24,8 @@ export interface EnviarMediaInput {
   mimeType: string;
   nombreArchivo?: string;
   caption?: string;
+  /** Id PROPIO (no wamid) del mensaje al que este responde. */
+  respondeAMensajeId?: string;
 }
 
 /** Envía un archivo (imagen/video/audio/documento/sticker) a un chat —
@@ -100,6 +102,20 @@ export class EnviarMediaWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
+    let respondeAWamid: string | undefined;
+    if (input.respondeAMensajeId) {
+      const citado = await this.conversaciones.buscarMensajePorId(
+        organizacionId,
+        input.respondeAMensajeId,
+      );
+      if (!citado || citado.whatsappConversacionId !== conversacionId) {
+        throw new NotFoundException(
+          'El mensaje citado no existe en esta conversación',
+        );
+      }
+      respondeAWamid = citado.wamid;
+    }
+
     const subido = await this.graph.subirMediaWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
@@ -113,7 +129,7 @@ export class EnviarMediaWhatsAppUseCase {
       conversacion.waId,
       categoria,
       subido.mediaId,
-      { caption: input.caption, filename: input.nombreArchivo },
+      { caption: input.caption, filename: input.nombreArchivo, respondeAWamid },
     );
 
     await this.conversaciones.registrarMensaje({
@@ -137,6 +153,7 @@ export class EnviarMediaWhatsAppUseCase {
       mediaBytes: input.buffer,
       fechaMensaje: new Date(),
       usuarioCreacion: ctx.usuarioId,
+      respondeAMensajeId: input.respondeAMensajeId,
     });
   }
 }

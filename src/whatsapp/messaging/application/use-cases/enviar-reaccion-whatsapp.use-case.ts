@@ -57,7 +57,7 @@ export class EnviarReaccionWhatsAppUseCase {
       );
     }
 
-    const mensaje = await this.conversaciones.buscarMensajeParaReaccion(
+    const mensaje = await this.conversaciones.buscarMensajePorId(
       organizacionId,
       mensajeId,
     );

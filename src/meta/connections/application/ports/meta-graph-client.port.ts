@@ -312,12 +312,16 @@ export interface MetaGraphClient {
     accessToken: string,
     input: CrearPlantillaWhatsAppInput,
   ): Promise<void>;
-  /** POST /{phone-number-id}/messages — sesión libre (dentro de la ventana 24h). */
+  /** POST /{phone-number-id}/messages — sesión libre (dentro de la ventana 24h).
+   * `respondeAWamid`, si viene, agrega `context: { message_id }` al payload —
+   * es lo que hace que Meta muestre la burbuja de "respondió a" en WhatsApp
+   * del contacto (límite de Meta: solo mensajes de los últimos 30 días). */
   enviarMensajeTextoWhatsApp(
     phoneNumberId: string,
     accessToken: string,
     para: string,
     texto: string,
+    respondeAWamid?: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
   /** POST /{phone-number-id}/messages type=reaction — emoji vacío ("") saca
    * la reacción que ya estuviera puesta, no hace falta un endpoint aparte. */
@@ -390,6 +394,6 @@ export interface MetaGraphClient {
     para: string,
     tipo: TipoMediaWhatsApp,
     mediaId: string,
-    opciones?: { caption?: string; filename?: string },
+    opciones?: { caption?: string; filename?: string; respondeAWamid?: string },
   ): Promise<MetaMensajeWhatsAppEnviado>;
 }

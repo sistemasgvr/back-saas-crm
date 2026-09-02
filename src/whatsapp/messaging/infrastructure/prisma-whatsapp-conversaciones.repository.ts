@@ -5,7 +5,7 @@ import type {
   ConversacionResumen,
   FiltroVisibilidadChats,
   MediaMensaje,
-  MensajeParaReaccion,
+  MensajeResuelto,
   MensajeRow,
   RegistrarMensajeInput,
   WhatsappConversacionesRepository,
@@ -119,6 +119,18 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       where: { whatsappConversacionId },
       orderBy: { fechaMensaje: 'asc' },
       take: limite,
+      include: {
+        respondeA: {
+          select: {
+            id: true,
+            direccion: true,
+            tipo: true,
+            texto: true,
+            mediaId: true,
+            mediaCaption: true,
+          },
+        },
+      },
     });
     return mensajes.map((m) => ({
       id: m.id,
@@ -137,18 +149,39 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       mediaTamanoBytes: m.mediaTamanoBytes,
       reaccionAgente: m.reaccionAgente,
       reaccionCliente: m.reaccionCliente,
+      respondeA: m.respondeA
+        ? {
+            id: m.respondeA.id,
+            direccion: m.respondeA.direccion,
+            tipo: m.respondeA.tipo,
+            texto: m.respondeA.texto,
+            tieneMedia: m.respondeA.mediaId !== null,
+            mediaCaption: m.respondeA.mediaCaption,
+          }
+        : null,
     }));
   }
 
-  async buscarMensajeParaReaccion(
+  async buscarMensajePorId(
     organizacionId: string,
     mensajeId: string,
-  ): Promise<MensajeParaReaccion | null> {
+  ): Promise<MensajeResuelto | null> {
     const mensaje = await this.prisma.whatsappMensaje.findFirst({
       where: { id: mensajeId, organizacionId },
       select: { id: true, wamid: true, whatsappConversacionId: true },
     });
     return mensaje;
+  }
+
+  async buscarIdPorWamid(
+    organizacionId: string,
+    wamid: string,
+  ): Promise<string | null> {
+    const mensaje = await this.prisma.whatsappMensaje.findFirst({
+      where: { organizacionId, wamid },
+      select: { id: true },
+    });
+    return mensaje?.id ?? null;
   }
 
   async actualizarReaccionAgente(
@@ -292,6 +325,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         mediaCaption: input.mediaCaption,
         mediaEsVoz: input.mediaEsVoz,
         mediaTamanoBytes: input.mediaTamanoBytes,
+        respondeAMensajeId: input.respondeAMensajeId,
         ...(input.mediaBytes
           ? { media: { create: { bytes: input.mediaBytes } } }
           : {}),

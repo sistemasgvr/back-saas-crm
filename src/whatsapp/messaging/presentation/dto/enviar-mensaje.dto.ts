@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   ValidateNested,
@@ -87,4 +88,12 @@ export class EnviarMensajeDto {
   @IsOptional()
   @IsIn(['NAMED', 'POSITIONAL'])
   plantillaFormatoParametros?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Id propio del mensaje al que se responde/cita — "Responder" del chat. Solo aplica al texto de sesión.',
+  })
+  @IsOptional()
+  @IsUUID()
+  respondeAMensajeId?: string;
 }

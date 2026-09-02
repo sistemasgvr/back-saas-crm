@@ -70,6 +70,17 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         )
       : undefined;
 
+    // El webhook solo trae el wamid del mensaje citado — hace falta el id
+    // propio para guardar la relación (self-relation por id, no por wamid).
+    // Si no se encuentra (mensaje muy viejo, o cita un mensaje que no es
+    // nuestro), simplemente no se guarda la cita — no es un error.
+    const respondeAMensajeId = evento.respondeAWamid
+      ? ((await this.conversaciones.buscarIdPorWamid(
+          conexion.organizacionId,
+          evento.respondeAWamid,
+        )) ?? undefined)
+      : undefined;
+
     const { creado } = await this.conversaciones.registrarMensaje({
       organizacionId: conexion.organizacionId,
       whatsappConversacionId: conversacionId,
@@ -86,6 +97,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       mediaEsVoz: evento.media?.esVoz,
       mediaTamanoBytes: media?.buffer.length,
       mediaBytes: media?.buffer,
+      respondeAMensajeId,
     });
 
     if (!creado) {

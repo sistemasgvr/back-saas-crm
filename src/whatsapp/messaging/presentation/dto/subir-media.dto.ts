@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 /** Multipart/form-data — el archivo en sí viaja como file, no en este DTO
  * (ver `@UploadedFile()` en el controller). */
@@ -13,4 +13,11 @@ export class SubirMediaDto {
   @IsString()
   @MaxLength(1024)
   caption?: string;
+
+  @ApiPropertyOptional({
+    description: 'Id propio del mensaje al que se responde/cita.',
+  })
+  @IsOptional()
+  @IsUUID()
+  respondeAMensajeId?: string;
 }
