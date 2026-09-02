@@ -8,8 +8,8 @@ import type {
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
 import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
 import {
-  estadosPorTipo,
-  etiquetasPorTipo,
+  estadosColumnasTablero,
+  etiquetasColumnasTablero,
 } from '../../../shared/domain/pipeline-inmobiliaria';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
@@ -56,19 +56,19 @@ export class ListarTableroLeadsUseCase {
     asignadoParam: string | undefined,
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ): Promise<{ columnas: ColumnaTablero[] }> {
-    const tipoLeadValido = TIPOS_LEAD_INMOBILIARIA.includes(
+    const tipoFiltro = TIPOS_LEAD_INMOBILIARIA.includes(
       tipoLeadParam as never,
     )
       ? (tipoLeadParam as string)
-      : null;
+      : undefined;
 
     const filas = await this.leads.listarParaTablero(organizacionId, {
-      tipoLead: tipoLeadValido,
+      tipoLead: tipoFiltro,
       asignacion: this.resolverAsignacion(asignadoParam, ctx),
     });
 
-    const etiquetas = etiquetasPorTipo(tipoLeadValido);
-    const columnas = estadosPorTipo(tipoLeadValido).map((codigo) => ({
+    const etiquetas = etiquetasColumnasTablero(tipoFiltro);
+    const columnas = estadosColumnasTablero(tipoFiltro).map((codigo) => ({
       codigo,
       etiqueta: etiquetas[codigo] ?? codigo,
       leads: filas.filter((f) => f.estadoGestion === codigo),

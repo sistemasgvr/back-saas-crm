@@ -201,6 +201,20 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           });
         }
       }
+
+      if (historial.cancelarVisitasProgramadas) {
+        await tx.leadVisita.updateMany({
+          where: {
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            estado: 'PROGRAMADA',
+          },
+          data: {
+            estado: 'CANCELADA',
+            resultado: 'CANCELADA',
+          },
+        });
+      }
     });
   }
 

@@ -36,6 +36,7 @@ import { ActualizarGestionLeadUseCase } from '../application/use-cases/actualiza
 import { ObtenerHistorialLeadUseCase } from '../application/use-cases/obtener-historial-lead.use-case';
 import { ObtenerMetaPipelineUseCase } from '../application/use-cases/obtener-meta-pipeline.use-case';
 import { ListarTableroLeadsUseCase } from '../application/use-cases/listar-tablero-leads.use-case';
+import { ContarLeadsNuevosUseCase } from '../application/use-cases/contar-leads-nuevos.use-case';
 import { ListarAgendaVisitasUseCase } from '../application/use-cases/listar-agenda-visitas.use-case';
 import { ListarVisitasLeadUseCase } from '../application/use-cases/listar-visitas-lead.use-case';
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
@@ -60,6 +61,7 @@ export class LeadsController {
     private readonly obtenerHistorial: ObtenerHistorialLeadUseCase,
     private readonly obtenerMetaPipeline: ObtenerMetaPipelineUseCase,
     private readonly listarTablero: ListarTableroLeadsUseCase,
+    private readonly contarLeadsNuevos: ContarLeadsNuevosUseCase,
     private readonly listarAgendaVisitas: ListarAgendaVisitasUseCase,
     private readonly listarVisitasLead: ListarVisitasLeadUseCase,
     @Inject(LEADS_LECTURA_REPOSITORY)
@@ -103,6 +105,20 @@ export class LeadsController {
     return this.leadsLectura.listarMiembrosAsignables(ctx.organizacionId!);
   }
 
+  @Get('nuevos/count')
+  @ApiOperation({
+    summary: 'Contador de leads nuevos',
+    description:
+      'Cantidad de leads en estado NUEVO visibles para el usuario — para badge del sidebar.',
+  })
+  @ApiResponse({ status: 200, description: '{ count: number }' })
+  contarNuevos(@CurrentUser() ctx: RequestContext) {
+    return this.contarLeadsNuevos.execute(ctx.organizacionId!, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
   /** Antes de :id — mismo motivo que /asignables. */
   @Get('pipeline/meta')
   @ApiOperation({
@@ -129,6 +145,7 @@ export class LeadsController {
     summary: 'Tablero kanban del pipeline',
     description:
       'Todos los leads del tipo pedido (tope 300, más recientes primero), agrupados por columna de estado. ' +
+      'Sin tipoLead devuelve todos los embudos en columnas unificadas. ' +
       'Mover una tarjeta usa el mismo PATCH .../gestion que la vista de detalle — misma validación de transición.',
   })
   @ApiQuery({

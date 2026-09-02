@@ -18,10 +18,14 @@ import {
   esTransicionValida,
   estadoAlCambiarTipo,
   estadosPorTipo,
+  cambioTipoReiniciaEmbudo,
+  ESTADO_TRAS_REINICIO_POR_CAMBIO_TIPO,
   MOTIVOS_DESCARTE,
   MOTIVOS_PERDIDO,
   motivosGanado,
   requiereTipoLeadDefinido,
+  debeClasificarTipoDesdeNuevo,
+  tipoLeadClasificado,
 } from '../../../shared/domain/pipeline-inmobiliaria';
 import {
   extraerMetadataTransicion,
@@ -100,12 +104,23 @@ export class ActualizarGestionLeadUseCase {
     const tipoLeadEfectivo = input.tipoLead ?? lead.tipoLead;
 
     let estadoGestionFinal = lead.estadoGestion;
+    let reinicioPorCambioTipo = false;
+    let notaReinicioTipo: string | null = null;
 
-    // 1) Cambio de tipoLead sin tocar estadoGestion explícitamente: reacomoda
-    // el estado según la regla §4.1.5 (se conserva si es común a los tres
-    // embudos, si no vuelve a CONTACTADO).
+    // 1) Cambio de tipoLead — en etapas tempranas es libre; si ya avanzó,
+    // reinicia el embudo a CONTACTADO y cancela visitas programadas.
     if (input.tipoLead !== undefined && input.tipoLead !== lead.tipoLead) {
-      if (input.estadoGestion === undefined) {
+      if (esEstadoTerminal(lead.estadoGestion)) {
+        throw new BadRequestException(
+          'No se puede cambiar el tipo de un lead cerrado',
+        );
+      }
+      if (cambioTipoReiniciaEmbudo(lead.estadoGestion)) {
+        reinicioPorCambioTipo = true;
+        estadoGestionFinal = ESTADO_TRAS_REINICIO_POR_CAMBIO_TIPO;
+        const tipoAnterior = lead.tipoLead ?? 'sin clasificar';
+        notaReinicioTipo = `Tipo cambiado de ${tipoAnterior} a ${input.tipoLead}. Embudo reiniciado a Contactado.`;
+      } else if (input.estadoGestion === undefined) {
         estadoGestionFinal = estadoAlCambiarTipo(lead.estadoGestion);
       }
     }
@@ -133,9 +148,21 @@ export class ActualizarGestionLeadUseCase {
           );
         }
       } else {
+        const tipoParaClasificar = input.tipoLead ?? lead.tipoLead;
+        if (
+          debeClasificarTipoDesdeNuevo(
+            lead.estadoGestion,
+            input.estadoGestion,
+            tipoParaClasificar,
+          )
+        ) {
+          throw new BadRequestException(
+            'Clasifica el lead (Compra, Venta u Otro) antes de avanzar desde Nuevo',
+          );
+        }
         if (
           requiereTipoLeadDefinido(input.estadoGestion) &&
-          !tipoLeadEfectivo
+          !tipoLeadClasificado(tipoLeadEfectivo)
         ) {
           throw new ConflictException(
             'Define primero si el lead es de Compra o Venta para avanzar el pipeline más allá de Contactado',
@@ -182,7 +209,7 @@ export class ActualizarGestionLeadUseCase {
       esReapertura = true;
     }
 
-    if (huboCambioDeEstado && !motivosValidos) {
+    if (huboCambioDeEstado && !motivosValidos && !reinicioPorCambioTipo) {
       const validacion = validarTransicionPipeline(
         tipoLeadEfectivo,
         estadoGestionFinal,
@@ -198,7 +225,7 @@ export class ActualizarGestionLeadUseCase {
     }
 
     const metadataExtraida =
-      huboCambioDeEstado && !motivosValidos
+      huboCambioDeEstado && !motivosValidos && !reinicioPorCambioTipo
         ? extraerMetadataTransicion(
             tipoLeadEfectivo,
             estadoGestionFinal,
@@ -208,12 +235,14 @@ export class ActualizarGestionLeadUseCase {
         : null;
 
     const metadataHistorial =
-      huboCambioDeEstado && !motivosValidos
+      huboCambioDeEstado && !motivosValidos && !reinicioPorCambioTipo
         ? metadataHistorialLigera(estadoGestionFinal, metadataExtraida)
         : null;
 
     const crearVisita =
-      huboCambioDeEstado && estadoGestionFinal === 'VISITA_AGENDADA'
+      huboCambioDeEstado &&
+      !reinicioPorCambioTipo &&
+      estadoGestionFinal === 'VISITA_AGENDADA'
         ? construirVisitaDesdeMetadata(metadataExtraida, {
             asignadoUsuarioId: lead.asignadoUsuarioId,
             creadoPorUsuarioId: ctx.usuarioId,
@@ -221,23 +250,38 @@ export class ActualizarGestionLeadUseCase {
           })
         : null;
 
-    if (huboCambioDeEstado && estadoGestionFinal === 'VISITA_AGENDADA' && !crearVisita) {
+    if (
+      huboCambioDeEstado &&
+      estadoGestionFinal === 'VISITA_AGENDADA' &&
+      !crearVisita
+    ) {
       throw new BadRequestException(
         'No se pudo registrar la visita — revisa fecha/hora e inmueble',
       );
     }
 
     const cerrarVisita =
-      huboCambioDeEstado && estadoGestionFinal === 'VISITA_REALIZADA'
-        ? construirCierreVisitaDesdeMetadata(metadataExtraida, input.notaTransicion)
+      huboCambioDeEstado &&
+      !reinicioPorCambioTipo &&
+      estadoGestionFinal === 'VISITA_REALIZADA'
+        ? construirCierreVisitaDesdeMetadata(
+            metadataExtraida,
+            input.notaTransicion,
+          )
         : null;
 
-    if (huboCambioDeEstado && estadoGestionFinal === 'VISITA_REALIZADA' && !cerrarVisita) {
+    if (
+      huboCambioDeEstado &&
+      estadoGestionFinal === 'VISITA_REALIZADA' &&
+      !cerrarVisita
+    ) {
       throw new BadRequestException('Falta el resultado de la visita');
     }
 
     const crearCalificacion =
-      huboCambioDeEstado && estadoGestionFinal === 'CALIFICADO'
+      huboCambioDeEstado &&
+      !reinicioPorCambioTipo &&
+      estadoGestionFinal === 'CALIFICADO'
         ? construirCalificacionDesdeMetadata(
             tipoLeadEfectivo,
             metadataExtraida,
@@ -246,14 +290,20 @@ export class ActualizarGestionLeadUseCase {
           )
         : null;
 
-    if (huboCambioDeEstado && estadoGestionFinal === 'CALIFICADO' && !crearCalificacion) {
+    if (
+      huboCambioDeEstado &&
+      estadoGestionFinal === 'CALIFICADO' &&
+      !crearCalificacion
+    ) {
       throw new BadRequestException('Falta la nota de calificación');
     }
 
     const notaHistorial = huboCambioDeEstado
-      ? motivosValidos
-        ? (input.notaCierre ?? null)
-        : (input.notaTransicion ?? null)
+      ? reinicioPorCambioTipo
+        ? notaReinicioTipo
+        : motivosValidos
+          ? (input.notaCierre ?? null)
+          : (input.notaTransicion ?? null)
       : null;
 
     // Solo un cambio de ESTADO es una fila de historial válida — el
@@ -288,6 +338,7 @@ export class ActualizarGestionLeadUseCase {
             crearVisita: crearVisita ?? undefined,
             cerrarVisita: cerrarVisita ?? undefined,
             crearCalificacion: crearCalificacion ?? undefined,
+            cancelarVisitasProgramadas: reinicioPorCambioTipo || undefined,
           }
         : undefined,
     );

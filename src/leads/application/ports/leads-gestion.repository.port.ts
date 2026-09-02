@@ -52,6 +52,8 @@ export interface RegistrarHistorialInput {
     nota: string;
     usuarioId: string;
   };
+  /** Al reiniciar el embudo por cambio de tipo — cancela citas abiertas. */
+  cancelarVisitasProgramadas?: boolean;
 }
 
 export interface HistorialEstadoRow {

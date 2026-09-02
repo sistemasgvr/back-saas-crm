@@ -10,6 +10,7 @@ import { ActualizarGestionLeadUseCase } from './application/use-cases/actualizar
 import { ObtenerHistorialLeadUseCase } from './application/use-cases/obtener-historial-lead.use-case';
 import { ObtenerMetaPipelineUseCase } from './application/use-cases/obtener-meta-pipeline.use-case';
 import { ListarTableroLeadsUseCase } from './application/use-cases/listar-tablero-leads.use-case';
+import { ContarLeadsNuevosUseCase } from './application/use-cases/contar-leads-nuevos.use-case';
 import { ListarAgendaVisitasUseCase } from './application/use-cases/listar-agenda-visitas.use-case';
 import { ListarVisitasLeadUseCase } from './application/use-cases/listar-visitas-lead.use-case';
 import { EnviarEventoConversionLeadUseCase } from './application/use-cases/enviar-evento-conversion-lead.use-case';
@@ -33,6 +34,7 @@ import { PrismaLeadVisitasRepository } from './infrastructure/prisma-lead-visita
     ObtenerHistorialLeadUseCase,
     ObtenerMetaPipelineUseCase,
     ListarTableroLeadsUseCase,
+    ContarLeadsNuevosUseCase,
     ListarAgendaVisitasUseCase,
     ListarVisitasLeadUseCase,
     EnviarEventoConversionLeadUseCase,

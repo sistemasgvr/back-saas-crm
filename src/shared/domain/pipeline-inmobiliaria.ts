@@ -263,6 +263,49 @@ export function etiquetasPorTipo(
   return ETIQUETAS_OTRO;
 }
 
+/** Columnas del kanban cuando se listan todos los tipos a la vez. */
+export const ESTADOS_TABLERO_UNIFICADO = [
+  'NUEVO',
+  'CONTACTADO',
+  'CALIFICADO',
+  'VISITA_AGENDADA',
+  'VISITA_REALIZADA',
+  'CAPTACION',
+  'EN_COMERCIALIZACION',
+  'NEGOCIACION',
+  'SEPARACION',
+  'CERRADO_GANADO',
+  'CERRADO_PERDIDO',
+  'DESCARTADO',
+] as const;
+
+function etiquetasTableroUnificado(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const codigo of ESTADOS_TABLERO_UNIFICADO) {
+    map[codigo] =
+      ETIQUETAS_COMPRA[codigo] ??
+      ETIQUETAS_VENTA[codigo] ??
+      ETIQUETAS_OTRO[codigo] ??
+      codigo;
+  }
+  return map;
+}
+
+/** `tipoLead` undefined = tablero unificado (todos los tipos). */
+export function estadosColumnasTablero(
+  tipoLead: string | undefined,
+): readonly string[] {
+  if (tipoLead === undefined) return ESTADOS_TABLERO_UNIFICADO;
+  return estadosPorTipo(tipoLead);
+}
+
+export function etiquetasColumnasTablero(
+  tipoLead: string | undefined,
+): Record<string, string> {
+  if (tipoLead === undefined) return etiquetasTableroUnificado();
+  return etiquetasPorTipo(tipoLead);
+}
+
 export function estadosPorTipo(
   tipoLead: string | null | undefined,
 ): readonly string[] {
@@ -323,6 +366,44 @@ export function esReaperturaValida(
     (ESTADOS_REAPERTURA as readonly string[]).includes(estadoDestino)
   );
 }
+
+/** Solo en etapas tempranas se puede reclasificar Compra/Venta/Otro — una vez
+ * calificado o más adelante el embudo ya tiene datos (visitas, captación…)
+ * atados al tipo. */
+export const ESTADOS_PERMITEN_CAMBIO_TIPO = ['NUEVO', 'CONTACTADO'] as const;
+
+export function puedeCambiarTipoLead(estadoGestion: string): boolean {
+  return (ESTADOS_PERMITEN_CAMBIO_TIPO as readonly string[]).includes(
+    estadoGestion,
+  );
+}
+
+export function tipoLeadClasificado(
+  tipoLead: string | null | undefined,
+): tipoLead is TipoLeadInmobiliaria {
+  return TIPOS_LEAD_INMOBILIARIA.includes(tipoLead as TipoLeadInmobiliaria);
+}
+
+/** Un lead en NUEVO debe tener tipo Lead definido antes de salir de esa etapa. */
+export function debeClasificarTipoDesdeNuevo(
+  estadoActual: string,
+  estadoDestino: string,
+  tipoLead: string | null | undefined,
+): boolean {
+  return (
+    estadoActual === 'NUEVO' &&
+    estadoDestino !== 'NUEVO' &&
+    !tipoLeadClasificado(tipoLead)
+  );
+}
+
+/** Si el lead ya avanzó más allá de Contactado, cambiar Compra/Venta/Otro
+ * reinicia el embudo a CONTACTADO y cancela visitas programadas. */
+export function cambioTipoReiniciaEmbudo(estadoGestion: string): boolean {
+  return !puedeCambiarTipoLead(estadoGestion);
+}
+
+export const ESTADO_TRAS_REINICIO_POR_CAMBIO_TIPO = 'CONTACTADO' as const;
 
 /** Al cambiar tipoLead con el pipeline ya avanzado (§4.1.5): un estado común
  * a los tres embudos se conserva tal cual; si no, se resetea a CONTACTADO. */

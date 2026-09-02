@@ -63,6 +63,7 @@ export interface LeadTableroRow {
   nombre: string | null;
   telefono: string | null;
   email: string | null;
+  tipoLead: string | null;
   asignado: ReferenciaNombrada | null;
   estadoGestion: string;
   fechaLead: Date | null;
@@ -88,10 +89,14 @@ export interface LeadsLecturaRepository {
   ): Promise<ReferenciaNombrada[]>;
   /** Todos los leads del tipo pedido (tope 300, más recientes primero) para
    * armar el tablero kanban — sin paginar, el front agrupa por columna.
-   * tipoLead null trae COMPRA/VENTA/OTRO/sin-clasificar según venga en el
-   * filtro (PLAN-PIPELINE-INMOBILIARIA.md §20.4). */
+   * `tipoLead` omitido = todos los tipos; `OTRO` incluye sin clasificar. */
   listarParaTablero(
     organizacionId: string,
-    filtro: { tipoLead: string | null; asignacion: FiltroAsignacion },
+    filtro: { tipoLead?: string; asignacion: FiltroAsignacion },
   ): Promise<LeadTableroRow[]>;
+  /** Leads en estado NUEVO visibles para el usuario (misma regla de asignación). */
+  contarNuevos(
+    organizacionId: string,
+    asignacion: FiltroAsignacion,
+  ): Promise<number>;
 }

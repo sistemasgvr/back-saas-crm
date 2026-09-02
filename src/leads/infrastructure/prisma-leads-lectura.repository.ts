@@ -226,12 +226,14 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
 
   async listarParaTablero(
     organizacionId: string,
-    filtro: { tipoLead: string | null; asignacion: FiltroAsignacion },
+    filtro: { tipoLead?: string; asignacion: FiltroAsignacion },
   ): Promise<LeadTableroRow[]> {
     const whereTipo: Prisma.LeadWhereInput =
-      filtro.tipoLead === null
-        ? { OR: [{ tipoLead: 'OTRO' }, { tipoLead: null }] }
-        : { tipoLead: filtro.tipoLead };
+      filtro.tipoLead === undefined
+        ? {}
+        : filtro.tipoLead === 'OTRO'
+          ? { OR: [{ tipoLead: 'OTRO' }, { tipoLead: null }] }
+          : { tipoLead: filtro.tipoLead };
 
     const leads = await this.prisma.lead.findMany({
       where: {
@@ -250,9 +252,24 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       nombre: lead.nombre,
       telefono: lead.telefono,
       email: lead.email,
+      tipoLead: lead.tipoLead,
       asignado: nombreUsuario(lead.asignadoUsuario),
       estadoGestion: lead.estadoGestion,
       fechaLead: lead.fechaLead,
     }));
+  }
+
+  async contarNuevos(
+    organizacionId: string,
+    asignacion: FiltroAsignacion,
+  ): Promise<number> {
+    return this.prisma.lead.count({
+      where: {
+        organizacionId,
+        estado: 1,
+        estadoGestion: 'NUEVO',
+        AND: [whereDeAsignacion(asignacion)],
+      },
+    });
   }
 }

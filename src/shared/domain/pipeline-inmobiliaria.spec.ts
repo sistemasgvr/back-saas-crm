@@ -1,8 +1,11 @@
 import {
+  cambioTipoReiniciaEmbudo,
   esEstadoTerminal,
   esReaperturaValida,
   esTransicionValida,
   estadoAlCambiarTipo,
+  debeClasificarTipoDesdeNuevo,
+  puedeCambiarTipoLead,
   requiereTipoLeadDefinido,
   transicionesPermitidas,
 } from './pipeline-inmobiliaria';
@@ -183,6 +186,37 @@ describe('esReaperturaValida', () => {
 
   it('rechaza "reabrir" un estado que no es terminal', () => {
     expect(esReaperturaValida('CONTACTADO', 'CALIFICADO')).toBe(false);
+  });
+});
+
+describe('cambioTipoReiniciaEmbudo', () => {
+  it('reinicia cuando el lead ya pasó Contactado', () => {
+    expect(cambioTipoReiniciaEmbudo('CONTACTADO')).toBe(false);
+    expect(cambioTipoReiniciaEmbudo('CALIFICADO')).toBe(true);
+    expect(cambioTipoReiniciaEmbudo('VISITA_AGENDADA')).toBe(true);
+  });
+});
+
+describe('debeClasificarTipoDesdeNuevo', () => {
+  it('exige tipo al salir de NUEVO sin clasificar', () => {
+    expect(debeClasificarTipoDesdeNuevo('NUEVO', 'CONTACTADO', null)).toBe(true);
+    expect(debeClasificarTipoDesdeNuevo('NUEVO', 'CONTACTADO', 'COMPRA')).toBe(
+      false,
+    );
+    expect(debeClasificarTipoDesdeNuevo('CONTACTADO', 'CALIFICADO', null)).toBe(
+      false,
+    );
+  });
+});
+
+describe('puedeCambiarTipoLead', () => {
+  it('permite reclasificar solo en NUEVO o CONTACTADO', () => {
+    expect(puedeCambiarTipoLead('NUEVO')).toBe(true);
+    expect(puedeCambiarTipoLead('CONTACTADO')).toBe(true);
+    expect(puedeCambiarTipoLead('CALIFICADO')).toBe(false);
+    expect(puedeCambiarTipoLead('VISITA_AGENDADA')).toBe(false);
+    expect(puedeCambiarTipoLead('CAPTACION')).toBe(false);
+    expect(puedeCambiarTipoLead('NEGOCIACION')).toBe(false);
   });
 });
 
