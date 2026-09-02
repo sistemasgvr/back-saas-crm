@@ -10,6 +10,7 @@ import {
 } from '../application/mapear-error-meta-graph';
 import type {
   AppSuscritaGraph,
+  ContactoParaEnviar,
   CrearPlantillaWhatsAppInput,
   DebugTokenGraph,
   FiltroInsights,
@@ -21,6 +22,7 @@ import type {
   MetaCuentaPublicitariaDetalleGraph,
   MetaCuentaPublicitariaGraph,
   MetaFormularioGraph,
+  InteractivoParaEnviar,
   MetaGraphClient,
   MetaInsightGraph,
   MetaLeadGraph,
@@ -35,6 +37,7 @@ import type {
   ParametroPlantilla,
   TipoMediaWhatsApp,
   TokenIntercambiado,
+  UbicacionParaEnviar,
 } from '../application/ports/meta-graph-client.port';
 
 // https://developers.facebook.com/docs/marketing-api/reference/ad-account#fields (account_status)
@@ -836,6 +839,24 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return { wamid: data.messages[0].id };
   }
 
+  async enviarConfirmacionLecturaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    wamid: string,
+    mostrarEscribiendo?: boolean,
+  ): Promise<void> {
+    await this.postJson(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        status: 'read',
+        message_id: wamid,
+        ...(mostrarEscribiendo ? { typing_indicator: { type: 'text' } } : {}),
+      },
+      accessToken,
+    );
+  }
+
   async enviarReaccionWhatsApp(
     phoneNumberId: string,
     accessToken: string,
@@ -1023,6 +1044,145 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         ...(opciones?.respondeAWamid
           ? { context: { message_id: opciones.respondeAWamid } }
           : {}),
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
+  async enviarUbicacionWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    ubicacion: UbicacionParaEnviar,
+    respondeAWamid?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'location',
+        location: {
+          latitude: ubicacion.latitud,
+          longitude: ubicacion.longitud,
+          name: ubicacion.nombre,
+          address: ubicacion.direccion,
+        },
+        ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
+  async enviarContactoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    contactos: ContactoParaEnviar[],
+    respondeAWamid?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'contacts',
+        contacts: contactos.map((c) => ({
+          // Meta exige name.formatted_name + first_name — solo pedimos un
+          // nombre en el form, así que ambos quedan iguales.
+          name: { formatted_name: c.nombre, first_name: c.nombre },
+          ...(c.organizacion ? { org: { company: c.organizacion } } : {}),
+          phones: c.telefonos.map((t) => ({
+            phone: t.numero,
+            ...(t.tipo ? { type: t.tipo } : {}),
+          })),
+        })),
+        ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),
+      },
+      accessToken,
+    );
+    return { wamid: data.messages[0].id };
+  }
+
+  async enviarInteractivoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    interactivo: InteractivoParaEnviar,
+    respondeAWamid?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado> {
+    const cuerpoComun = {
+      body: { text: interactivo.cuerpo },
+      ...(interactivo.pie ? { footer: { text: interactivo.pie } } : {}),
+    };
+
+    let objetoInteractivo: Record<string, unknown>;
+    switch (interactivo.subtipo) {
+      case 'button':
+        objetoInteractivo = {
+          type: 'button',
+          ...cuerpoComun,
+          action: {
+            buttons: (interactivo.botones ?? []).map((b) => ({
+              type: 'reply',
+              reply: { id: b.id, title: b.titulo },
+            })),
+          },
+        };
+        break;
+      case 'list':
+        objetoInteractivo = {
+          type: 'list',
+          ...cuerpoComun,
+          action: {
+            button: interactivo.botonLista,
+            sections: (interactivo.secciones ?? []).map((s) => ({
+              ...(s.titulo ? { title: s.titulo } : {}),
+              rows: s.filas.map((f) => ({
+                id: f.id,
+                title: f.titulo,
+                ...(f.descripcion ? { description: f.descripcion } : {}),
+              })),
+            })),
+          },
+        };
+        break;
+      case 'cta_url':
+        objetoInteractivo = {
+          type: 'cta_url',
+          ...cuerpoComun,
+          action: {
+            name: 'cta_url',
+            parameters: {
+              display_text: interactivo.textoBoton,
+              url: interactivo.url,
+            },
+          },
+        };
+        break;
+      case 'location_request':
+        // Sin footer — Meta no lo admite en este subtipo.
+        objetoInteractivo = {
+          type: 'location_request_message',
+          body: { text: interactivo.cuerpo },
+          action: { name: 'send_location' },
+        };
+        break;
+    }
+
+    const data = await this.postJson<{ messages: { id: string }[] }>(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: para,
+        type: 'interactive',
+        interactive: objetoInteractivo,
+        ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),
       },
       accessToken,
     );

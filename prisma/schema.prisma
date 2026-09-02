@@ -765,7 +765,10 @@ model WhatsappMensaje {
    */
   direccion       String   @db.VarChar(10)
   /**
-   * text | template | image | document | audio | video | sticker.
+   * text | template | image | document | audio | video | sticker | location |
+   * contacts | interactive (saliente: botones/lista/link/pedido de ubicación
+   * que MANDAMOS) | button_reply | list_reply (entrante: lo que el contacto
+   * TOCÓ en respuesta a un interactive nuestro).
    */
   tipo            String   @db.VarChar(20)
   texto           String?
@@ -800,6 +803,16 @@ model WhatsappMensaje {
   /** Reacción que puso el contacto sobre este mensaje — mismo criterio. */
   reaccionCliente String?  @map("reaccion_cliente") @db.VarChar(20)
   /**
+   * Cuándo el CONTACTO editó este mensaje por última vez — null si nunca lo
+   * editó. WhatsApp no expone historial de ediciones (ni a los usuarios ni
+   * por la API), así que `texto`/`mediaCaption` ya quedan pisados con el
+   * contenido nuevo — este campo solo sirve para pintar la etiqueta
+   * "editado" junto a la hora, igual que hace WhatsApp real. Nosotros (el
+   * negocio) no podemos editar mensajes ya enviados — la Cloud API no
+   * expone esa acción, solo notifica ediciones que hace el contacto.
+   */
+  fechaEdicion DateTime? @map("fecha_edicion") @db.Timestamptz
+  /**
    * Respuesta contextual (citar un mensaje anterior) — PLAN Fase reacciones/
    * respuestas. Null si el mensaje no responde a nada. Se resuelve al id
    * PROPIO del mensaje citado (no al wamid) para poder traer su contenido
@@ -810,6 +823,32 @@ model WhatsappMensaje {
   respondeAMensajeId String?           @map("responde_a_mensaje_id") @db.Uuid
   respondeA          WhatsappMensaje?  @relation("RespuestaAMensaje", fields: [respondeAMensajeId], references: [id])
   respuestas         WhatsappMensaje[] @relation("RespuestaAMensaje")
+  /**
+   * Solo aplica a tipo === 'location'. Nombre/dirección son opcionales — Meta
+   * los manda si el usuario compartió un lugar con nombre (ej. un negocio en
+   * el mapa) en vez de solo su posición actual.
+   */
+  ubicacionLatitud   Float?  @map("ubicacion_latitud")
+  ubicacionLongitud  Float?  @map("ubicacion_longitud")
+  ubicacionNombre    String? @map("ubicacion_nombre") @db.VarChar(255)
+  ubicacionDireccion String? @map("ubicacion_direccion") @db.VarChar(500)
+  /**
+   * Solo aplica a tipo === 'contacts'. WhatsApp permite mandar varios
+   * contactos en un mismo mensaje — se guarda tal cual como JSON (array de
+   * {nombre, telefonos: [{numero, tipo}], organizacion?}), no hace falta
+   * una tabla aparte para algo que nunca se consulta individualmente.
+   */
+  contactos Json? @map("contactos")
+  /**
+   * Solo aplica a tipo === 'interactive' (SIEMPRE saliente — la Cloud API no
+   * tiene forma de mandar botones/lista desde el lado del contacto). Guarda
+   * la forma ya normalizada que arma EnviarInteractivoWhatsAppUseCase — así
+   * el propio chat de la org puede repintar qué botones/lista/link mandó,
+   * no solo el texto del cuerpo. La respuesta del contacto (qué botón tocó)
+   * NO usa este campo — llega como un mensaje de chat normal, con `texto`
+   * = título elegido y `tipo` = 'button_reply' | 'list_reply'.
+   */
+  interactivo Json? @map("interactivo")
   datosCrudos     Json     @map("datos_crudos")
   /**
    * Timestamp real de Meta (puede diferir de fechaCreacion si el webhook llega tarde).

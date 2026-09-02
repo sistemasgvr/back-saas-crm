@@ -24,6 +24,7 @@ import { CrearNotificacionUseCase } from '../../../notifications/application/use
 import { ProcesarMensajeWhatsAppEntranteUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
+import { ProcesarEdicionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-edicion-whatsapp.use-case';
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
@@ -40,6 +41,7 @@ export class MetaWebhooksController {
     private readonly procesarMensajeWhatsApp: ProcesarMensajeWhatsAppEntranteUseCase,
     private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
     private readonly procesarReaccionWhatsApp: ProcesarReaccionWhatsAppUseCase,
+    private readonly procesarEdicionWhatsApp: ProcesarEdicionWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -177,7 +179,8 @@ export class MetaWebhooksController {
   private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
   ): Promise<void> {
-    const { mensajes, estados, reacciones } = extraerEventosWhatsApp(payload);
+    const { mensajes, estados, reacciones, ediciones } =
+      extraerEventosWhatsApp(payload);
 
     for (const evento of mensajes) {
       try {
@@ -207,6 +210,17 @@ export class MetaWebhooksController {
       } catch (error) {
         this.logger.error(
           `Error procesando reacción WhatsApp sobre ${evento.wamidObjetivo}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
+    for (const evento of ediciones) {
+      try {
+        await this.procesarEdicionWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando edición WhatsApp sobre ${evento.wamidOriginal}`,
           error instanceof Error ? error.stack : error,
         );
       }

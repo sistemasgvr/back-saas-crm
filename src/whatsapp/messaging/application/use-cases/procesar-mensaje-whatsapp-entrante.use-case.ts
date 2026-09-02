@@ -98,6 +98,11 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       mediaTamanoBytes: media?.buffer.length,
       mediaBytes: media?.buffer,
       respondeAMensajeId,
+      ubicacionLatitud: evento.ubicacion?.latitud,
+      ubicacionLongitud: evento.ubicacion?.longitud,
+      ubicacionNombre: evento.ubicacion?.nombre,
+      ubicacionDireccion: evento.ubicacion?.direccion,
+      contactos: evento.contactos,
     });
 
     if (!creado) {

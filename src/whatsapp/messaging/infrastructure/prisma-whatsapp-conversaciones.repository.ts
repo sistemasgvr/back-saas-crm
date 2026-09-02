@@ -2,8 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
+  ContactoMensajeRow,
   ConversacionResumen,
   FiltroVisibilidadChats,
+  InteractivoMensajeRow,
   MediaMensaje,
   MensajeResuelto,
   MensajeRow,
@@ -159,6 +161,20 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
             mediaCaption: m.respondeA.mediaCaption,
           }
         : null,
+      ubicacion:
+        m.ubicacionLatitud !== null && m.ubicacionLongitud !== null
+          ? {
+              latitud: m.ubicacionLatitud,
+              longitud: m.ubicacionLongitud,
+              nombre: m.ubicacionNombre,
+              direccion: m.ubicacionDireccion,
+            }
+          : null,
+      contactos:
+        (m.contactos as unknown as ContactoMensajeRow[] | null) ?? null,
+      fechaEdicion: m.fechaEdicion,
+      interactivo:
+        (m.interactivo as unknown as InteractivoMensajeRow | null) ?? null,
     }));
   }
 
@@ -206,11 +222,40 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
   }
 
+  async actualizarMensajeEditado(
+    organizacionId: string,
+    wamidOriginal: string,
+    cambios: { texto?: string; mediaCaption?: string },
+    fechaEdicion: Date,
+  ): Promise<void> {
+    await this.prisma.whatsappMensaje.updateMany({
+      where: { organizacionId, wamid: wamidOriginal },
+      data: {
+        ...(cambios.texto !== undefined ? { texto: cambios.texto } : {}),
+        ...(cambios.mediaCaption !== undefined
+          ? { mediaCaption: cambios.mediaCaption }
+          : {}),
+        fechaEdicion,
+      },
+    });
+  }
+
   async marcarLeida(id: string): Promise<void> {
     await this.prisma.whatsappConversacion.update({
       where: { id },
       data: { noLeidos: 0 },
     });
+  }
+
+  async buscarUltimoWamidEntrante(
+    whatsappConversacionId: string,
+  ): Promise<string | null> {
+    const mensaje = await this.prisma.whatsappMensaje.findFirst({
+      where: { whatsappConversacionId, direccion: 'entrante' },
+      orderBy: { fechaMensaje: 'desc' },
+      select: { wamid: true },
+    });
+    return mensaje?.wamid ?? null;
   }
 
   async vincularLeadPorTelefono(
@@ -326,6 +371,16 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         mediaEsVoz: input.mediaEsVoz,
         mediaTamanoBytes: input.mediaTamanoBytes,
         respondeAMensajeId: input.respondeAMensajeId,
+        ubicacionLatitud: input.ubicacionLatitud,
+        ubicacionLongitud: input.ubicacionLongitud,
+        ubicacionNombre: input.ubicacionNombre,
+        ubicacionDireccion: input.ubicacionDireccion,
+        contactos: input.contactos
+          ? (input.contactos as unknown as Prisma.InputJsonValue)
+          : undefined,
+        interactivo: input.interactivo
+          ? (input.interactivo as unknown as Prisma.InputJsonValue)
+          : undefined,
         ...(input.mediaBytes
           ? { media: { create: { bytes: input.mediaBytes } } }
           : {}),

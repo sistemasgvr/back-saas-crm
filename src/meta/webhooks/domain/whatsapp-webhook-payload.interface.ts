@@ -28,6 +28,42 @@ export interface WhatsappWebhookPayload {
           /** Presente cuando este mensaje es una respuesta contextual —
            * "citó" otro mensaje. `id` es el wamid del mensaje citado. */
           context?: { from?: string; id?: string };
+          /** Solo presente cuando type === 'location'. */
+          location?: {
+            latitude?: number;
+            longitude?: number;
+            name?: string;
+            address?: string;
+          };
+          /** Solo presente cuando type === 'contacts' — puede traer varios
+           * contactos en un mismo mensaje (WhatsApp lo permite). */
+          contacts?: ContactoMetaCrudo[];
+          /** Solo presente cuando type === 'edit' — el contacto editó un
+           * mensaje que ya había mandado. `id` de este evento es un wamid
+           * nuevo (el del evento de edición, no el del mensaje editado);
+           * `edit.original_message_id` es el que hay que buscar en nuestra
+           * base. WhatsApp solo permite editar el texto (mensajes de texto)
+           * o el caption (mensajes con archivo) — nunca el archivo en sí.
+           * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/edit/ */
+          edit?: {
+            original_message_id?: string;
+            message?: {
+              type?: string;
+              text?: { body?: string };
+              image?: MetaMediaObjeto;
+              video?: MetaMediaObjeto;
+              document?: MetaMediaObjeto;
+              sticker?: MetaMediaObjeto;
+            };
+          };
+          /** Solo presente cuando type === 'interactive' — el contacto tocó
+           * un botón o eligió una opción de una lista que le mandamos.
+           * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/interactive/ */
+          interactive?: {
+            type?: string;
+            button_reply?: { id?: string; title?: string };
+            list_reply?: { id?: string; title?: string; description?: string };
+          };
         }[];
         statuses?: {
           id?: string;
@@ -37,6 +73,14 @@ export interface WhatsappWebhookPayload {
       };
     }[];
   }[];
+}
+
+/** Un contacto tal cual lo manda Meta (formato vCard-ish) — ver
+ * extraerContactos() para la traducción a nuestro propio vocabulario. */
+export interface ContactoMetaCrudo {
+  name?: { formatted_name?: string };
+  org?: { company?: string };
+  phones?: { phone?: string; type?: string; wa_id?: string }[];
 }
 
 /** Objeto de media que manda Meta en un mensaje entrante — `id` solo dura 7
@@ -56,6 +100,26 @@ export interface MediaEntranteWhatsApp {
   esVoz?: boolean;
 }
 
+/** Ya en nuestro propio vocabulario (no el crudo de Meta) — mismo shape que
+ * usa RegistrarMensajeInput, así el use-case lo pasa directo sin traducir. */
+export interface UbicacionMensaje {
+  latitud: number;
+  longitud: number;
+  nombre?: string;
+  direccion?: string;
+}
+
+export interface TelefonoContacto {
+  numero: string;
+  tipo?: string;
+}
+
+export interface ContactoMensaje {
+  nombre: string;
+  telefonos: TelefonoContacto[];
+  organizacion?: string;
+}
+
 export interface EventoMensajeWhatsApp {
   phoneNumberId: string;
   waId: string;
@@ -68,6 +132,10 @@ export interface EventoMensajeWhatsApp {
   /** wamid del mensaje que este citó al responder — resolver a nuestro id
    * propio queda del lado del use-case, acá solo se extrae el dato crudo. */
   respondeAWamid?: string;
+  /** Solo presente cuando tipo === 'location'. */
+  ubicacion?: UbicacionMensaje;
+  /** Solo presente cuando tipo === 'contacts'. */
+  contactos?: ContactoMensaje[];
   raw: unknown;
 }
 
@@ -77,6 +145,17 @@ export interface EventoReaccionWhatsApp {
   wamidObjetivo: string;
   /** Vacío = el contacto sacó su reacción. */
   emoji: string;
+}
+
+export interface EventoEdicionWhatsApp {
+  phoneNumberId: string;
+  /** wamid del mensaje ORIGINAL que el contacto editó, no del evento de edición. */
+  wamidOriginal: string;
+  /** Presente si editó un mensaje de texto. */
+  texto?: string;
+  /** Presente si editó el caption de un archivo. */
+  mediaCaption?: string;
+  fechaEdicion: Date;
 }
 
 export interface EventoEstadoWhatsApp {
@@ -110,14 +189,40 @@ export function traducirEstadoWhatsApp(statusMeta: string): string {
   return TRADUCCION_ESTADO[statusMeta] ?? statusMeta;
 }
 
+/** El nombre es lo único que WhatsApp exige por contacto — sin él no hay
+ * forma útil de mostrarlo, se descarta esa entrada en vez de guardar un
+ * contacto sin nombre. */
+function extraerContactos(
+  contactos: ContactoMetaCrudo[] | undefined,
+): ContactoMensaje[] {
+  const resultado: ContactoMensaje[] = [];
+  for (const c of contactos ?? []) {
+    const nombre = c.name?.formatted_name;
+    if (!nombre) continue;
+    resultado.push({
+      nombre,
+      telefonos: (c.phones ?? [])
+        .filter(
+          (p): p is { phone: string; type?: string; wa_id?: string } =>
+            !!p.phone,
+        )
+        .map((p) => ({ numero: p.phone, tipo: p.type })),
+      organizacion: c.org?.company,
+    });
+  }
+  return resultado;
+}
+
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   mensajes: EventoMensajeWhatsApp[];
   estados: EventoEstadoWhatsApp[];
   reacciones: EventoReaccionWhatsApp[];
+  ediciones: EventoEdicionWhatsApp[];
 } {
   const mensajes: EventoMensajeWhatsApp[] = [];
   const estados: EventoEstadoWhatsApp[] = [];
   const reacciones: EventoReaccionWhatsApp[] = [];
+  const ediciones: EventoEdicionWhatsApp[] = [];
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
@@ -147,21 +252,78 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
           continue;
         }
 
+        // Tampoco es un mensaje nuevo — es una edición de un mensaje que el
+        // contacto ya nos había mandado. WhatsApp solo permite editar el
+        // texto o el caption de un archivo, nunca el archivo en sí.
+        if (mensaje.type === 'edit') {
+          const original = mensaje.edit?.original_message_id;
+          const editado = mensaje.edit?.message;
+          if (original && editado) {
+            const mediaEditada =
+              editado.image ??
+              editado.video ??
+              editado.document ??
+              editado.sticker;
+            ediciones.push({
+              phoneNumberId,
+              wamidOriginal: original,
+              texto: editado.text?.body,
+              mediaCaption: mediaEditada?.caption,
+              fechaEdicion: timestampADate(mensaje.timestamp),
+            });
+          }
+          continue;
+        }
+
         const objetoMedia =
           mensaje.image ??
           mensaje.video ??
           mensaje.audio ??
           mensaje.document ??
           mensaje.sticker;
+        // Tocar un botón o elegir una opción de lista SÍ es un mensaje de
+        // chat nuevo (a diferencia de reaccionar o editar) — solo que su
+        // "texto" no viene en mensaje.text sino en el título elegido. Se
+        // reusa toda la tubería normal de mensajes con esto resuelto acá,
+        // en vez de agregar un array aparte y duplicar registrarMensaje/
+        // notificaciones/etc. para un caso que en el fondo es un mensaje más.
+        const textoInteractivo =
+          mensaje.interactive?.type === 'button_reply'
+            ? mensaje.interactive.button_reply?.title
+            : mensaje.interactive?.type === 'list_reply'
+              ? [
+                  mensaje.interactive.list_reply?.title,
+                  mensaje.interactive.list_reply?.description,
+                ]
+                  .filter(Boolean)
+                  .join(' — ')
+              : undefined;
         mensajes.push({
           phoneNumberId,
           waId: mensaje.from,
           nombreContacto: contactoPorWaId.get(mensaje.from),
           wamid: mensaje.id,
           timestamp: timestampADate(mensaje.timestamp),
-          tipo: mensaje.type ?? 'unknown',
-          texto: mensaje.text?.body,
+          tipo:
+            mensaje.type === 'interactive'
+              ? (mensaje.interactive?.type ?? 'interactive')
+              : (mensaje.type ?? 'unknown'),
+          texto: mensaje.text?.body ?? textoInteractivo,
           respondeAWamid: mensaje.context?.id,
+          ubicacion:
+            mensaje.location?.latitude !== undefined &&
+            mensaje.location?.longitude !== undefined
+              ? {
+                  latitud: mensaje.location.latitude,
+                  longitud: mensaje.location.longitude,
+                  nombre: mensaje.location.name,
+                  direccion: mensaje.location.address,
+                }
+              : undefined,
+          contactos:
+            mensaje.type === 'contacts'
+              ? extraerContactos(mensaje.contacts)
+              : undefined,
           media:
             objetoMedia?.id !== undefined
               ? {
@@ -188,5 +350,5 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
     }
   }
 
-  return { mensajes, estados, reacciones };
+  return { mensajes, estados, reacciones, ediciones };
 }

@@ -112,6 +112,53 @@ export interface MetaMensajeWhatsAppEnviado {
   wamid: string;
 }
 
+export interface UbicacionParaEnviar {
+  latitud: number;
+  longitud: number;
+  nombre?: string;
+  direccion?: string;
+}
+
+export interface ContactoParaEnviar {
+  nombre: string;
+  telefonos: { numero: string; tipo?: string }[];
+  organizacion?: string;
+}
+
+export interface BotonInteractivoParaEnviar {
+  id: string;
+  titulo: string;
+}
+
+export interface FilaListaParaEnviar {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+}
+
+export interface SeccionListaParaEnviar {
+  titulo?: string;
+  filas: FilaListaParaEnviar[];
+}
+
+/** Los 4 subtipos de "interactive" que soporta este CRM — Meta soporta
+ * varios más (flows, catálogo…) que quedan afuera a propósito, no los pide
+ * el negocio hoy. */
+export interface InteractivoParaEnviar {
+  subtipo: 'button' | 'list' | 'cta_url' | 'location_request';
+  cuerpo: string;
+  pie?: string;
+  /** Solo 'button' — hasta 3. */
+  botones?: BotonInteractivoParaEnviar[];
+  /** Solo 'list' — etiqueta del botón que abre el picker. */
+  botonLista?: string;
+  /** Solo 'list'. */
+  secciones?: SeccionListaParaEnviar[];
+  /** Solo 'cta_url'. */
+  textoBoton?: string;
+  url?: string;
+}
+
 export type TipoMediaWhatsApp =
   'image' | 'video' | 'audio' | 'document' | 'sticker';
 
@@ -323,6 +370,21 @@ export interface MetaGraphClient {
     texto: string,
     respondeAWamid?: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
+  /**
+   * POST /{phone-number-id}/messages con status=read — le pone el check azul
+   * al mensaje entrante en el WhatsApp del contacto. `mostrarEscribiendo`
+   * agrega `typing_indicator` al mismo llamado: Meta muestra "escribiendo…"
+   * en el chat del contacto hasta por 25 segundos, o hasta que le mandemos
+   * un mensaje (lo que pase primero) — no existe un endpoint aparte solo
+   * para "escribiendo", siempre va pegado a la confirmación de lectura.
+   */
+  enviarConfirmacionLecturaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    wamid: string,
+    mostrarEscribiendo?: boolean,
+  ): Promise<void>;
+
   /** POST /{phone-number-id}/messages type=reaction — emoji vacío ("") saca
    * la reacción que ya estuviera puesta, no hace falta un endpoint aparte. */
   enviarReaccionWhatsApp(
@@ -395,5 +457,38 @@ export interface MetaGraphClient {
     tipo: TipoMediaWhatsApp,
     mediaId: string,
     opciones?: { caption?: string; filename?: string; respondeAWamid?: string },
+  ): Promise<MetaMensajeWhatsAppEnviado>;
+
+  /** POST /{phone-number-id}/messages type=location. */
+  enviarUbicacionWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    ubicacion: UbicacionParaEnviar,
+    respondeAWamid?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado>;
+
+  /** POST /{phone-number-id}/messages type=contacts — WhatsApp admite mandar
+   * varios contactos en un mismo mensaje. */
+  enviarContactoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    contactos: ContactoParaEnviar[],
+    respondeAWamid?: string,
+  ): Promise<MetaMensajeWhatsAppEnviado>;
+
+  /** POST /{phone-number-id}/messages type=interactive — botones de
+   * respuesta rápida (hasta 3), lista de opciones (hasta 10), botón con link
+   * (cta_url), o pedido de ubicación (location_request_message). Los 4
+   * comparten el mismo endpoint/tipo de Meta, solo cambia `interactive.type`
+   * y su `action`. Igual que texto/media/ubicación/contacto: solo funciona
+   * DENTRO de la ventana de 24h, no hay plantilla equivalente. */
+  enviarInteractivoWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    para: string,
+    interactivo: InteractivoParaEnviar,
+    respondeAWamid?: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
 }

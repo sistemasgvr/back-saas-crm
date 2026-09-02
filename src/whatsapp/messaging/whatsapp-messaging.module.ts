@@ -10,12 +10,17 @@ import { ObtenerConversacionUseCase } from './application/use-cases/obtener-conv
 import { EnviarMensajeWhatsAppUseCase } from './application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { EnviarReaccionWhatsAppUseCase } from './application/use-cases/enviar-reaccion-whatsapp.use-case';
 import { EnviarMediaWhatsAppUseCase } from './application/use-cases/enviar-media-whatsapp.use-case';
+import { EnviarUbicacionWhatsAppUseCase } from './application/use-cases/enviar-ubicacion-whatsapp.use-case';
+import { EnviarContactoWhatsAppUseCase } from './application/use-cases/enviar-contacto-whatsapp.use-case';
+import { EnviarInteractivoWhatsAppUseCase } from './application/use-cases/enviar-interactivo-whatsapp.use-case';
+import { MarcarLeidoWhatsAppUseCase } from './application/use-cases/marcar-leido-whatsapp.use-case';
 import { ObtenerMediaMensajeUseCase } from './application/use-cases/obtener-media-mensaje.use-case';
 import { ListarPlantillasUseCase } from './application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from './application/use-cases/crear-plantilla.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from './application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from './application/use-cases/procesar-reaccion-whatsapp.use-case';
+import { ProcesarEdicionWhatsAppUseCase } from './application/use-cases/procesar-edicion-whatsapp.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from './application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { VincularLeadConversacionesWhatsAppUseCase } from './application/use-cases/vincular-lead-conversaciones-whatsapp.use-case';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
@@ -36,12 +41,17 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     EnviarMensajeWhatsAppUseCase,
     EnviarReaccionWhatsAppUseCase,
     EnviarMediaWhatsAppUseCase,
+    EnviarUbicacionWhatsAppUseCase,
+    EnviarContactoWhatsAppUseCase,
+    EnviarInteractivoWhatsAppUseCase,
+    MarcarLeidoWhatsAppUseCase,
     ObtenerMediaMensajeUseCase,
     ListarPlantillasUseCase,
     CrearPlantillaUseCase,
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEstadoWhatsAppUseCase,
     ProcesarReaccionWhatsAppUseCase,
+    ProcesarEdicionWhatsAppUseCase,
     IniciarConversacionDesdeLeadUseCase,
     VincularLeadConversacionesWhatsAppUseCase,
     {
@@ -53,6 +63,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEstadoWhatsAppUseCase,
     ProcesarReaccionWhatsAppUseCase,
+    ProcesarEdicionWhatsAppUseCase,
     VincularLeadConversacionesWhatsAppUseCase,
   ],
 })

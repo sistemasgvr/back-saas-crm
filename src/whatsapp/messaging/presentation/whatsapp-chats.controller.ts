@@ -38,6 +38,10 @@ import { ObtenerConversacionUseCase } from '../application/use-cases/obtener-con
 import { EnviarMensajeWhatsAppUseCase } from '../application/use-cases/enviar-mensaje-whatsapp.use-case';
 import { EnviarReaccionWhatsAppUseCase } from '../application/use-cases/enviar-reaccion-whatsapp.use-case';
 import { EnviarMediaWhatsAppUseCase } from '../application/use-cases/enviar-media-whatsapp.use-case';
+import { EnviarUbicacionWhatsAppUseCase } from '../application/use-cases/enviar-ubicacion-whatsapp.use-case';
+import { EnviarContactoWhatsAppUseCase } from '../application/use-cases/enviar-contacto-whatsapp.use-case';
+import { EnviarInteractivoWhatsAppUseCase } from '../application/use-cases/enviar-interactivo-whatsapp.use-case';
+import { MarcarLeidoWhatsAppUseCase } from '../application/use-cases/marcar-leido-whatsapp.use-case';
 import { ObtenerMediaMensajeUseCase } from '../application/use-cases/obtener-media-mensaje.use-case';
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from '../application/use-cases/crear-plantilla.use-case';
@@ -46,6 +50,9 @@ import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
 import { EnviarReaccionDto } from './dto/enviar-reaccion.dto';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { SubirMediaDto } from './dto/subir-media.dto';
+import { EnviarUbicacionDto } from './dto/enviar-ubicacion.dto';
+import { EnviarContactoDto } from './dto/enviar-contacto.dto';
+import { EnviarInteractivoDto } from './dto/enviar-interactivo.dto';
 
 // El límite real por tipo lo valida validarArchivoWhatsApp() en el use-case
 // (5MB imagen / 16MB audio-video / 100MB documento) — este es solo el tope
@@ -65,6 +72,10 @@ export class WhatsappChatsController {
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
     private readonly enviarReaccion: EnviarReaccionWhatsAppUseCase,
     private readonly enviarMedia: EnviarMediaWhatsAppUseCase,
+    private readonly enviarUbicacion: EnviarUbicacionWhatsAppUseCase,
+    private readonly enviarContacto: EnviarContactoWhatsAppUseCase,
+    private readonly enviarInteractivo: EnviarInteractivoWhatsAppUseCase,
+    private readonly marcarLeidoWhatsApp: MarcarLeidoWhatsAppUseCase,
     private readonly obtenerMedia: ObtenerMediaMensajeUseCase,
     private readonly listarPlantillas: ListarPlantillasUseCase,
     private readonly crearPlantilla: CrearPlantillaUseCase,
@@ -333,6 +344,128 @@ export class WhatsappChatsController {
       },
       { usuarioId: ctx.usuarioId, rol: ctx.rol! },
     );
+  }
+
+  @Post(':id/location')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Enviar una ubicación (coordenadas)',
+    description:
+      'Solo funciona dentro de la ventana de 24h — WhatsApp no tiene plantilla equivalente para ubicaciones.',
+  })
+  @ApiResponse({ status: 204, description: 'Ubicación enviada.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Coordenadas inválidas, o fuera de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description:
+      'La conversación no existe o el rol no puede escribir en ella.',
+  })
+  sendLocation(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: EnviarUbicacionDto,
+  ) {
+    return this.enviarUbicacion.execute(ctx.organizacionId!, id, dto, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Post(':id/contact')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Enviar una tarjeta de contacto (vCard)',
+    description:
+      'Uno o más contactos en un mismo mensaje. Solo funciona dentro de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 204, description: 'Contacto(s) enviado(s).' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Falta el nombre/teléfono de algún contacto, o fuera de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description:
+      'La conversación no existe o el rol no puede escribir en ella.',
+  })
+  sendContact(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: EnviarContactoDto,
+  ) {
+    return this.enviarContacto.execute(
+      ctx.organizacionId!,
+      id,
+      { contactos: dto.contactos, respondeAMensajeId: dto.respondeAMensajeId },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
+  @Post(':id/interactive')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Enviar un mensaje interactivo',
+    description:
+      'Un solo endpoint para los 4 subtipos que soporta Meta: "button" (hasta 3 botones de respuesta rápida), ' +
+      '"list" (hasta 10 opciones), "cta_url" (botón con link) y "location_request" (botón que abre el picker de ' +
+      'ubicación del contacto). Solo funciona dentro de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 204, description: 'Mensaje interactivo enviado.' })
+  @ApiResponse({
+    status: 400,
+    description:
+      'Faltan campos del subtipo elegido, o fuera de la ventana de 24h.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  @ApiResponse({
+    status: 404,
+    description:
+      'La conversación no existe o el rol no puede escribir en ella.',
+  })
+  sendInteractive(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: EnviarInteractivoDto,
+  ) {
+    return this.enviarInteractivo.execute(ctx.organizacionId!, id, dto, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Post(':id/typing')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Mostrar "escribiendo…" en el WhatsApp del contacto',
+    description:
+      'Le confirma a Meta la lectura del último mensaje del contacto (check azul) y le pide mostrar el ' +
+      'indicador de "escribiendo…" — dura hasta 25s o hasta que se le mande un mensaje, lo que pase primero. ' +
+      'Pensado para llamarse mientras el usuario escribe en el composer, no en cada tecla.',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Indicador enviado (o no hay nada que marcar todavía).',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
+  async typing(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<void> {
+    // Ídem: efecto de UX, nunca debe devolver un error que el front tenga
+    // que manejar mientras alguien solo está escribiendo un mensaje.
+    await this.marcarLeidoWhatsApp
+      .execute(ctx.organizacionId!, id, { escribiendo: true })
+      .catch(() => undefined);
   }
 
   @Get(':id/messages/:mensajeId/media')

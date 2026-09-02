@@ -41,6 +41,63 @@ export interface MensajeRow {
   reaccionCliente: string | null;
   /** Mensaje citado (respuesta contextual) — null si este mensaje no responde a nada. */
   respondeA: MensajeCitado | null;
+  /** Solo si tipo === 'location'. */
+  ubicacion: UbicacionMensajeRow | null;
+  /** Solo si tipo === 'contacts' — puede traer varios. */
+  contactos: ContactoMensajeRow[] | null;
+  /** Cuándo el contacto editó este mensaje por última vez — null si nunca. */
+  fechaEdicion: Date | null;
+  /** Solo si tipo === 'interactive' — lo que NOSOTROS mandamos (botones/
+   * lista/link/pedido de ubicación). La respuesta del contacto llega como
+   * mensaje normal (tipo 'button_reply'/'list_reply'), no usa este campo. */
+  interactivo: InteractivoMensajeRow | null;
+}
+
+export interface UbicacionMensajeRow {
+  latitud: number;
+  longitud: number;
+  nombre: string | null;
+  direccion: string | null;
+}
+
+export interface ContactoMensajeRow {
+  nombre: string;
+  telefonos: { numero: string; tipo?: string }[];
+  organizacion?: string;
+}
+
+export interface BotonInteractivoRow {
+  id: string;
+  titulo: string;
+}
+
+export interface FilaListaRow {
+  id: string;
+  titulo: string;
+  descripcion?: string;
+}
+
+export interface SeccionListaRow {
+  titulo?: string;
+  filas: FilaListaRow[];
+}
+
+/** Forma ya normalizada (no la cruda de Meta) de un mensaje interactivo
+ * SALIENTE — cubre los 4 subtipos que soporta este CRM. Los campos que no
+ * aplican al subtipo elegido quedan undefined. */
+export interface InteractivoMensajeRow {
+  subtipo: 'button' | 'list' | 'cta_url' | 'location_request';
+  cuerpo: string;
+  pie?: string;
+  /** Solo subtipo 'button' — hasta 3. */
+  botones?: BotonInteractivoRow[];
+  /** Solo subtipo 'list' — etiqueta del botón que abre el picker. */
+  botonLista?: string;
+  /** Solo subtipo 'list'. */
+  secciones?: SeccionListaRow[];
+  /** Solo subtipo 'cta_url'. */
+  textoBoton?: string;
+  url?: string;
 }
 
 /** Vista chica del mensaje citado — lo justo para pintar la burbujita de cita. */
@@ -96,6 +153,15 @@ export interface RegistrarMensajeInput {
   /** Id PROPIO (no wamid) del mensaje que este responde/cita — ya resuelto
    * por el use-case antes de llamar acá. */
   respondeAMensajeId?: string;
+  /** Solo si tipo === 'location'. */
+  ubicacionLatitud?: number;
+  ubicacionLongitud?: number;
+  ubicacionNombre?: string;
+  ubicacionDireccion?: string;
+  /** Solo si tipo === 'contacts'. */
+  contactos?: ContactoMensajeRow[];
+  /** Solo si tipo === 'interactive'. */
+  interactivo?: InteractivoMensajeRow;
 }
 
 export interface WhatsappConversacionesRepository {
@@ -119,6 +185,14 @@ export interface WhatsappConversacionesRepository {
     limite: number,
   ): Promise<MensajeRow[]>;
   marcarLeida(id: string): Promise<void>;
+
+  /** wamid del último mensaje ENTRANTE de la conversación — el que hay que
+   * marcar como leído/con "escribiendo…" en Meta (la confirmación de
+   * lectura de WhatsApp va sobre el mensaje del contacto, no sobre uno
+   * nuestro). Null si el contacto todavía no escribió nada. */
+  buscarUltimoWamidEntrante(
+    whatsappConversacionId: string,
+  ): Promise<string | null>;
 
   /** Vincula conversaciones existentes sin lead cuyo wa_id coincide con el
    * teléfono del lead (heurística de sufijo / E.164). No pisa un lead_id ya
@@ -194,5 +268,15 @@ export interface WhatsappConversacionesRepository {
     organizacionId: string,
     wamidObjetivo: string,
     emoji: string | null,
+  ): Promise<void>;
+
+  /** El contacto editó un mensaje que ya nos había mandado — se busca por
+   * wamid, mismo motivo que la reacción. Pisa `texto`/`mediaCaption` con el
+   * contenido nuevo (WhatsApp no guarda historial) y marca `fechaEdicion`. */
+  actualizarMensajeEditado(
+    organizacionId: string,
+    wamidOriginal: string,
+    cambios: { texto?: string; mediaCaption?: string },
+    fechaEdicion: Date,
   ): Promise<void>;
 }
