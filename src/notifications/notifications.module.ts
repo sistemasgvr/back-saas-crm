@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { NotificationsController } from './presentation/notifications.controller';
+import { AgendaRecordatoriosCronController } from './presentation/agenda-recordatorios-cron.controller';
 import { NotificacionesGateway } from './presentation/notificaciones.gateway';
 import { WsTicketService } from './infrastructure/ws-ticket.service';
 import { PrismaNotificacionesRepository } from './infrastructure/prisma-notificaciones.repository';
 import { WebPushSender } from './infrastructure/web-push.sender';
-import { AgendaRecordatoriosScheduler } from './infrastructure/agenda-recordatorios.scheduler';
+import { AgendaRecordatoriosInlineTicker } from './infrastructure/agenda-recordatorios-inline.ticker';
 import { NOTIFICACIONES_REPOSITORY } from './application/ports/notificaciones.repository.port';
 import { WS_EMITTER } from './application/ports/ws-emitter.port';
 import { PUSH_SENDER } from './application/ports/push-sender.port';
@@ -20,7 +21,7 @@ import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, AgendaRecordatoriosCronController],
   providers: [
     CrearNotificacionUseCase,
     ListarNotificacionesUseCase,
@@ -30,7 +31,7 @@ import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar
     DispararRecordatoriosAgendaUseCase,
     RegistrarSuscripcionPushUseCase,
     EliminarSuscripcionPushUseCase,
-    AgendaRecordatoriosScheduler,
+    AgendaRecordatoriosInlineTicker,
     WsTicketService,
     NotificacionesGateway,
     WebPushSender,

@@ -73,6 +73,12 @@ export const envValidationSchema = Joi.object({
   VAPID_PUBLIC_KEY: Joi.string().optional(),
   VAPID_PRIVATE_KEY: Joi.string().optional(),
   VAPID_SUBJECT: Joi.string().optional(),
+
+  /**
+   * Secreto para el cron de recordatorios de agenda (Vercel Cron envía
+   * Authorization: Bearer <CRON_SECRET>). Obligatorio en producción Vercel.
+   */
+  CRON_SECRET: Joi.string().min(16).optional(),
 });
 
 export const envValidationOptions = {

@@ -8,7 +8,6 @@ import {
 } from './shared/infrastructure/env.validation';
 import { PrismaModule } from './shared/infrastructure/prisma.module';
 import { RequestLoggerMiddleware } from './shared/presentation/middleware/request-logger.middleware';
-import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ModulesModule } from './modules/modules.module';
@@ -30,7 +29,6 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
       validationSchema: envValidationSchema,
       validationOptions: envValidationOptions,
     }),
-    ScheduleModule.forRoot(),
     PrismaModule,
     AuthModule,
     OrganizationsModule,
