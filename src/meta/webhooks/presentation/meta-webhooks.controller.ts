@@ -23,6 +23,7 @@ import { VerificarWebhookMetaUseCase } from '../application/use-cases/verificar-
 import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { AutoAsignarLeadUseCase } from '../../../leads/application/use-cases/auto-asignar-lead.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
+import { ProcesarEcoMensajeWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-eco-mensaje-whatsapp.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
 import { ProcesarEdicionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-edicion-whatsapp.use-case';
@@ -41,6 +42,7 @@ export class MetaWebhooksController {
     private readonly autoAsignarLead: AutoAsignarLeadUseCase,
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly procesarMensajeWhatsApp: ProcesarMensajeWhatsAppEntranteUseCase,
+    private readonly procesarEcoMensajeWhatsApp: ProcesarEcoMensajeWhatsAppUseCase,
     private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
     private readonly procesarReaccionWhatsApp: ProcesarReaccionWhatsAppUseCase,
     private readonly procesarEdicionWhatsApp: ProcesarEdicionWhatsAppUseCase,
@@ -181,7 +183,7 @@ export class MetaWebhooksController {
   private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
   ): Promise<void> {
-    const { mensajes, estados, reacciones, ediciones } =
+    const { mensajes, ecos, estados, reacciones, ediciones } =
       extraerEventosWhatsApp(payload);
 
     for (const evento of mensajes) {
@@ -190,6 +192,17 @@ export class MetaWebhooksController {
       } catch (error) {
         this.logger.error(
           `Error procesando mensaje WhatsApp ${evento.wamid} (phone_number_id ${evento.phoneNumberId})`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
+    for (const evento of ecos) {
+      try {
+        await this.procesarEcoMensajeWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando eco WhatsApp ${evento.wamid} (phone_number_id ${evento.phoneNumberId})`,
           error instanceof Error ? error.stack : error,
         );
       }

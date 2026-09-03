@@ -18,6 +18,7 @@ import { ObtenerMediaMensajeUseCase } from './application/use-cases/obtener-medi
 import { ListarPlantillasUseCase } from './application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from './application/use-cases/crear-plantilla.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from './application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
+import { ProcesarEcoMensajeWhatsAppUseCase } from './application/use-cases/procesar-eco-mensaje-whatsapp.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from './application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from './application/use-cases/procesar-reaccion-whatsapp.use-case';
 import { ProcesarEdicionWhatsAppUseCase } from './application/use-cases/procesar-edicion-whatsapp.use-case';
@@ -49,6 +50,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ListarPlantillasUseCase,
     CrearPlantillaUseCase,
     ProcesarMensajeWhatsAppEntranteUseCase,
+    ProcesarEcoMensajeWhatsAppUseCase,
     ProcesarEstadoWhatsAppUseCase,
     ProcesarReaccionWhatsAppUseCase,
     ProcesarEdicionWhatsAppUseCase,
@@ -61,6 +63,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
   ],
   exports: [
     ProcesarMensajeWhatsAppEntranteUseCase,
+    ProcesarEcoMensajeWhatsAppUseCase,
     ProcesarEstadoWhatsAppUseCase,
     ProcesarReaccionWhatsAppUseCase,
     ProcesarEdicionWhatsAppUseCase,

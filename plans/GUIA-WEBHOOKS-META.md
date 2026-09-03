@@ -88,7 +88,8 @@ Hazlo **después** de tener WABA + número en Business Manager y el módulo What
 2. Misma **Callback URL** y el **mismo verify token** (un solo endpoint sirve para Page y WABA).
 3. **Verificar y guardar**.
 4. Suscribir campos relevantes, como mínimo:
-   - **`messages`** (mensajes entrantes / salientes)
+   - **`messages`** (mensajes entrantes / estados)
+   - **`smb_message_echoes`** (coexistencia: lo que mandan desde la app WhatsApp Business en el celular)
    - Si aparecen: estados de entrega (`message_status` / similares según la UI actual de Meta)
 
 ### Checklist WhatsApp
@@ -97,6 +98,7 @@ Hazlo **después** de tener WABA + número en Business Manager y el módulo What
 - [ ] Misma Callback URL + verify token
 - [ ] Verificar y guardar OK
 - [ ] Campo **`messages`** suscrito
+- [ ] Campo **`smb_message_echoes`** suscrito (si usan coexistencia / app móvil)
 - [ ] En CRM: `/settings/whatsapp` con número vinculado
 
 ---

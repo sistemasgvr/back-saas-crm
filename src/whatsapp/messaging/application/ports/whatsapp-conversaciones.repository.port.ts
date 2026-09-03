@@ -234,6 +234,13 @@ export interface WhatsappConversacionesRepository {
     nombreContacto?: string,
   ): Promise<void>;
 
+  /** Mensaje saliente (CRM o eco desde la app Business) — actualiza orden
+   * del chat sin incrementar noLeidos ni extender la ventana de 24h. */
+  actualizarTrasSaliente(
+    conversacionId: string,
+    fechaMensaje: Date,
+  ): Promise<void>;
+
   actualizarEstadoMensaje(
     organizacionId: string,
     wamid: string,

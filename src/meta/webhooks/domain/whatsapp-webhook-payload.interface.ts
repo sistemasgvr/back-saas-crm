@@ -10,61 +10,11 @@ export interface WhatsappWebhookPayload {
       value?: {
         metadata?: { phone_number_id?: string };
         contacts?: { wa_id?: string; profile?: { name?: string } }[];
-        messages?: {
-          from?: string;
-          id?: string;
-          timestamp?: string;
-          type?: string;
-          text?: { body?: string };
-          image?: MetaMediaObjeto;
-          video?: MetaMediaObjeto;
-          audio?: MetaMediaObjeto & { voice?: boolean };
-          document?: MetaMediaObjeto & { filename?: string };
-          sticker?: MetaMediaObjeto & { animated?: boolean };
-          /** Solo presente cuando type === 'reaction' — message_id apunta
-           * al wamid del mensaje NUESTRO que el contacto reaccionó, no al
-           * id de este evento. emoji vacío significa que sacó la reacción. */
-          reaction?: { message_id?: string; emoji?: string };
-          /** Presente cuando este mensaje es una respuesta contextual —
-           * "citó" otro mensaje. `id` es el wamid del mensaje citado. */
-          context?: { from?: string; id?: string };
-          /** Solo presente cuando type === 'location'. */
-          location?: {
-            latitude?: number;
-            longitude?: number;
-            name?: string;
-            address?: string;
-          };
-          /** Solo presente cuando type === 'contacts' — puede traer varios
-           * contactos en un mismo mensaje (WhatsApp lo permite). */
-          contacts?: ContactoMetaCrudo[];
-          /** Solo presente cuando type === 'edit' — el contacto editó un
-           * mensaje que ya había mandado. `id` de este evento es un wamid
-           * nuevo (el del evento de edición, no el del mensaje editado);
-           * `edit.original_message_id` es el que hay que buscar en nuestra
-           * base. WhatsApp solo permite editar el texto (mensajes de texto)
-           * o el caption (mensajes con archivo) — nunca el archivo en sí.
-           * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/edit/ */
-          edit?: {
-            original_message_id?: string;
-            message?: {
-              type?: string;
-              text?: { body?: string };
-              image?: MetaMediaObjeto;
-              video?: MetaMediaObjeto;
-              document?: MetaMediaObjeto;
-              sticker?: MetaMediaObjeto;
-            };
-          };
-          /** Solo presente cuando type === 'interactive' — el contacto tocó
-           * un botón o eligió una opción de una lista que le mandamos.
-           * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/interactive/ */
-          interactive?: {
-            type?: string;
-            button_reply?: { id?: string; title?: string };
-            list_reply?: { id?: string; title?: string; description?: string };
-          };
-        }[];
+        messages?: MensajeMetaCrudo[];
+        /** Coexistencia: mensajes enviados desde la app WhatsApp Business
+         * (celular / dispositivo vinculado). El contacto es `to`, no `from`.
+         * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/smb_message_echoes */
+        message_echoes?: EcoMensajeMetaCrudo[];
         statuses?: {
           id?: string;
           status?: string;
@@ -73,6 +23,70 @@ export interface WhatsappWebhookPayload {
       };
     }[];
   }[];
+}
+
+/** Forma común de un mensaje en webhooks `messages` / `smb_message_echoes`. */
+export interface MensajeMetaCrudo {
+  from?: string;
+  id?: string;
+  timestamp?: string;
+  type?: string;
+  text?: { body?: string };
+  image?: MetaMediaObjeto;
+  video?: MetaMediaObjeto;
+  audio?: MetaMediaObjeto & { voice?: boolean };
+  document?: MetaMediaObjeto & { filename?: string };
+  sticker?: MetaMediaObjeto & { animated?: boolean };
+  /** Solo presente cuando type === 'reaction' — message_id apunta
+   * al wamid del mensaje NUESTRO que el contacto reaccionó, no al
+   * id de este evento. emoji vacío significa que sacó la reacción. */
+  reaction?: { message_id?: string; emoji?: string };
+  /** Presente cuando este mensaje es una respuesta contextual —
+   * "citó" otro mensaje. `id` es el wamid del mensaje citado. */
+  context?: { from?: string; id?: string };
+  /** Solo presente cuando type === 'location'. */
+  location?: {
+    latitude?: number;
+    longitude?: number;
+    name?: string;
+    address?: string;
+  };
+  /** Solo presente cuando type === 'contacts' — puede traer varios
+   * contactos en un mismo mensaje (WhatsApp lo permite). */
+  contacts?: ContactoMetaCrudo[];
+  /** Solo presente cuando type === 'edit' — el contacto editó un
+   * mensaje que ya había mandado. `id` de este evento es un wamid
+   * nuevo (el del evento de edición, no el del mensaje editado);
+   * `edit.original_message_id` es el que hay que buscar en nuestra
+   * base. WhatsApp solo permite editar el texto (mensajes de texto)
+   * o el caption (mensajes con archivo) — nunca el archivo en sí.
+   * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/edit/ */
+  edit?: {
+    original_message_id?: string;
+    message?: {
+      type?: string;
+      text?: { body?: string };
+      image?: MetaMediaObjeto;
+      video?: MetaMediaObjeto;
+      document?: MetaMediaObjeto;
+      sticker?: MetaMediaObjeto;
+    };
+  };
+  /** Solo presente cuando type === 'interactive' — el contacto tocó
+   * un botón o eligió una opción de una lista que le mandamos.
+   * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/interactive/ */
+  interactive?: {
+    type?: string;
+    button_reply?: { id?: string; title?: string };
+    list_reply?: { id?: string; title?: string; description?: string };
+  };
+  /** Solo type === 'revoke' en ecos (mensaje borrado desde la app Business). */
+  revoke?: { original_message_id?: string };
+}
+
+export interface EcoMensajeMetaCrudo extends MensajeMetaCrudo {
+  /** Teléfono del contacto (cliente) — en ecos `from` es el negocio. */
+  to?: string;
 }
 
 /** Un contacto tal cual lo manda Meta (formato vCard-ish) — ver
@@ -213,142 +227,204 @@ function extraerContactos(
   return resultado;
 }
 
+/** wa_id de Meta / teléfono en ecos suele venir con o sin '+'. */
+function normalizarWaId(valor: string): string {
+  return valor.replace(/\D/g, '');
+}
+
+type AcumuladoresEventos = {
+  mensajes: EventoMensajeWhatsApp[];
+  ecos: EventoMensajeWhatsApp[];
+  estados: EventoEstadoWhatsApp[];
+  reacciones: EventoReaccionWhatsApp[];
+  ediciones: EventoEdicionWhatsApp[];
+};
+
+/** Clasifica un mensaje Meta crudo (entrante o eco) en el acumulador correcto.
+ * `destino` = 'mensajes' (cliente → negocio) o 'ecos' (negocio app → cliente). */
+function clasificarMensajeMeta(
+  phoneNumberId: string,
+  mensaje: MensajeMetaCrudo,
+  waId: string,
+  nombreContacto: string | undefined,
+  destino: 'mensajes' | 'ecos',
+  out: AcumuladoresEventos,
+): void {
+  if (!mensaje.id) return;
+
+  if (mensaje.type === 'reaction') {
+    if (mensaje.reaction?.message_id) {
+      out.reacciones.push({
+        phoneNumberId,
+        wamidObjetivo: mensaje.reaction.message_id,
+        emoji: mensaje.reaction.emoji ?? '',
+      });
+    }
+    return;
+  }
+
+  if (mensaje.type === 'edit') {
+    const original = mensaje.edit?.original_message_id;
+    const editado = mensaje.edit?.message;
+    if (original && editado) {
+      const mediaEditada =
+        editado.image ?? editado.video ?? editado.document ?? editado.sticker;
+      out.ediciones.push({
+        phoneNumberId,
+        wamidOriginal: original,
+        texto: editado.text?.body,
+        mediaCaption: mediaEditada?.caption,
+        fechaEdicion: timestampADate(mensaje.timestamp),
+      });
+    }
+    return;
+  }
+
+  if (mensaje.type === 'revoke') {
+    const original = mensaje.revoke?.original_message_id;
+    if (original) {
+      out.estados.push({
+        phoneNumberId,
+        wamid: original,
+        status: 'eliminado',
+        timestamp: timestampADate(mensaje.timestamp),
+      });
+    }
+    return;
+  }
+
+  const objetoMedia =
+    mensaje.image ??
+    mensaje.video ??
+    mensaje.audio ??
+    mensaje.document ??
+    mensaje.sticker;
+  // Tocar un botón o elegir una opción de lista SÍ es un mensaje de
+  // chat nuevo (a diferencia de reaccionar o editar) — solo que su
+  // "texto" no viene en mensaje.text sino en el título elegido.
+  const textoInteractivo =
+    mensaje.interactive?.type === 'button_reply'
+      ? mensaje.interactive.button_reply?.title
+      : mensaje.interactive?.type === 'list_reply'
+        ? [
+            mensaje.interactive.list_reply?.title,
+            mensaje.interactive.list_reply?.description,
+          ]
+            .filter(Boolean)
+            .join(' — ')
+        : undefined;
+
+  const evento: EventoMensajeWhatsApp = {
+    phoneNumberId,
+    waId,
+    nombreContacto,
+    wamid: mensaje.id,
+    timestamp: timestampADate(mensaje.timestamp),
+    tipo:
+      mensaje.type === 'interactive'
+        ? (mensaje.interactive?.type ?? 'interactive')
+        : (mensaje.type ?? 'unknown'),
+    texto: mensaje.text?.body ?? textoInteractivo,
+    respondeAWamid: mensaje.context?.id,
+    ubicacion:
+      mensaje.location?.latitude !== undefined &&
+      mensaje.location?.longitude !== undefined
+        ? {
+            latitud: mensaje.location.latitude,
+            longitud: mensaje.location.longitude,
+            nombre: mensaje.location.name,
+            direccion: mensaje.location.address,
+          }
+        : undefined,
+    contactos:
+      mensaje.type === 'contacts'
+        ? extraerContactos(mensaje.contacts)
+        : undefined,
+    media:
+      objetoMedia?.id !== undefined
+        ? {
+            mediaId: objetoMedia.id,
+            mimeType: objetoMedia.mime_type,
+            caption: objetoMedia.caption,
+            nombreArchivo: mensaje.document?.filename,
+            esVoz: mensaje.audio?.voice,
+          }
+        : undefined,
+    raw: mensaje,
+  };
+
+  out[destino].push(evento);
+}
+
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   mensajes: EventoMensajeWhatsApp[];
+  /** Enviados desde la app WhatsApp Business (coexistencia). */
+  ecos: EventoMensajeWhatsApp[];
   estados: EventoEstadoWhatsApp[];
   reacciones: EventoReaccionWhatsApp[];
   ediciones: EventoEdicionWhatsApp[];
 } {
-  const mensajes: EventoMensajeWhatsApp[] = [];
-  const estados: EventoEstadoWhatsApp[] = [];
-  const reacciones: EventoReaccionWhatsApp[] = [];
-  const ediciones: EventoEdicionWhatsApp[] = [];
+  const out: AcumuladoresEventos = {
+    mensajes: [],
+    ecos: [],
+    estados: [],
+    reacciones: [],
+    ediciones: [],
+  };
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
-      if (change.field !== 'messages') continue;
       const value = change.value;
       const phoneNumberId = value?.metadata?.phone_number_id;
       if (!phoneNumberId) continue;
 
-      const contactoPorWaId = new Map(
-        (value?.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]),
-      );
+      if (change.field === 'messages') {
+        const contactoPorWaId = new Map(
+          (value?.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]),
+        );
 
-      for (const mensaje of value?.messages ?? []) {
-        if (!mensaje.id || !mensaje.from) continue;
-
-        // Una reacción no es un mensaje de chat nuevo — es metadata que se
-        // pega sobre un mensaje NUESTRO ya existente (reaction.message_id).
-        // Va a un array aparte, no a `mensajes`.
-        if (mensaje.type === 'reaction') {
-          if (mensaje.reaction?.message_id) {
-            reacciones.push({
-              phoneNumberId,
-              wamidObjetivo: mensaje.reaction.message_id,
-              emoji: mensaje.reaction.emoji ?? '',
-            });
-          }
-          continue;
+        for (const mensaje of value?.messages ?? []) {
+          if (!mensaje.from) continue;
+          // Entrante: conservar `from` tal cual lo manda Meta (wa_id estable
+          // de la conversación). No normalizar acá — un cambio de formato
+          // crearía un chat duplicado.
+          clasificarMensajeMeta(
+            phoneNumberId,
+            mensaje,
+            mensaje.from,
+            contactoPorWaId.get(mensaje.from),
+            'mensajes',
+            out,
+          );
         }
 
-        // Tampoco es un mensaje nuevo — es una edición de un mensaje que el
-        // contacto ya nos había mandado. WhatsApp solo permite editar el
-        // texto o el caption de un archivo, nunca el archivo en sí.
-        if (mensaje.type === 'edit') {
-          const original = mensaje.edit?.original_message_id;
-          const editado = mensaje.edit?.message;
-          if (original && editado) {
-            const mediaEditada =
-              editado.image ??
-              editado.video ??
-              editado.document ??
-              editado.sticker;
-            ediciones.push({
-              phoneNumberId,
-              wamidOriginal: original,
-              texto: editado.text?.body,
-              mediaCaption: mediaEditada?.caption,
-              fechaEdicion: timestampADate(mensaje.timestamp),
-            });
-          }
-          continue;
+        for (const status of value?.statuses ?? []) {
+          if (!status.id || !status.status) continue;
+          out.estados.push({
+            phoneNumberId,
+            wamid: status.id,
+            status: traducirEstadoWhatsApp(status.status),
+            timestamp: timestampADate(status.timestamp),
+          });
         }
-
-        const objetoMedia =
-          mensaje.image ??
-          mensaje.video ??
-          mensaje.audio ??
-          mensaje.document ??
-          mensaje.sticker;
-        // Tocar un botón o elegir una opción de lista SÍ es un mensaje de
-        // chat nuevo (a diferencia de reaccionar o editar) — solo que su
-        // "texto" no viene en mensaje.text sino en el título elegido. Se
-        // reusa toda la tubería normal de mensajes con esto resuelto acá,
-        // en vez de agregar un array aparte y duplicar registrarMensaje/
-        // notificaciones/etc. para un caso que en el fondo es un mensaje más.
-        const textoInteractivo =
-          mensaje.interactive?.type === 'button_reply'
-            ? mensaje.interactive.button_reply?.title
-            : mensaje.interactive?.type === 'list_reply'
-              ? [
-                  mensaje.interactive.list_reply?.title,
-                  mensaje.interactive.list_reply?.description,
-                ]
-                  .filter(Boolean)
-                  .join(' — ')
-              : undefined;
-        mensajes.push({
-          phoneNumberId,
-          waId: mensaje.from,
-          nombreContacto: contactoPorWaId.get(mensaje.from),
-          wamid: mensaje.id,
-          timestamp: timestampADate(mensaje.timestamp),
-          tipo:
-            mensaje.type === 'interactive'
-              ? (mensaje.interactive?.type ?? 'interactive')
-              : (mensaje.type ?? 'unknown'),
-          texto: mensaje.text?.body ?? textoInteractivo,
-          respondeAWamid: mensaje.context?.id,
-          ubicacion:
-            mensaje.location?.latitude !== undefined &&
-            mensaje.location?.longitude !== undefined
-              ? {
-                  latitud: mensaje.location.latitude,
-                  longitud: mensaje.location.longitude,
-                  nombre: mensaje.location.name,
-                  direccion: mensaje.location.address,
-                }
-              : undefined,
-          contactos:
-            mensaje.type === 'contacts'
-              ? extraerContactos(mensaje.contacts)
-              : undefined,
-          media:
-            objetoMedia?.id !== undefined
-              ? {
-                  mediaId: objetoMedia.id,
-                  mimeType: objetoMedia.mime_type,
-                  caption: objetoMedia.caption,
-                  nombreArchivo: mensaje.document?.filename,
-                  esVoz: mensaje.audio?.voice,
-                }
-              : undefined,
-          raw: mensaje,
-        });
+        continue;
       }
 
-      for (const status of value?.statuses ?? []) {
-        if (!status.id || !status.status) continue;
-        estados.push({
-          phoneNumberId,
-          wamid: status.id,
-          status: traducirEstadoWhatsApp(status.status),
-          timestamp: timestampADate(status.timestamp),
-        });
+      if (change.field === 'smb_message_echoes') {
+        for (const eco of value?.message_echoes ?? []) {
+          if (!eco.to) continue;
+          clasificarMensajeMeta(
+            phoneNumberId,
+            eco,
+            normalizarWaId(eco.to),
+            undefined,
+            'ecos',
+            out,
+          );
+        }
       }
     }
   }
 
-  return { mensajes, estados, reacciones, ediciones };
+  return out;
 }

@@ -289,7 +289,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     nombreContacto?: string;
     leadIdConocido?: string;
   }): Promise<{ id: string; esNueva: boolean }> {
-    const existente = await this.prisma.whatsappConversacion.findUnique({
+    const existenteExacto = await this.prisma.whatsappConversacion.findUnique({
       where: {
         organizacionId_waId: {
           organizacionId: input.organizacionId,
@@ -297,6 +297,20 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         },
       },
     });
+    // Ecos de coexistencia a veces traen `to` con '+' u otro formato; el
+    // chat ya existe con el wa_id del webhook entrante. Emparejar por sufijo.
+    const existente =
+      existenteExacto ??
+      (ultimosDigitos(input.waId)
+        ? await this.prisma.whatsappConversacion.findFirst({
+            where: {
+              organizacionId: input.organizacionId,
+              estado: 1,
+              waId: { endsWith: ultimosDigitos(input.waId) },
+            },
+            orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+          })
+        : null);
     if (existente) {
       if (input.leadIdConocido && !existente.leadId) {
         await this.prisma.whatsappConversacion.update({
@@ -423,6 +437,16 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         noLeidos: { increment: 1 },
         ...(nombreContacto ? { nombreContacto } : {}),
       },
+    });
+  }
+
+  async actualizarTrasSaliente(
+    conversacionId: string,
+    fechaMensaje: Date,
+  ): Promise<void> {
+    await this.prisma.whatsappConversacion.update({
+      where: { id: conversacionId },
+      data: { ultimoMensajeEn: fechaMensaje },
     });
   }
 
