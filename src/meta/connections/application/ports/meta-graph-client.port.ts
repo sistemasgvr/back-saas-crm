@@ -456,7 +456,13 @@ export interface MetaGraphClient {
     para: string,
     tipo: TipoMediaWhatsApp,
     mediaId: string,
-    opciones?: { caption?: string; filename?: string; respondeAWamid?: string },
+    opciones?: {
+      caption?: string;
+      filename?: string;
+      respondeAWamid?: string;
+      /** Nota de voz (PTT): solo con type=audio y OGG/Opus. */
+      voice?: boolean;
+    },
   ): Promise<MetaMensajeWhatsAppEnviado>;
 
   /** POST /{phone-number-id}/messages type=location. */

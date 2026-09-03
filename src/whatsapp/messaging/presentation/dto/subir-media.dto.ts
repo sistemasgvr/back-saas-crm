@@ -20,4 +20,12 @@ export class SubirMediaDto {
   @IsOptional()
   @IsUUID()
   respondeAMensajeId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Si es "1"/"true" y el archivo es audio/ogg, se envía como nota de voz (voice:true).',
+  })
+  @IsOptional()
+  @IsString()
+  esVoz?: string;
 }

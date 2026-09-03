@@ -26,6 +26,8 @@ export interface EnviarMediaInput {
   caption?: string;
   /** Id PROPIO (no wamid) del mensaje al que este responde. */
   respondeAMensajeId?: string;
+  /** Nota de voz (PTT). Solo tiene efecto si el mime es audio/ogg. */
+  esVoz?: boolean;
 }
 
 /** Envía un archivo (imagen/video/audio/documento/sticker) a un chat —
@@ -123,13 +125,23 @@ export class EnviarMediaWhatsAppUseCase {
       input.mimeType,
       input.nombreArchivo,
     );
+    const esVoz =
+      categoria === 'audio' &&
+      Boolean(input.esVoz) &&
+      input.mimeType.toLowerCase().includes('ogg');
+
     const resultado = await this.graph.enviarMediaWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
       conversacion.waId,
       categoria,
       subido.mediaId,
-      { caption: input.caption, filename: input.nombreArchivo, respondeAWamid },
+      {
+        caption: input.caption,
+        filename: input.nombreArchivo,
+        respondeAWamid,
+        voice: esVoz || undefined,
+      },
     );
 
     await this.conversaciones.registrarMensaje({
@@ -144,11 +156,13 @@ export class EnviarMediaWhatsAppUseCase {
         tipo: categoria,
         caption: input.caption,
         nombreArchivo: input.nombreArchivo,
+        voice: esVoz || undefined,
       },
       mediaId: subido.mediaId,
       mediaMimeType: input.mimeType,
       mediaNombreArchivo: input.nombreArchivo,
       mediaCaption: input.caption,
+      mediaEsVoz: esVoz || undefined,
       mediaTamanoBytes: input.buffer.length,
       mediaBytes: input.buffer,
       fechaMensaje: new Date(),

@@ -1022,7 +1022,12 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     para: string,
     tipo: TipoMediaWhatsApp,
     mediaId: string,
-    opciones?: { caption?: string; filename?: string; respondeAWamid?: string },
+    opciones?: {
+      caption?: string;
+      filename?: string;
+      respondeAWamid?: string;
+      voice?: boolean;
+    },
   ): Promise<MetaMensajeWhatsAppEnviado> {
     // Meta no admite caption en audio/sticker, y filename solo en document.
     const objetoMedia: Record<string, unknown> = { id: mediaId };
@@ -1031,6 +1036,10 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     }
     if (opciones?.filename && tipo === 'document') {
       objetoMedia.filename = opciones.filename;
+    }
+    // Nota de voz (burbuja de micrófono en el WhatsApp del contacto).
+    if (tipo === 'audio' && opciones?.voice) {
+      objetoMedia.voice = true;
     }
 
     const data = await this.postJson<{ messages: { id: string }[] }>(

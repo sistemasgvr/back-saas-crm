@@ -307,6 +307,8 @@ export class WhatsappChatsController {
       properties: {
         archivo: { type: 'string', format: 'binary' },
         caption: { type: 'string' },
+        respondeAMensajeId: { type: 'string', format: 'uuid' },
+        esVoz: { type: 'string', description: '"1" para nota de voz (ogg)' },
       },
       required: ['archivo'],
     },
@@ -340,6 +342,10 @@ export class WhatsappChatsController {
     if (!archivo) {
       throw new BadRequestException('Falta el archivo');
     }
+    const esVoz =
+      dto.esVoz === '1' ||
+      dto.esVoz === 'true' ||
+      dto.esVoz === 'True';
     return this.enviarMedia.execute(
       ctx.organizacionId!,
       id,
@@ -349,6 +355,7 @@ export class WhatsappChatsController {
         nombreArchivo: archivo.originalname,
         caption: dto.caption,
         respondeAMensajeId: dto.respondeAMensajeId,
+        esVoz,
       },
       { usuarioId: ctx.usuarioId, rol: ctx.rol! },
     );
