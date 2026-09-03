@@ -39,6 +39,10 @@ import { ListarTableroLeadsUseCase } from '../application/use-cases/listar-table
 import { ContarLeadsNuevosUseCase } from '../application/use-cases/contar-leads-nuevos.use-case';
 import { ListarAgendaVisitasUseCase } from '../application/use-cases/listar-agenda-visitas.use-case';
 import { ListarVisitasLeadUseCase } from '../application/use-cases/listar-visitas-lead.use-case';
+import { CrearVisitaAgendaUseCase } from '../application/use-cases/crear-visita-agenda.use-case';
+import { ActualizarVisitaAgendaUseCase } from '../application/use-cases/actualizar-visita-agenda.use-case';
+import { CrearActividadAgendaUseCase } from '../application/use-cases/crear-actividad-agenda.use-case';
+import { ActualizarActividadAgendaUseCase } from '../application/use-cases/actualizar-actividad-agenda.use-case';
 import { ObtenerAutoAsignacionConfigUseCase } from '../application/use-cases/obtener-auto-asignacion-config.use-case';
 import { ActualizarAutoAsignacionConfigUseCase } from '../application/use-cases/actualizar-auto-asignacion-config.use-case';
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
@@ -47,6 +51,10 @@ import { ListarLeadsQueryDto } from './dto/listar-leads.query.dto';
 import { AsignarLeadDto } from './dto/asignar-lead.dto';
 import { ActualizarGestionLeadDto } from './dto/actualizar-gestion-lead.dto';
 import { AutoAsignacionLeadsConfigDto } from './dto/auto-asignacion-leads-config.dto';
+import { CrearVisitaAgendaDto } from './dto/crear-visita-agenda.dto';
+import { ActualizarVisitaAgendaDto } from './dto/actualizar-visita-agenda.dto';
+import { CrearActividadAgendaDto } from './dto/crear-actividad-agenda.dto';
+import { ActualizarActividadAgendaDto } from './dto/actualizar-actividad-agenda.dto';
 
 @ApiTags('Leads')
 @ApiBearerAuth('JWT-auth')
@@ -67,6 +75,10 @@ export class LeadsController {
     private readonly contarLeadsNuevos: ContarLeadsNuevosUseCase,
     private readonly listarAgendaVisitas: ListarAgendaVisitasUseCase,
     private readonly listarVisitasLead: ListarVisitasLeadUseCase,
+    private readonly crearVisitaAgenda: CrearVisitaAgendaUseCase,
+    private readonly actualizarVisitaAgenda: ActualizarVisitaAgendaUseCase,
+    private readonly crearActividadAgenda: CrearActividadAgendaUseCase,
+    private readonly actualizarActividadAgenda: ActualizarActividadAgendaUseCase,
     private readonly obtenerAutoAsignacionConfig: ObtenerAutoAsignacionConfigUseCase,
     private readonly actualizarAutoAsignacionConfig: ActualizarAutoAsignacionConfigUseCase,
     @Inject(LEADS_LECTURA_REPOSITORY)
@@ -207,13 +219,18 @@ export class LeadsController {
 
   @Get('visitas/agenda')
   @ApiOperation({
-    summary: 'Agenda de visitas (calendario)',
+    summary: 'Agenda unificada (visitas + actividades)',
     description:
-      'Lista visitas programadas en un rango de fechas — fuente de verdad para vista calendario y recordatorios.',
+      'Lista ítems de calendario en un rango: visitas del pipeline y actividades ' +
+      '(llamada, reunión, seguimiento, visita u otra) creadas desde la agenda.',
   })
   @ApiQuery({ name: 'desde', required: true, description: 'ISO 8601 inicio del rango' })
   @ApiQuery({ name: 'hasta', required: true, description: 'ISO 8601 fin del rango' })
-  @ApiQuery({ name: 'asignado', required: false, description: '"mios" o UUID de asesor (admin)' })
+  @ApiQuery({
+    name: 'asignado',
+    required: false,
+    description: '"todos" (admin), "mios", o UUID de asesor (admin). Agentes siempre ven las suyas.',
+  })
   agendaVisitas(
     @CurrentUser() ctx: RequestContext,
     @Query('desde') desde: string,
@@ -223,6 +240,85 @@ export class LeadsController {
     return this.listarAgendaVisitas.execute(
       ctx.organizacionId!,
       { desde, hasta, asignado },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
+  @Post('actividades')
+  @ApiOperation({
+    summary: 'Registrar actividad en la agenda',
+    description:
+      'Crea una actividad (VISITA, LLAMADA, REUNION, SEGUIMIENTO u OTRO) sin exigir transición de pipeline.',
+  })
+  @ApiResponse({ status: 201, description: 'Actividad creada.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o fuera de horario.' })
+  @ApiResponse({ status: 409, description: 'Solape con otra cita del asesor.' })
+  crearActividad(
+    @CurrentUser() ctx: RequestContext,
+    @Body() body: CrearActividadAgendaDto,
+  ) {
+    return this.crearActividadAgenda.execute(ctx.organizacionId!, body, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Patch('actividades/:actividadId')
+  @ApiOperation({
+    summary: 'Actualizar actividad de agenda',
+    description: 'Reagendar, completar o cancelar una actividad.',
+  })
+  actualizarActividad(
+    @CurrentUser() ctx: RequestContext,
+    @Param('actividadId', ParseUUIDPipe) actividadId: string,
+    @Body() body: ActualizarActividadAgendaDto,
+  ) {
+    return this.actualizarActividadAgenda.execute(
+      ctx.organizacionId!,
+      actividadId,
+      body,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
+  @Post('visitas')
+  @ApiOperation({
+    summary: 'Registrar visita desde la agenda',
+    description:
+      'Crea una visita PROGRAMADA sin exigir transición de pipeline. ' +
+      'Si el lead ya tenía otra visita abierta, se cancela. Valida horario laboral y anti-solape.',
+  })
+  @ApiResponse({ status: 201, description: 'Visita creada.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos o fuera de horario.' })
+  @ApiResponse({ status: 409, description: 'Solape con otra visita del asesor.' })
+  crearVisita(
+    @CurrentUser() ctx: RequestContext,
+    @Body() body: CrearVisitaAgendaDto,
+  ) {
+    return this.crearVisitaAgenda.execute(ctx.organizacionId!, body, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Patch('visitas/:visitaId')
+  @ApiOperation({
+    summary: 'Reagendar o actualizar estado de una visita',
+    description:
+      'Permite cambiar fecha/duración (reagendar) o marcar REALIZADA / NO_SHOW / CANCELADA desde la agenda.',
+  })
+  @ApiResponse({ status: 200, description: 'Visita actualizada.' })
+  @ApiResponse({ status: 400, description: 'Datos inválidos.' })
+  @ApiResponse({ status: 409, description: 'Solape al reagendar.' })
+  actualizarVisita(
+    @CurrentUser() ctx: RequestContext,
+    @Param('visitaId', ParseUUIDPipe) visitaId: string,
+    @Body() body: ActualizarVisitaAgendaDto,
+  ) {
+    return this.actualizarVisitaAgenda.execute(
+      ctx.organizacionId!,
+      visitaId,
+      body,
       { usuarioId: ctx.usuarioId, rol: ctx.rol! },
     );
   }

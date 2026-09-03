@@ -1,16 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
-  ActualizarVisitaRepoInput,
-  CrearVisitaRepoInput,
-  LeadVisitasRepository,
-  VisitaAgendaRow,
-  VisitaDetalle,
-  VisitaLeadRow,
-} from '../application/ports/lead-visitas.repository.port';
+  ActividadAgendaRow,
+  ActividadDetalle,
+  ActualizarActividadRepoInput,
+  CrearActividadRepoInput,
+  LeadActividadesRepository,
+} from '../application/ports/lead-actividades.repository.port';
 
 @Injectable()
-export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
+export class PrismaLeadActividadesRepository implements LeadActividadesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async listarAgenda(
@@ -20,8 +19,8 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       hasta: Date;
       asignadoUsuarioId?: string;
     },
-  ): Promise<VisitaAgendaRow[]> {
-    const filas = await this.prisma.leadVisita.findMany({
+  ): Promise<ActividadAgendaRow[]> {
+    const filas = await this.prisma.leadActividad.findMany({
       where: {
         organizacionId,
         programadaEn: { gte: filtros.desde, lte: filtros.hasta },
@@ -35,67 +34,44 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       },
       orderBy: { programadaEn: 'asc' },
     });
-
     return filas.map((f) => this.mapAgenda(f));
-  }
-
-  async listarPorLead(
-    organizacionId: string,
-    leadId: string,
-  ): Promise<VisitaLeadRow[]> {
-    const filas = await this.prisma.leadVisita.findMany({
-      where: { organizacionId, leadId },
-      orderBy: { programadaEn: 'desc' },
-    });
-
-    return filas.map((f) => ({
-      id: f.id,
-      programadaEn: f.programadaEn,
-      programadaFin: f.programadaFin,
-      duracionMinutos: f.duracionMinutos,
-      referenciaInmueble: f.referenciaInmueble,
-      modalidad: f.modalidad,
-      estado: f.estado,
-      resultado: f.resultado,
-      nota: f.nota,
-      feedback: f.feedback,
-      fechaCreacion: f.fechaCreacion,
-    }));
   }
 
   async obtenerPorId(
     organizacionId: string,
-    visitaId: string,
-  ): Promise<VisitaDetalle | null> {
-    const f = await this.prisma.leadVisita.findFirst({
-      where: { id: visitaId, organizacionId },
+    actividadId: string,
+  ): Promise<ActividadDetalle | null> {
+    const f = await this.prisma.leadActividad.findFirst({
+      where: { id: actividadId, organizacionId },
     });
     if (!f) return null;
     return {
       id: f.id,
       leadId: f.leadId,
+      tipo: f.tipo,
+      titulo: f.titulo,
       programadaEn: f.programadaEn,
       programadaFin: f.programadaFin,
       duracionMinutos: f.duracionMinutos,
       referenciaInmueble: f.referenciaInmueble,
       modalidad: f.modalidad,
       estado: f.estado,
-      resultado: f.resultado,
       nota: f.nota,
-      feedback: f.feedback,
       asignadoUsuarioId: f.asignadoUsuarioId,
     };
   }
 
   async crear(
     organizacionId: string,
-    input: CrearVisitaRepoInput,
-  ): Promise<VisitaAgendaRow> {
-    const f = await this.prisma.leadVisita.create({
+    input: CrearActividadRepoInput,
+  ): Promise<ActividadAgendaRow> {
+    const f = await this.prisma.leadActividad.create({
       data: {
         id: input.id,
         organizacionId,
         leadId: input.leadId,
+        tipo: input.tipo,
+        titulo: input.titulo,
         programadaEn: input.programadaEn,
         programadaFin: input.programadaFin,
         duracionMinutos: input.duracionMinutos,
@@ -116,12 +92,14 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
 
   async actualizar(
     organizacionId: string,
-    visitaId: string,
-    cambios: ActualizarVisitaRepoInput,
-  ): Promise<VisitaAgendaRow> {
-    await this.prisma.leadVisita.updateMany({
-      where: { id: visitaId, organizacionId },
+    actividadId: string,
+    cambios: ActualizarActividadRepoInput,
+  ): Promise<ActividadAgendaRow> {
+    await this.prisma.leadActividad.updateMany({
+      where: { id: actividadId, organizacionId },
       data: {
+        ...(cambios.tipo !== undefined ? { tipo: cambios.tipo } : {}),
+        ...(cambios.titulo !== undefined ? { titulo: cambios.titulo } : {}),
         ...(cambios.programadaEn !== undefined
           ? { programadaEn: cambios.programadaEn }
           : {}),
@@ -138,37 +116,19 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
           ? { modalidad: cambios.modalidad }
           : {}),
         ...(cambios.estado !== undefined ? { estado: cambios.estado } : {}),
-        ...(cambios.resultado !== undefined
-          ? { resultado: cambios.resultado }
-          : {}),
         ...(cambios.nota !== undefined ? { nota: cambios.nota } : {}),
-        ...(cambios.feedback !== undefined
-          ? { feedback: cambios.feedback }
-          : {}),
       },
     });
 
-    const f = await this.prisma.leadVisita.findFirst({
-      where: { id: visitaId, organizacionId },
+    const f = await this.prisma.leadActividad.findFirst({
+      where: { id: actividadId, organizacionId },
       include: {
         lead: { select: { id: true, nombre: true, telefono: true } },
         asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
       },
     });
-    if (!f) {
-      throw new Error('Visita no encontrada tras actualizar');
-    }
+    if (!f) throw new Error('Actividad no encontrada tras actualizar');
     return this.mapAgenda(f);
-  }
-
-  async cancelarProgramadasDelLead(
-    organizacionId: string,
-    leadId: string,
-  ): Promise<void> {
-    await this.prisma.leadVisita.updateMany({
-      where: { organizacionId, leadId, estado: 'PROGRAMADA' },
-      data: { estado: 'CANCELADA', resultado: 'CANCELADA' },
-    });
   }
 
   async existeSolape(
@@ -176,14 +136,14 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
     asignadoUsuarioId: string,
     inicio: Date,
     fin: Date,
-    excluirVisitaId?: string,
+    excluirActividadId?: string,
   ): Promise<boolean> {
-    const conflicto = await this.prisma.leadVisita.findFirst({
+    const conflicto = await this.prisma.leadActividad.findFirst({
       where: {
         organizacionId,
         asignadoUsuarioId,
         estado: 'PROGRAMADA',
-        ...(excluirVisitaId ? { id: { not: excluirVisitaId } } : {}),
+        ...(excluirActividadId ? { id: { not: excluirActividadId } } : {}),
         programadaEn: { lt: fin },
         programadaFin: { gt: inicio },
       },
@@ -195,11 +155,13 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
   private mapAgenda(f: {
     id: string;
     leadId: string;
+    tipo: string;
+    titulo: string;
     programadaEn: Date;
     programadaFin: Date;
     duracionMinutos: number;
-    referenciaInmueble: string;
-    modalidad: string;
+    referenciaInmueble: string | null;
+    modalidad: string | null;
     estado: string;
     nota: string | null;
     lead: { id: string; nombre: string | null; telefono: string | null };
@@ -208,12 +170,14 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       nombre: string;
       apellido: string | null;
     } | null;
-  }): VisitaAgendaRow {
+  }): ActividadAgendaRow {
     return {
       id: f.id,
       leadId: f.leadId,
       leadNombre: f.lead.nombre,
       leadTelefono: f.lead.telefono,
+      tipo: f.tipo,
+      titulo: f.titulo,
       programadaEn: f.programadaEn,
       programadaFin: f.programadaFin,
       duracionMinutos: f.duracionMinutos,

@@ -117,6 +117,19 @@ function camposCompra(estadoDestino: string): CampoTransicionDef[] {
           requerido: true,
         },
         {
+          codigo: 'duracionMinutos',
+          etiqueta: 'Duración',
+          tipo: 'select',
+          requerido: false,
+          opciones: [
+            { codigo: '30', etiqueta: '30 minutos' },
+            { codigo: '60', etiqueta: '60 minutos' },
+            { codigo: '90', etiqueta: '90 minutos' },
+            { codigo: '120', etiqueta: '2 horas' },
+            { codigo: '180', etiqueta: '3 horas' },
+          ],
+        },
+        {
           codigo: 'referenciaInmueble',
           etiqueta: 'Inmueble o proyecto',
           tipo: 'text',
@@ -405,6 +418,7 @@ export const ETIQUETAS_METADATA: Record<string, string> = {
   zona: 'Zona',
   tipoInmueble: 'Tipo de inmueble',
   visitaProgramadaEn: 'Visita programada',
+  duracionMinutos: 'Duración',
   referenciaInmueble: 'Inmueble',
   modalidadVisita: 'Modalidad',
   resultadoVisita: 'Resultado',
@@ -433,15 +447,21 @@ export function etiquetaValorMetadata(
   }
 
   if (codigo === 'visitaProgramadaEn') {
-    try {
-      return new Date(str).toLocaleString('es-PE', {
+    const d = new Date(str);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString('es-PE', {
         timeZone: 'America/Lima',
         dateStyle: 'medium',
         timeStyle: 'short',
       });
-    } catch {
-      return str;
     }
+  }
+
+  if (codigo === 'duracionMinutos') {
+    const n = Number.parseInt(str, 10);
+    if (n === 120) return '2 horas';
+    if (n === 180) return '3 horas';
+    if (!Number.isNaN(n)) return `${n} minutos`;
   }
 
   return str;

@@ -1,10 +1,16 @@
 import { randomUUID } from 'crypto';
+import {
+  calcularProgramadaFin,
+  normalizarDuracionMinutos,
+} from './agenda-visitas';
 
 /** Mapea metadata validada a entidades estructuradas (Fase 22). */
 
 export interface CrearVisitaTransicionInput {
   id: string;
   programadaEn: Date;
+  programadaFin: Date;
+  duracionMinutos: number;
   referenciaInmueble: string;
   modalidad: string;
   nota?: string | null;
@@ -33,6 +39,7 @@ const CAMPOS_VISITA = new Set([
   'visitaProgramadaEn',
   'referenciaInmueble',
   'modalidadVisita',
+  'duracionMinutos',
 ]);
 
 const CAMPOS_CALIFICACION = new Set([
@@ -82,9 +89,13 @@ export function construirVisitaDesdeMetadata(
   const programadaEn = new Date(metadata.visitaProgramadaEn);
   if (Number.isNaN(programadaEn.getTime())) return null;
 
+  const duracionMinutos = normalizarDuracionMinutos(metadata.duracionMinutos);
+
   return {
     id: randomUUID(),
     programadaEn,
+    programadaFin: calcularProgramadaFin(programadaEn, duracionMinutos),
+    duracionMinutos,
     referenciaInmueble: metadata.referenciaInmueble,
     modalidad: metadata.modalidadVisita ?? 'PRESENCIAL',
     nota: ctx.notaTransicion ?? null,

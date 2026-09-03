@@ -142,6 +142,8 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
             organizacionId: historial.organizacionId,
             leadId: historial.leadId,
             programadaEn: v.programadaEn,
+            programadaFin: v.programadaFin,
+            duracionMinutos: v.duracionMinutos,
             referenciaInmueble: v.referenciaInmueble,
             modalidad: v.modalidad,
             nota: v.nota,
@@ -230,10 +232,13 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           select: {
             id: true,
             programadaEn: true,
+            programadaFin: true,
+            duracionMinutos: true,
             referenciaInmueble: true,
             modalidad: true,
             estado: true,
             resultado: true,
+            nota: true,
           },
         },
         calificacion: {

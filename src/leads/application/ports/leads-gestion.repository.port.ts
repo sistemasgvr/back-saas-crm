@@ -31,6 +31,8 @@ export interface RegistrarHistorialInput {
   crearVisita?: {
     id: string;
     programadaEn: Date;
+    programadaFin: Date;
+    duracionMinutos: number;
     referenciaInmueble: string;
     modalidad: string;
     nota?: string | null;
@@ -67,10 +69,13 @@ export interface HistorialEstadoRow {
   visita: {
     id: string;
     programadaEn: Date;
+    programadaFin: Date;
+    duracionMinutos: number;
     referenciaInmueble: string;
     modalidad: string;
     estado: string;
     resultado: string | null;
+    nota: string | null;
   } | null;
   calificacion: {
     id: string;

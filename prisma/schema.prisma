@@ -40,6 +40,8 @@ model Usuario {
   leadEstadoHistorial   LeadEstadoHistorial[]
   leadVisitasAsignadas  LeadVisita[]          @relation("LeadVisitaAsignado")
   leadVisitasCreadas    LeadVisita[]          @relation("LeadVisitaCreadoPor")
+  leadActividadesAsignadas LeadActividad[]    @relation("LeadActividadAsignado")
+  leadActividadesCreadas   LeadActividad[]    @relation("LeadActividadCreadoPor")
   leadCalificaciones    LeadCalificacion[]    @relation("LeadCalificacionUsuario")
 
   leadAutoAsignacionConfigsPrimero LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionPrimero")
@@ -249,6 +251,7 @@ model Lead {
   whatsappConversaciones WhatsappConversacion[]
   estadoHistorial        LeadEstadoHistorial[]
   visitas                LeadVisita[]
+  actividades            LeadActividad[]
   calificaciones         LeadCalificacion[]
 
   leadAutoAsignacionQueue LeadAutoAsignacionQueue[]
@@ -368,6 +371,10 @@ model LeadVisita {
   leadId         String @map("lead_id") @db.Uuid
 
   programadaEn       DateTime @map("programada_en") @db.Timestamptz
+  /** Fin denormalizado = programadaEn + duracionMinutos (anti-solape / calendario). */
+  programadaFin      DateTime @map("programada_fin") @db.Timestamptz
+  /** Duración de la cita en minutos (30–180; default 60). */
+  duracionMinutos    Int      @default(60) @map("duracion_minutos") @db.SmallInt
   referenciaInmueble String   @map("referencia_inmueble") @db.VarChar(300)
   direccion          String?  @db.VarChar(300)
   modalidad          String   @default("PRESENCIAL") @db.VarChar(20)
@@ -398,8 +405,52 @@ model LeadVisita {
   @@index([organizacionId, programadaEn])
   @@index([leadId, programadaEn])
   @@index([asignadoUsuarioId, programadaEn])
+  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin])
   @@index([organizacionId, estado, programadaEn])
   @@map("lead_visitas")
+}
+
+/**
+ * Actividad de agenda (llamada, reunión, seguimiento, visita u otra).
+ * Independiente del pipeline — se agenda desde /agenda sin exigir transición.
+ */
+model LeadActividad {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  leadId         String @map("lead_id") @db.Uuid
+
+  /** VISITA | LLAMADA | REUNION | SEGUIMIENTO | OTRO */
+  tipo    String @db.VarChar(30)
+  /** Título corto visible en calendario */
+  titulo  String @db.VarChar(200)
+
+  programadaEn    DateTime @map("programada_en") @db.Timestamptz
+  programadaFin   DateTime @map("programada_fin") @db.Timestamptz
+  duracionMinutos Int      @default(60) @map("duracion_minutos") @db.SmallInt
+
+  /** Solo relevante si tipo = VISITA */
+  referenciaInmueble String? @map("referencia_inmueble") @db.VarChar(300)
+  modalidad          String? @db.VarChar(20)
+
+  /** PROGRAMADA | COMPLETADA | CANCELADA */
+  estado String  @default("PROGRAMADA") @db.VarChar(20)
+  nota   String? @db.VarChar(500)
+
+  asignadoUsuarioId  String? @map("asignado_usuario_id") @db.Uuid
+  creadoPorUsuarioId String? @map("creado_por_usuario_id") @db.Uuid
+
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  lead             Lead     @relation(fields: [leadId], references: [id])
+  asignadoUsuario  Usuario? @relation("LeadActividadAsignado", fields: [asignadoUsuarioId], references: [id])
+  creadoPorUsuario Usuario? @relation("LeadActividadCreadoPor", fields: [creadoPorUsuarioId], references: [id])
+
+  @@index([organizacionId, programadaEn])
+  @@index([leadId, programadaEn])
+  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin])
+  @@index([organizacionId, estado, programadaEn])
+  @@map("lead_actividades")
 }
 
 /**

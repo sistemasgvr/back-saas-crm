@@ -37,6 +37,17 @@ import {
   construirVisitaDesdeMetadata,
   metadataHistorialLigera,
 } from '../../../shared/domain/entidades-transicion-pipeline';
+import {
+  estaEnHorarioLaboral,
+  esVisitaEnPasado,
+  mensajeHorarioLaboral,
+  mensajeSolapeVisita,
+  mensajeVisitaPasado,
+} from '../../../shared/domain/agenda-visitas';
+import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
+import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
+import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
+import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -68,6 +79,10 @@ export class ActualizarGestionLeadUseCase {
   constructor(
     @Inject(LEADS_GESTION_REPOSITORY)
     private readonly leads: LeadsGestionRepository,
+    @Inject(LEAD_VISITAS_REPOSITORY)
+    private readonly visitas: LeadVisitasRepository,
+    @Inject(LEAD_ACTIVIDADES_REPOSITORY)
+    private readonly actividades: LeadActividadesRepository,
     private readonly enviarEventoCapi: EnviarEventoConversionLeadUseCase,
   ) {}
 
@@ -258,6 +273,32 @@ export class ActualizarGestionLeadUseCase {
       throw new BadRequestException(
         'No se pudo registrar la visita — revisa fecha/hora e inmueble',
       );
+    }
+
+    if (crearVisita) {
+      if (esVisitaEnPasado(crearVisita.programadaEn)) {
+        throw new BadRequestException(mensajeVisitaPasado());
+      }
+      if (!estaEnHorarioLaboral(crearVisita.programadaEn, crearVisita.programadaFin)) {
+        throw new BadRequestException(mensajeHorarioLaboral());
+      }
+      if (crearVisita.asignadoUsuarioId) {
+        const solapa = await this.visitas.existeSolape(
+          organizacionId,
+          crearVisita.asignadoUsuarioId,
+          crearVisita.programadaEn,
+          crearVisita.programadaFin,
+        );
+        const solapaAct = await this.actividades.existeSolape(
+          organizacionId,
+          crearVisita.asignadoUsuarioId,
+          crearVisita.programadaEn,
+          crearVisita.programadaFin,
+        );
+        if (solapa || solapaAct) {
+          throw new ConflictException(mensajeSolapeVisita());
+        }
+      }
     }
 
     const cerrarVisita =
