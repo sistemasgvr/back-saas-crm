@@ -1,8 +1,11 @@
 import {
+  Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Param,
   ParseUUIDPipe,
   Post,
@@ -24,7 +27,15 @@ import { ListarNotificacionesUseCase } from '../application/use-cases/listar-not
 import { ContarNoLeidasUseCase } from '../application/use-cases/contar-no-leidas.use-case';
 import { MarcarLeidaUseCase } from '../application/use-cases/marcar-leida.use-case';
 import { MarcarTodasLeidasUseCase } from '../application/use-cases/marcar-todas-leidas.use-case';
+import { RegistrarSuscripcionPushUseCase } from '../application/use-cases/registrar-suscripcion-push.use-case';
+import { EliminarSuscripcionPushUseCase } from '../application/use-cases/eliminar-suscripcion-push.use-case';
 import { ListarNotificacionesQueryDto } from './dto/listar-notificaciones.query.dto';
+import {
+  EliminarSuscripcionPushDto,
+  SuscripcionPushDto,
+} from './dto/suscripcion-push.dto';
+import { PUSH_SENDER } from '../application/ports/push-sender.port';
+import type { PushSender } from '../application/ports/push-sender.port';
 
 @ApiTags('Notifications')
 @ApiBearerAuth('JWT-auth')
@@ -37,6 +48,9 @@ export class NotificationsController {
     private readonly contarNoLeidas: ContarNoLeidasUseCase,
     private readonly marcarLeida: MarcarLeidaUseCase,
     private readonly marcarTodasLeidas: MarcarTodasLeidasUseCase,
+    private readonly registrarPush: RegistrarSuscripcionPushUseCase,
+    private readonly eliminarPush: EliminarSuscripcionPushUseCase,
+    @Inject(PUSH_SENDER) private readonly pushSender: PushSender,
   ) {}
 
   @Post('socket-ticket')
@@ -50,6 +64,46 @@ export class NotificationsController {
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   emitirTicket(@CurrentUser() ctx: RequestContext) {
     return { ticket: this.wsTicket.emitir(ctx.usuarioId, ctx.organizacionId!) };
+  }
+
+  @Get('push/vapid-public-key')
+  @ApiOperation({
+    summary: 'Clave pública VAPID',
+    description:
+      'Para suscribir el Service Worker a Web Push. Si push no está configurado, enabled=false.',
+  })
+  vapidPublicKey() {
+    const key = this.pushSender.publicKey();
+    return { enabled: Boolean(key), publicKey: key };
+  }
+
+  @Post('push/subscribe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Registrar suscripción Web Push de este dispositivo' })
+  async subscribePush(
+    @CurrentUser() ctx: RequestContext,
+    @Body() body: SuscripcionPushDto,
+  ) {
+    const { id } = await this.registrarPush.execute({
+      organizacionId: ctx.organizacionId!,
+      usuarioId: ctx.usuarioId,
+      endpoint: body.endpoint,
+      p256dh: body.keys.p256dh,
+      auth: body.keys.auth,
+      userAgent: body.userAgent,
+    });
+    return { id };
+  }
+
+  @Delete('push/subscribe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Desactivar suscripción Web Push de este dispositivo' })
+  async unsubscribePush(
+    @CurrentUser() ctx: RequestContext,
+    @Body() body: EliminarSuscripcionPushDto,
+  ) {
+    await this.eliminarPush.execute(ctx.usuarioId, body.endpoint);
+    return { ok: true };
   }
 
   @Get()

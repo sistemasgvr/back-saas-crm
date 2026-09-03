@@ -3,6 +3,8 @@ import { NOTIFICACIONES_REPOSITORY } from '../ports/notificaciones.repository.po
 import type { NotificacionesRepository } from '../ports/notificaciones.repository.port';
 import { WS_EMITTER } from '../ports/ws-emitter.port';
 import type { WsEmitter } from '../ports/ws-emitter.port';
+import { PUSH_SENDER } from '../ports/push-sender.port';
+import type { PushSender } from '../ports/push-sender.port';
 
 export interface CrearNotificacionInput {
   organizacionId: string;
@@ -15,9 +17,9 @@ export interface CrearNotificacionInput {
 }
 
 /**
- * Punto de entrada genérico para disparar cualquier tipo de notificación
- * (hoy solo "lead nuevo" lo usa, pero está diseñado para más tipos futuros
- * sin cambios de esquema — el discriminador `tipo` es un string libre).
+ * Punto de entrada genérico para disparar cualquier tipo de notificación.
+ * Persiste, emite por WebSocket y, si hay VAPID, envía Web Push a los
+ * dispositivos suscritos (móvil / pestaña cerrada).
  */
 @Injectable()
 export class CrearNotificacionUseCase {
@@ -25,9 +27,10 @@ export class CrearNotificacionUseCase {
     @Inject(NOTIFICACIONES_REPOSITORY)
     private readonly repo: NotificacionesRepository,
     @Inject(WS_EMITTER) private readonly wsEmitter: WsEmitter,
+    @Inject(PUSH_SENDER) private readonly pushSender: PushSender,
   ) {}
 
-  async execute(input: CrearNotificacionInput): Promise<void> {
+  async execute(input: CrearNotificacionInput): Promise<{ id: string } | void> {
     const usuarioIds =
       input.usuarioIds ??
       (await this.repo.findUsuarioIdsActivosDeOrganizacion(
@@ -44,13 +47,25 @@ export class CrearNotificacionUseCase {
       usuarioIds,
     });
 
-    this.wsEmitter.emitirAUsuarios(usuarioIds, 'notificacion:nueva', {
+    const evento = {
       id: creada.id,
       tipo: creada.tipo,
       titulo: creada.titulo,
       mensaje: creada.mensaje,
       payload: creada.payload,
       fechaCreacion: creada.fechaCreacion,
+    };
+
+    this.wsEmitter.emitirAUsuarios(usuarioIds, 'notificacion:nueva', evento);
+
+    void this.pushSender.enviarAUsuarios(usuarioIds, {
+      id: creada.id,
+      tipo: creada.tipo,
+      titulo: creada.titulo,
+      mensaje: creada.mensaje,
+      payload: creada.payload as Record<string, unknown> | null,
     });
+
+    return { id: creada.id };
   }
 }

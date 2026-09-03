@@ -12,7 +12,7 @@ datasource db {
 // Fase 7 — Meta OAuth (§4.8): meta_conexiones.
 // Fase 8 — modelo Meta (§4.9-4.12): campanas, conjuntos_anuncios, anuncios, leads.
 // La ingestión real (poblar estas tablas desde el webhook) es Fase 9.
-// Fase 12 — Notificaciones in-app por WebSocket (sin push del navegador por ahora): notificaciones, notificaciones_usuario.
+// Fase 12 — Notificaciones in-app por WebSocket + Web Push (suscripciones_push) y recordatorios de agenda.
 // Fase 13 — Meta multi-origen (PLAN-FASE-13-META-MULTI.md): meta_paginas, meta_cuentas_publicitarias (N por org).
 
 model Usuario {
@@ -35,6 +35,7 @@ model Usuario {
   organizacionUsuarios  OrganizacionUsuario[]
   tokensRefresco        TokenRefresco[]
   notificacionesUsuario NotificacionUsuario[]
+  suscripcionesPush     SuscripcionPush[]
   leadsAsignados        Lead[]                @relation("LeadAsignado")
   leadsAsignadosPor     Lead[]                @relation("LeadAsignadoPor")
   leadEstadoHistorial   LeadEstadoHistorial[]
@@ -113,6 +114,7 @@ model Organizacion {
   leadAutoAsignacionQueue  LeadAutoAsignacionQueue[]
   notificaciones           Notificacion[]
   notificacionesUsuario    NotificacionUsuario[]
+  suscripcionesPush        SuscripcionPush[]
   whatsappConexiones       WhatsappConexion[]
   whatsappConversaciones   WhatsappConversacion[]
 
@@ -782,6 +784,53 @@ model NotificacionUsuario {
   @@index([notificacionId])
   @@index([estado])
   @@map("notificaciones_usuario")
+}
+
+/**
+ * Suscripción Web Push por dispositivo/navegador.
+ * Permite avisos del SO con el CRM cerrado o en segundo plano (Android Chrome;
+ * iOS solo si la PWA está instalada en pantalla de inicio).
+ */
+model SuscripcionPush {
+  id             String @id @default(uuid()) @db.Uuid
+  usuarioId      String @map("usuario_id") @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  endpoint       String
+  p256dh         String @db.VarChar(255)
+  auth           String @db.VarChar(255)
+  userAgent      String? @map("user_agent") @db.VarChar(255)
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+
+  @@unique([endpoint])
+  @@index([usuarioId])
+  @@index([organizacionId])
+  @@index([estado])
+  @@map("suscripciones_push")
+}
+
+/**
+ * Idempotencia de recordatorios de agenda (visita o actividad × offset en minutos).
+ */
+model AgendaRecordatorioEnviado {
+  id             String   @id @default(uuid()) @db.Uuid
+  /** VISITA | ACTIVIDAD */
+  origen         String   @db.VarChar(20)
+  itemId         String   @map("item_id") @db.Uuid
+  offsetMinutos  Int      @map("offset_minutos") @db.SmallInt
+  notificacionId String?  @map("notificacion_id") @db.Uuid
+  fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  @@unique([origen, itemId, offsetMinutos])
+  @@index([itemId])
+  @@map("agenda_recordatorios_enviados")
 }
 
 model WhatsappConexion {

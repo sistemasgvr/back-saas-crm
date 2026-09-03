@@ -68,6 +68,11 @@ export const envValidationSchema = Joi.object({
   SEED_ADMIN_PASSWORD: Joi.string().optional(),
   SEED_ADMIN_NOMBRE: Joi.string().optional(),
   SEED_ADMIN_APELLIDO: Joi.string().optional(),
+
+  /** Web Push (opcional). Sin estas claves el CRM sigue con WS + toast; push queda off. */
+  VAPID_PUBLIC_KEY: Joi.string().optional(),
+  VAPID_PRIVATE_KEY: Joi.string().optional(),
+  VAPID_SUBJECT: Joi.string().optional(),
 });
 
 export const envValidationOptions = {
