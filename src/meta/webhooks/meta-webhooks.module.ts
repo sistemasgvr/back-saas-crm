@@ -7,12 +7,14 @@ import { NotificationsModule } from '../../notifications/notifications.module';
 import { WhatsappMessagingModule } from '../../whatsapp/messaging/whatsapp-messaging.module';
 import { VerificarWebhookMetaUseCase } from './application/use-cases/verificar-webhook-meta.use-case';
 import { MetaWebhooksController } from './presentation/meta-webhooks.controller';
+import { LeadsModule } from '../../leads/leads.module';
 
 @Module({
   imports: [
     MetaConnectionsModule,
     MetaPagesModule,
     MetaLeadsModule,
+    LeadsModule,
     PrismaModule,
     NotificationsModule,
     WhatsappMessagingModule,

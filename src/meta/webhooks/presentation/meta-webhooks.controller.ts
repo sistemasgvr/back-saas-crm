@@ -21,6 +21,7 @@ import { extraerEventosWhatsApp } from '../domain/whatsapp-webhook-payload.inter
 import type { WhatsappWebhookPayload } from '../domain/whatsapp-webhook-payload.interface';
 import { VerificarWebhookMetaUseCase } from '../application/use-cases/verificar-webhook-meta.use-case';
 import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
+import { AutoAsignarLeadUseCase } from '../../../leads/application/use-cases/auto-asignar-lead.use-case';
 import { ProcesarMensajeWhatsAppEntranteUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-mensaje-whatsapp-entrante.use-case';
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
@@ -37,6 +38,7 @@ export class MetaWebhooksController {
     private readonly config: ConfigService,
     private readonly verificarWebhook: VerificarWebhookMetaUseCase,
     private readonly procesarLead: ProcesarLeadEntranteUseCase,
+    private readonly autoAsignarLead: AutoAsignarLeadUseCase,
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly procesarMensajeWhatsApp: ProcesarMensajeWhatsAppEntranteUseCase,
     private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
@@ -246,6 +248,26 @@ export class MetaWebhooksController {
           resultado.leadId &&
           resultado.organizacionId
         ) {
+          // Auto-asignación: las notificaciones “LEAD_NUEVO” deben llegar solo
+          // al responsable resultante (asignadoUsuarioId) y no a toda la organización.
+          // Si no existe responsable, no se emite notificación.
+          let usuarioIds: string[] = [];
+          try {
+            const asignacion = await this.autoAsignarLead.execute(
+              resultado.organizacionId,
+              resultado.leadId,
+            );
+            usuarioIds = asignacion.asignadoUsuarioId
+              ? [asignacion.asignadoUsuarioId]
+              : [];
+          } catch (error: unknown) {
+            this.logger.error(
+              'Error auto-asignando lead entrante',
+              error instanceof Error ? error.stack : error,
+            );
+            usuarioIds = [];
+          }
+
           void this.crearNotificacion
             .execute({
               organizacionId: resultado.organizacionId,
@@ -253,6 +275,7 @@ export class MetaWebhooksController {
               titulo: 'Nuevo lead',
               mensaje: 'Llegó un nuevo lead desde Meta.',
               payload: { leadId: resultado.leadId },
+              usuarioIds,
             })
             .catch((error: unknown) =>
               this.logger.error(

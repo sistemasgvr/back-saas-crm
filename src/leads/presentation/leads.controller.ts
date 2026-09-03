@@ -39,11 +39,14 @@ import { ListarTableroLeadsUseCase } from '../application/use-cases/listar-table
 import { ContarLeadsNuevosUseCase } from '../application/use-cases/contar-leads-nuevos.use-case';
 import { ListarAgendaVisitasUseCase } from '../application/use-cases/listar-agenda-visitas.use-case';
 import { ListarVisitasLeadUseCase } from '../application/use-cases/listar-visitas-lead.use-case';
+import { ObtenerAutoAsignacionConfigUseCase } from '../application/use-cases/obtener-auto-asignacion-config.use-case';
+import { ActualizarAutoAsignacionConfigUseCase } from '../application/use-cases/actualizar-auto-asignacion-config.use-case';
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../application/ports/leads-lectura.repository.port';
 import { ListarLeadsQueryDto } from './dto/listar-leads.query.dto';
 import { AsignarLeadDto } from './dto/asignar-lead.dto';
 import { ActualizarGestionLeadDto } from './dto/actualizar-gestion-lead.dto';
+import { AutoAsignacionLeadsConfigDto } from './dto/auto-asignacion-leads-config.dto';
 
 @ApiTags('Leads')
 @ApiBearerAuth('JWT-auth')
@@ -64,6 +67,8 @@ export class LeadsController {
     private readonly contarLeadsNuevos: ContarLeadsNuevosUseCase,
     private readonly listarAgendaVisitas: ListarAgendaVisitasUseCase,
     private readonly listarVisitasLead: ListarVisitasLeadUseCase,
+    private readonly obtenerAutoAsignacionConfig: ObtenerAutoAsignacionConfigUseCase,
+    private readonly actualizarAutoAsignacionConfig: ActualizarAutoAsignacionConfigUseCase,
     @Inject(LEADS_LECTURA_REPOSITORY)
     private readonly leadsLectura: LeadsLecturaRepository,
   ) {}
@@ -103,6 +108,35 @@ export class LeadsController {
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   asignables(@CurrentUser() ctx: RequestContext) {
     return this.leadsLectura.listarMiembrosAsignables(ctx.organizacionId!);
+  }
+
+  @Get('auto-asignacion/config')
+  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @ApiOperation({
+    summary: 'Configurar auto-asignación secuencial de leads',
+    description:
+      'Obtiene la configuración por organización para auto-asignar leads NUEVO en round-robin (ej. David/Daimler).',
+  })
+  @ApiResponse({ status: 200, description: 'Config de auto-asignación.' })
+  autoAsignacionConfigGet(@CurrentUser() ctx: RequestContext) {
+    return this.obtenerAutoAsignacionConfig.execute(ctx.organizacionId!);
+  }
+
+  @Patch('auto-asignacion/config')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @ApiOperation({
+    summary: 'Guardar configuración de auto-asignación secuencial de leads',
+  })
+  @ApiResponse({ status: 204, description: 'Config actualizada.' })
+  autoAsignacionConfigPatch(
+    @CurrentUser() ctx: RequestContext,
+    @Body() dto: AutoAsignacionLeadsConfigDto,
+  ) {
+    return this.actualizarAutoAsignacionConfig.execute(ctx.organizacionId!, {
+      habilitado: dto.habilitado,
+      usuarioIds: dto.usuarioIds,
+    });
   }
 
   @Get('nuevos/count')

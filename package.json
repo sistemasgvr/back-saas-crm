@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "preinstall": "node -e \"require('fs').mkdirSync('node_modules/.bin',{recursive:true})\"",
-    "build": "nest build --webpack --webpackPath webpack.config.js && prisma generate",
+    "build": "prisma generate && nest build --webpack --webpackPath webpack.config.js",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "postinstall": "prisma generate",
     "start": "cross-env NODE_ENV=production node dist/main.js",

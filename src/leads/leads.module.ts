@@ -14,12 +14,19 @@ import { ContarLeadsNuevosUseCase } from './application/use-cases/contar-leads-n
 import { ListarAgendaVisitasUseCase } from './application/use-cases/listar-agenda-visitas.use-case';
 import { ListarVisitasLeadUseCase } from './application/use-cases/listar-visitas-lead.use-case';
 import { EnviarEventoConversionLeadUseCase } from './application/use-cases/enviar-evento-conversion-lead.use-case';
+import { AutoAsignarLeadUseCase } from './application/use-cases/auto-asignar-lead.use-case';
+import { ObtenerAutoAsignacionConfigUseCase } from './application/use-cases/obtener-auto-asignacion-config.use-case';
+import { ActualizarAutoAsignacionConfigUseCase } from './application/use-cases/actualizar-auto-asignacion-config.use-case';
 import { LEADS_LECTURA_REPOSITORY } from './application/ports/leads-lectura.repository.port';
 import { PrismaLeadsLecturaRepository } from './infrastructure/prisma-leads-lectura.repository';
 import { LEADS_GESTION_REPOSITORY } from './application/ports/leads-gestion.repository.port';
 import { PrismaLeadsGestionRepository } from './infrastructure/prisma-leads-gestion.repository';
 import { LEAD_VISITAS_REPOSITORY } from './application/ports/lead-visitas.repository.port';
 import { PrismaLeadVisitasRepository } from './infrastructure/prisma-lead-visitas.repository';
+import {
+  LEAD_AUTO_ASIGNACION_REPOSITORY,
+} from './application/ports/lead-auto-asignacion.repository.port';
+import { PrismaLeadAutoAsignacionRepository } from './infrastructure/prisma-lead-auto-asignacion.repository';
 
 @Module({
   imports: [forwardRef(() => MetaConnectionsModule)],
@@ -38,6 +45,9 @@ import { PrismaLeadVisitasRepository } from './infrastructure/prisma-lead-visita
     ListarAgendaVisitasUseCase,
     ListarVisitasLeadUseCase,
     EnviarEventoConversionLeadUseCase,
+    AutoAsignarLeadUseCase,
+    ObtenerAutoAsignacionConfigUseCase,
+    ActualizarAutoAsignacionConfigUseCase,
     {
       provide: LEADS_LECTURA_REPOSITORY,
       useClass: PrismaLeadsLecturaRepository,
@@ -50,7 +60,11 @@ import { PrismaLeadVisitasRepository } from './infrastructure/prisma-lead-visita
       provide: LEAD_VISITAS_REPOSITORY,
       useClass: PrismaLeadVisitasRepository,
     },
+    {
+      provide: LEAD_AUTO_ASIGNACION_REPOSITORY,
+      useClass: PrismaLeadAutoAsignacionRepository,
+    },
   ],
-  exports: [LEADS_LECTURA_REPOSITORY],
+  exports: [LEADS_LECTURA_REPOSITORY, AutoAsignarLeadUseCase],
 })
 export class LeadsModule {}

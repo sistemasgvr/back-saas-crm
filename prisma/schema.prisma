@@ -42,6 +42,9 @@ model Usuario {
   leadVisitasCreadas    LeadVisita[]          @relation("LeadVisitaCreadoPor")
   leadCalificaciones    LeadCalificacion[]    @relation("LeadCalificacionUsuario")
 
+  leadAutoAsignacionConfigsPrimero LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionPrimero")
+  leadAutoAsignacionConfigsSegundo LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionSegundo")
+
   @@index([esAdminPlataforma])
   @@index([estado])
   @@map("usuarios")
@@ -104,6 +107,8 @@ model Organizacion {
   metaInsightsDiarios      MetaInsightDiario[]
   campanas                 Campana[]
   leads                    Lead[]
+  leadAutoAsignacionConfig LeadAutoAsignacionConfig?
+  leadAutoAsignacionQueue  LeadAutoAsignacionQueue[]
   notificaciones           Notificacion[]
   notificacionesUsuario    NotificacionUsuario[]
   whatsappConexiones       WhatsappConexion[]
@@ -246,6 +251,8 @@ model Lead {
   visitas                LeadVisita[]
   calificaciones         LeadCalificacion[]
 
+  leadAutoAsignacionQueue LeadAutoAsignacionQueue[]
+
   @@unique([organizacionId, idExterno])
   @@index([email])
   @@index([telefono])
@@ -260,6 +267,61 @@ model Lead {
   @@index([organizacionId, estadoGestion])
   @@index([organizacionId, tipoLead, estadoGestion])
   @@map("leads")
+}
+
+/**
+ * Config + cola para auto-asignación secuencial de leads NUEVO al entrar.
+ * (PLAN: round-robin por tenant + orden por lead.fecha_lead)
+ */
+model LeadAutoAsignacionConfig {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizacionId String @unique @map("organizacion_id") @db.Uuid
+  habilitado Int @default(0) @map("habilitado") @db.SmallInt
+
+  /**
+   * Legacy de 2 usuarios: el orden de estos dos IDs define qué usuario recibe
+   * el “primer” lead cuando `usuarioIds` no está configurado (backfill vía migración).
+   */
+  usuarioPrimeroId String @map("usuario_primero_id") @db.Uuid
+  usuarioSegundoId String @map("usuario_segundo_id") @db.Uuid
+
+  /**
+   * Lista (N) de IDs para el round-robin (JSONB).
+   * Si está vacío/null, la lógica usa [usuarioPrimeroId, usuarioSegundoId]
+   * por compatibilidad con configs existentes.
+   */
+  usuarioIds Json? @map("usuario_ids")
+
+  siguienteIndice Int @default(0) @map("siguiente_indice") @db.SmallInt
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  usuarioPrimero Usuario @relation("LeadAutoAsignacionPrimero", fields: [usuarioPrimeroId], references: [id])
+  usuarioSegundo Usuario @relation("LeadAutoAsignacionSegundo", fields: [usuarioSegundoId], references: [id])
+
+  @@map("lead_auto_asignacion_config")
+}
+
+/**
+ * Cola de leads recién creados para procesar en orden por `fecha_lead`.
+ * La fila se elimina cuando se asigna o cuando se descarta porque alguien
+ * lo tomó manualmente.
+ */
+model LeadAutoAsignacionQueue {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizacionId String @map("organizacion_id") @db.Uuid
+  leadId String @map("lead_id") @db.Uuid
+  fechaLead DateTime @map("fecha_lead") @db.Timestamptz
+  fechaEncolado DateTime @default(now()) @map("fecha_encolado") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  lead Lead @relation(fields: [leadId], references: [id])
+
+  @@unique([organizacionId, leadId])
+  @@index([organizacionId, fechaLead, fechaEncolado])
+  @@map("lead_auto_asignacion_queue")
 }
 
 /**
