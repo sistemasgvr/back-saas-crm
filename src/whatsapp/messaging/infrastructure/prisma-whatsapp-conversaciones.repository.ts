@@ -7,6 +7,7 @@ import type {
   FiltroVisibilidadChats,
   InteractivoMensajeRow,
   MediaMensaje,
+  MensajeParaReenviar,
   MensajeResuelto,
   MensajeRow,
   RegistrarMensajeInput,
@@ -63,6 +64,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
       ultimoMensajeTexto: c.mensajes[0]?.texto ?? null,
+      bloqueado: c.bloqueado === 1,
     }));
   }
 
@@ -110,6 +112,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
       ultimoMensajeTexto: c.mensajes[0]?.texto ?? null,
+      bloqueado: c.bloqueado === 1,
     };
   }
 
@@ -462,7 +465,9 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     // aplican, sin importar el orden.
     await this.prisma.$executeRaw`
       UPDATE whatsapp_mensajes
-      SET estado_entrega = ${estado}
+      SET estado_entrega = ${estado},
+          texto = CASE WHEN ${estado} = 'eliminado' THEN NULL ELSE texto END,
+          media_caption = CASE WHEN ${estado} = 'eliminado' THEN NULL ELSE media_caption END
       WHERE organizacion_id = ${organizacionId}::uuid
         AND wamid = ${wamid}
         AND (
@@ -477,5 +482,61 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
              )
         )
     `;
+  }
+
+  async marcarMensajeEliminadoEnCrm(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<boolean> {
+    const resultado = await this.prisma.whatsappMensaje.updateMany({
+      where: { id: mensajeId, organizacionId },
+      data: {
+        estadoEntrega: 'eliminado',
+        texto: null,
+        mediaCaption: null,
+      },
+    });
+    return resultado.count > 0;
+  }
+
+  async marcarBloqueado(
+    conversacionId: string,
+    bloqueado: boolean,
+  ): Promise<void> {
+    await this.prisma.whatsappConversacion.update({
+      where: { id: conversacionId },
+      data: { bloqueado: bloqueado ? 1 : 0 },
+    });
+  }
+
+  async buscarMensajeParaReenviar(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MensajeParaReenviar | null> {
+    const mensaje = await this.prisma.whatsappMensaje.findFirst({
+      where: { id: mensajeId, organizacionId },
+      include: { media: true },
+    });
+    if (!mensaje) return null;
+    return {
+      id: mensaje.id,
+      whatsappConversacionId: mensaje.whatsappConversacionId,
+      tipo: mensaje.tipo,
+      texto: mensaje.texto,
+      mediaMimeType: mensaje.mediaMimeType,
+      mediaNombreArchivo: mensaje.mediaNombreArchivo,
+      mediaCaption: mensaje.mediaCaption,
+      mediaEsVoz: mensaje.mediaEsVoz,
+      mediaBytes: mensaje.media ? Buffer.from(mensaje.media.bytes) : null,
+      ubicacionLatitud: mensaje.ubicacionLatitud,
+      ubicacionLongitud: mensaje.ubicacionLongitud,
+      ubicacionNombre: mensaje.ubicacionNombre,
+      ubicacionDireccion: mensaje.ubicacionDireccion,
+      contactos:
+        (mensaje.contactos as unknown as
+          | ContactoMensajeRow
+          | ContactoMensajeRow[]
+          | null) ?? null,
+    };
   }
 }

@@ -845,6 +845,11 @@ model WhatsappConversacion {
    */
   ventanaExpiraEn DateTime? @map("ventana_expira_en") @db.Timestamptz
   noLeidos        Int       @default(0) @map("no_leidos")
+  /**
+   * 1 = contacto bloqueado vía Cloud API (block_users) — no puede escribir
+   * al negocio ni el negocio le manda (salvo desbloquear).
+   */
+  bloqueado       Int       @default(0) @db.SmallInt
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid

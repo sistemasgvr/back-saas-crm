@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
@@ -53,6 +54,10 @@ import { SubirMediaDto } from './dto/subir-media.dto';
 import { EnviarUbicacionDto } from './dto/enviar-ubicacion.dto';
 import { EnviarContactoDto } from './dto/enviar-contacto.dto';
 import { EnviarInteractivoDto } from './dto/enviar-interactivo.dto';
+import { ReenviarMensajeDto } from './dto/reenviar-mensaje.dto';
+import { BloquearContactoWhatsAppUseCase } from '../application/use-cases/bloquear-contacto-whatsapp.use-case';
+import { EliminarMensajeWhatsAppCrmUseCase } from '../application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
+import { ReenviarMensajeWhatsAppUseCase } from '../application/use-cases/reenviar-mensaje-whatsapp.use-case';
 
 // El límite real por tipo lo valida validarArchivoWhatsApp() en el use-case
 // (5MB imagen / 16MB audio-video / 100MB documento) — este es solo el tope
@@ -80,6 +85,9 @@ export class WhatsappChatsController {
     private readonly listarPlantillas: ListarPlantillasUseCase,
     private readonly crearPlantilla: CrearPlantillaUseCase,
     private readonly iniciarDesdeLead: IniciarConversacionDesdeLeadUseCase,
+    private readonly bloquearContacto: BloquearContactoWhatsAppUseCase,
+    private readonly eliminarMensajeCrm: EliminarMensajeWhatsAppCrmUseCase,
+    private readonly reenviarMensaje: ReenviarMensajeWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -440,6 +448,79 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  @Post(':id/block')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Bloquear contacto en WhatsApp (block_users)' })
+  @ApiResponse({ status: 204, description: 'Contacto bloqueado.' })
+  blockContact(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.bloquearContacto.execute(ctx.organizacionId!, id, true, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Delete(':id/block')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Desbloquear contacto en WhatsApp' })
+  @ApiResponse({ status: 204, description: 'Contacto desbloqueado.' })
+  unblockContact(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.bloquearContacto.execute(ctx.organizacionId!, id, false, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Post(':id/messages/:mensajeId/forward')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Reenviar un mensaje a otro chat',
+    description:
+      'La Cloud API no tiene forward nativo: se vuelve a enviar el contenido al destino (dentro de ventana 24h).',
+  })
+  @ApiResponse({ status: 204, description: 'Mensaje reenviado.' })
+  forwardMessage(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('mensajeId', ParseUUIDPipe) mensajeId: string,
+    @Body() dto: ReenviarMensajeDto,
+  ) {
+    return this.reenviarMensaje.execute(
+      ctx.organizacionId!,
+      id,
+      mensajeId,
+      dto.conversacionDestinoId,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
+  @Delete(':id/messages/:mensajeId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Eliminar mensaje del CRM',
+    description:
+      'Soft-delete local. Meta Cloud API no permite "borrar para todos" desde la API; ' +
+      'si el contacto o la app Business borran, el webhook de revoke sí se sincroniza aquí.',
+  })
+  @ApiResponse({ status: 204, description: 'Mensaje marcado como eliminado.' })
+  deleteMessage(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('mensajeId', ParseUUIDPipe) mensajeId: string,
+  ) {
+    return this.eliminarMensajeCrm.execute(
+      ctx.organizacionId!,
+      id,
+      mensajeId,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
   }
 
   @Post(':id/typing')

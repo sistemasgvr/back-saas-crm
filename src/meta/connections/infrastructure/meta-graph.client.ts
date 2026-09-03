@@ -1189,6 +1189,36 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     return { wamid: data.messages[0].id };
   }
 
+  async bloquearUsuariosWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    telefonos: string[],
+  ): Promise<void> {
+    await this.postJson(
+      `/${phoneNumberId}/block_users`,
+      {
+        messaging_product: 'whatsapp',
+        block_users: telefonos.map((user) => ({ user })),
+      },
+      accessToken,
+    );
+  }
+
+  async desbloquearUsuariosWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    telefonos: string[],
+  ): Promise<void> {
+    await this.deleteJson(
+      `/${phoneNumberId}/block_users`,
+      {
+        messaging_product: 'whatsapp',
+        block_users: telefonos.map((user) => ({ user })),
+      },
+      accessToken,
+    );
+  }
+
   /**
    * Acumula todas las páginas de un edge Graph siguiendo `paging.cursors.after`
    * mientras exista `paging.next` (mismo criterio que `listarLeadsDeForm`).
@@ -1282,6 +1312,24 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         }),
       );
       return response.data;
+    } catch (error) {
+      throw excepcionDesdeErrorMeta(error);
+    }
+  }
+
+  /** DELETE con body JSON — Meta exige body en block_users (desbloquear). */
+  private async deleteJson(
+    path: string,
+    body: unknown,
+    accessToken: string,
+  ): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.graphBaseUrl}${path}`, {
+          params: { access_token: accessToken },
+          data: body,
+        }),
+      );
     } catch (error) {
       throw excepcionDesdeErrorMeta(error);
     }

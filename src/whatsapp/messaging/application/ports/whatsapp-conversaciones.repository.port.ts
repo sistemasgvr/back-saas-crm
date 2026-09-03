@@ -16,6 +16,8 @@ export interface ConversacionResumen {
   ventanaExpiraEn: Date | null;
   noLeidos: number;
   ultimoMensajeTexto: string | null;
+  /** true si el contacto está bloqueado en WhatsApp (block_users). */
+  bloqueado: boolean;
 }
 
 export interface MensajeRow {
@@ -114,6 +116,24 @@ export interface MensajeResuelto {
   id: string;
   wamid: string;
   whatsappConversacionId: string;
+}
+
+/** Lo necesario para reenviar un mensaje a otro chat (contenido + bytes). */
+export interface MensajeParaReenviar {
+  id: string;
+  whatsappConversacionId: string;
+  tipo: string;
+  texto: string | null;
+  mediaMimeType: string | null;
+  mediaNombreArchivo: string | null;
+  mediaCaption: string | null;
+  mediaEsVoz: boolean | null;
+  mediaBytes: Buffer | null;
+  ubicacionLatitud: number | null;
+  ubicacionLongitud: number | null;
+  ubicacionNombre: string | null;
+  ubicacionDireccion: string | null;
+  contactos: ContactoMensajeRow | ContactoMensajeRow[] | null;
 }
 
 export interface MediaMensaje {
@@ -246,6 +266,21 @@ export interface WhatsappConversacionesRepository {
     wamid: string,
     estado: string,
   ): Promise<void>;
+
+  /** Soft-delete en el CRM: estado eliminado + limpia texto/caption visibles.
+   * La Cloud API de Meta no permite "borrar para todos" iniciando desde API. */
+  marcarMensajeEliminadoEnCrm(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<boolean>;
+
+  marcarBloqueado(conversacionId: string, bloqueado: boolean): Promise<void>;
+
+  /** Mensaje + bytes de media para reenviar a otro chat. */
+  buscarMensajeParaReenviar(
+    organizacionId: string,
+    mensajeId: string,
+  ): Promise<MensajeParaReenviar | null>;
 
   /** Para resolver el wamid real (lo que pide Graph API) a partir del id
    * propio del mensaje — con chequeo de organización incluido. Se usa tanto

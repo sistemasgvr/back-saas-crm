@@ -491,4 +491,18 @@ export interface MetaGraphClient {
     interactivo: InteractivoParaEnviar,
     respondeAWamid?: string,
   ): Promise<MetaMensajeWhatsAppEnviado>;
+
+  /** POST /{phone-number-id}/block_users — bloquea contactos en WhatsApp. */
+  bloquearUsuariosWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    telefonos: string[],
+  ): Promise<void>;
+
+  /** DELETE /{phone-number-id}/block_users — desbloquea contactos. */
+  desbloquearUsuariosWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    telefonos: string[],
+  ): Promise<void>;
 }
