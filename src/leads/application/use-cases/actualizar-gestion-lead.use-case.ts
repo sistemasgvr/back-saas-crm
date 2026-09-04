@@ -51,6 +51,8 @@ import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repositor
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
 import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
 import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
+import { INMUEBLES_REPOSITORY } from '../../../inmuebles/application/ports/inmuebles.repository.port';
+import type { InmueblesRepository } from '../../../inmuebles/application/ports/inmuebles.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -61,6 +63,8 @@ export interface ActualizarGestionInput {
   notaCierre?: string | null;
   notaTransicion?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** null = quitar vínculo con el catálogo. */
+  inmuebleInteresId?: string | null;
 }
 
 function motivosValidosParaEstado(
@@ -88,6 +92,8 @@ export class ActualizarGestionLeadUseCase {
     private readonly actividades: LeadActividadesRepository,
     @Inject(ORGANIZACIONES_REPOSITORY)
     private readonly organizaciones: OrganizacionesRepository,
+    @Inject(INMUEBLES_REPOSITORY)
+    private readonly inmuebles: InmueblesRepository,
     private readonly enviarEventoCapi: EnviarEventoConversionLeadUseCase,
   ) {}
 
@@ -117,6 +123,18 @@ export class ActualizarGestionLeadUseCase {
       throw new ForbiddenException(
         'Solo el dueño del lead o un administrador puede gestionar este lead',
       );
+    }
+
+    if (input.inmuebleInteresId) {
+      const inmueble = await this.inmuebles.obtenerPorId(
+        organizacionId,
+        input.inmuebleInteresId,
+      );
+      if (!inmueble) {
+        throw new BadRequestException(
+          'El inmueble de interés no existe en esta organización',
+        );
+      }
     }
 
     const override = parsePipelineConfig(
@@ -372,6 +390,7 @@ export class ActualizarGestionLeadUseCase {
         estadoGestion: huboCambioDeEstado ? estadoGestionFinal : undefined,
         motivoCierre: input.motivoCierre,
         notaCierre: input.notaCierre,
+        inmuebleInteresId: input.inmuebleInteresId,
       },
       ctx.usuarioId,
       huboCambioDeEstado

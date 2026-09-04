@@ -31,6 +31,13 @@ export interface ReferenciaNombrada {
   nombre: string;
 }
 
+/** Resumen liviano del catálogo CRM para cards / ficha lead. */
+export interface InmuebleResumenCorto {
+  id: string;
+  codigo: string;
+  titulo: string;
+}
+
 export interface LeadResumen {
   id: string;
   nombre: string | null;
@@ -42,6 +49,7 @@ export interface LeadResumen {
   tipoLead: string | null;
   asignado: ReferenciaNombrada | null;
   estadoGestion: string;
+  inmuebleInteres: InmuebleResumenCorto | null;
 }
 
 export interface LeadDetalle extends LeadResumen {
@@ -80,6 +88,7 @@ export interface LeadTableroRow {
   asignado: ReferenciaNombrada | null;
   estadoGestion: string;
   fechaLead: Date | null;
+  inmuebleInteres: InmuebleResumenCorto | null;
 }
 
 export interface ListaLeadsResultado {

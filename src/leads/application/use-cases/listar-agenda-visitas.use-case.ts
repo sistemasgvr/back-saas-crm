@@ -18,6 +18,8 @@ export interface AgendaItemRow {
   programadaFin: Date;
   duracionMinutos: number;
   referenciaInmueble: string | null;
+  inmuebleId: string | null;
+  inmueble: { id: string; codigo: string; titulo: string } | null;
   modalidad: string | null;
   estado: string;
   nota: string | null;
@@ -79,6 +81,8 @@ export class ListarAgendaVisitasUseCase {
         programadaFin: v.programadaFin,
         duracionMinutos: v.duracionMinutos,
         referenciaInmueble: v.referenciaInmueble,
+        inmuebleId: v.inmuebleId,
+        inmueble: v.inmueble,
         modalidad: v.modalidad,
         estado: v.estado,
         nota: v.nota,
@@ -96,6 +100,8 @@ export class ListarAgendaVisitasUseCase {
         programadaFin: a.programadaFin,
         duracionMinutos: a.duracionMinutos,
         referenciaInmueble: a.referenciaInmueble,
+        inmuebleId: null,
+        inmueble: null,
         modalidad: a.modalidad,
         estado: a.estado,
         nota: a.nota,

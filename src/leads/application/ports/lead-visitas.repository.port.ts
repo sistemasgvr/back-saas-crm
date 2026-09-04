@@ -1,5 +1,11 @@
 export const LEAD_VISITAS_REPOSITORY = Symbol('LEAD_VISITAS_REPOSITORY');
 
+export interface InmuebleVisitaResumen {
+  id: string;
+  codigo: string;
+  titulo: string;
+}
+
 export interface VisitaAgendaRow {
   id: string;
   leadId: string;
@@ -9,6 +15,8 @@ export interface VisitaAgendaRow {
   programadaFin: Date;
   duracionMinutos: number;
   referenciaInmueble: string;
+  inmuebleId: string | null;
+  inmueble: InmuebleVisitaResumen | null;
   modalidad: string;
   estado: string;
   nota: string | null;
@@ -21,6 +29,8 @@ export interface VisitaLeadRow {
   programadaFin: Date;
   duracionMinutos: number;
   referenciaInmueble: string;
+  inmuebleId: string | null;
+  inmueble: InmuebleVisitaResumen | null;
   modalidad: string;
   estado: string;
   resultado: string | null;

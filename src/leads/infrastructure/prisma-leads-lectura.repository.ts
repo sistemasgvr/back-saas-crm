@@ -5,6 +5,7 @@ import { ESTADOS_TERMINALES } from '../../shared/domain/pipeline-inmobiliaria';
 import type {
   FiltroAsignacion,
   FiltroLeads,
+  InmuebleResumenCorto,
   LeadDetalle,
   LeadResumen,
   LeadsLecturaRepository,
@@ -17,12 +18,19 @@ import type {
  * límite duro para no traer miles de filas de una organización con mucho volumen. */
 const TOPE_TABLERO = 300;
 
+const INMUEBLE_INTERES_SELECT = {
+  id: true,
+  codigo: true,
+  titulo: true,
+} as const;
+
 type LeadConRelaciones = Prisma.LeadGetPayload<{
   include: {
     campana: true;
     anuncio: true;
     conjuntoAnuncio: true;
     asignadoUsuario: true;
+    inmuebleInteres: { select: typeof INMUEBLE_INTERES_SELECT };
   };
 }>;
 
@@ -46,6 +54,14 @@ function nombreUsuario(
   };
 }
 
+function inmuebleInteresRef(
+  inmueble: { id: string; codigo: string; titulo: string } | null,
+): InmuebleResumenCorto | null {
+  return inmueble
+    ? { id: inmueble.id, codigo: inmueble.codigo, titulo: inmueble.titulo }
+    : null;
+}
+
 function toResumen(lead: LeadConRelaciones): LeadResumen {
   return {
     id: lead.id,
@@ -58,6 +74,7 @@ function toResumen(lead: LeadConRelaciones): LeadResumen {
     tipoLead: lead.tipoLead,
     asignado: nombreUsuario(lead.asignadoUsuario),
     estadoGestion: lead.estadoGestion,
+    inmuebleInteres: inmuebleInteresRef(lead.inmuebleInteres),
   };
 }
 
@@ -167,6 +184,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
           anuncio: true,
           conjuntoAnuncio: true,
           asignadoUsuario: true,
+          inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
         },
         orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
         skip: (filtro.page - 1) * filtro.pageSize,
@@ -194,6 +212,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
         anuncio: true,
         conjuntoAnuncio: true,
         asignadoUsuario: true,
+        inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
       },
     });
     if (!lead) return null;
@@ -302,7 +321,10 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
         ...whereTipo,
         AND: [whereDeAsignacion(filtro.asignacion)],
       },
-      include: { asignadoUsuario: true },
+      include: {
+        asignadoUsuario: true,
+        inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
+      },
       orderBy: { fechaLead: 'desc' },
       take: TOPE_TABLERO,
     });
@@ -316,6 +338,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       asignado: nombreUsuario(lead.asignadoUsuario),
       estadoGestion: lead.estadoGestion,
       fechaLead: lead.fechaLead,
+      inmuebleInteres: inmuebleInteresRef(lead.inmuebleInteres),
     }));
   }
 

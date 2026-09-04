@@ -4,8 +4,10 @@ import {
   IsObject,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
 import { TODOS_LOS_MOTIVOS } from '../../../shared/domain/pipeline-inmobiliaria';
@@ -71,4 +73,14 @@ export class ActualizarGestionLeadDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Inmueble de interés del catálogo CRM. null quita el vínculo. Debe pertenecer a la organización.',
+  })
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsUUID()
+  inmuebleInteresId?: string | null;
 }

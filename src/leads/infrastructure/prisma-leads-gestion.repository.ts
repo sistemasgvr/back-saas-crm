@@ -113,6 +113,9 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           ...(cambios.notaCierre !== undefined
             ? { notaCierre: cambios.notaCierre }
             : {}),
+          ...(cambios.inmuebleInteresId !== undefined
+            ? { inmuebleInteresId: cambios.inmuebleInteresId }
+            : {}),
           usuarioEdicion,
         },
       });
@@ -236,10 +239,12 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
             programadaFin: true,
             duracionMinutos: true,
             referenciaInmueble: true,
+            inmuebleId: true,
             modalidad: true,
             estado: true,
             resultado: true,
             nota: true,
+            inmueble: { select: { id: true, codigo: true, titulo: true } },
           },
         },
         calificacion: {
@@ -269,7 +274,21 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
         !Array.isArray(f.metadata)
           ? (f.metadata as Record<string, string>)
           : null,
-      visita: f.visitaAgendo,
+      visita: f.visitaAgendo
+        ? {
+            id: f.visitaAgendo.id,
+            programadaEn: f.visitaAgendo.programadaEn,
+            programadaFin: f.visitaAgendo.programadaFin,
+            duracionMinutos: f.visitaAgendo.duracionMinutos,
+            referenciaInmueble: f.visitaAgendo.referenciaInmueble,
+            inmuebleId: f.visitaAgendo.inmuebleId,
+            inmueble: f.visitaAgendo.inmueble,
+            modalidad: f.visitaAgendo.modalidad,
+            estado: f.visitaAgendo.estado,
+            resultado: f.visitaAgendo.resultado,
+            nota: f.visitaAgendo.nota,
+          }
+        : null,
       calificacion: f.calificacion,
       usuario: f.usuario
         ? {

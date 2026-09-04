@@ -3,11 +3,22 @@ import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
   ActualizarVisitaRepoInput,
   CrearVisitaRepoInput,
+  InmuebleVisitaResumen,
   LeadVisitasRepository,
   VisitaAgendaRow,
   VisitaDetalle,
   VisitaLeadRow,
 } from '../application/ports/lead-visitas.repository.port';
+
+const INMUEBLE_SELECT = { id: true, codigo: true, titulo: true } as const;
+
+function mapInmueble(
+  inmueble: { id: string; codigo: string; titulo: string } | null,
+): InmuebleVisitaResumen | null {
+  return inmueble
+    ? { id: inmueble.id, codigo: inmueble.codigo, titulo: inmueble.titulo }
+    : null;
+}
 
 @Injectable()
 export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
@@ -32,6 +43,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       include: {
         lead: { select: { id: true, nombre: true, telefono: true } },
         asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
+        inmueble: { select: INMUEBLE_SELECT },
       },
       orderBy: { programadaEn: 'asc' },
     });
@@ -45,6 +57,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
   ): Promise<VisitaLeadRow[]> {
     const filas = await this.prisma.leadVisita.findMany({
       where: { organizacionId, leadId },
+      include: { inmueble: { select: INMUEBLE_SELECT } },
       orderBy: { programadaEn: 'desc' },
     });
 
@@ -54,6 +67,8 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       programadaFin: f.programadaFin,
       duracionMinutos: f.duracionMinutos,
       referenciaInmueble: f.referenciaInmueble,
+      inmuebleId: f.inmuebleId,
+      inmueble: mapInmueble(f.inmueble),
       modalidad: f.modalidad,
       estado: f.estado,
       resultado: f.resultado,
@@ -110,6 +125,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       include: {
         lead: { select: { id: true, nombre: true, telefono: true } },
         asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
+        inmueble: { select: INMUEBLE_SELECT },
       },
     });
     return this.mapAgenda(f);
@@ -157,6 +173,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       include: {
         lead: { select: { id: true, nombre: true, telefono: true } },
         asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
+        inmueble: { select: INMUEBLE_SELECT },
       },
     });
     if (!f) {
@@ -203,6 +220,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
     programadaFin: Date;
     duracionMinutos: number;
     referenciaInmueble: string;
+    inmuebleId: string | null;
     modalidad: string;
     estado: string;
     nota: string | null;
@@ -212,6 +230,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       nombre: string;
       apellido: string | null;
     } | null;
+    inmueble: { id: string; codigo: string; titulo: string } | null;
   }): VisitaAgendaRow {
     return {
       id: f.id,
@@ -222,6 +241,8 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
       programadaFin: f.programadaFin,
       duracionMinutos: f.duracionMinutos,
       referenciaInmueble: f.referenciaInmueble,
+      inmuebleId: f.inmuebleId,
+      inmueble: mapInmueble(f.inmueble),
       modalidad: f.modalidad,
       estado: f.estado,
       nota: f.nota,

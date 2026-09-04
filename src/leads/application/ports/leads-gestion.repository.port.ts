@@ -12,6 +12,8 @@ export interface CambiosGestionLead {
   estadoGestion?: string;
   motivoCierre?: string | null;
   notaCierre?: string | null;
+  /** null = quitar vínculo con el catálogo. */
+  inmuebleInteresId?: string | null;
 }
 
 export interface RegistrarHistorialInput {
@@ -73,6 +75,8 @@ export interface HistorialEstadoRow {
     programadaFin: Date;
     duracionMinutos: number;
     referenciaInmueble: string;
+    inmuebleId: string | null;
+    inmueble: { id: string; codigo: string; titulo: string } | null;
     modalidad: string;
     estado: string;
     resultado: string | null;
