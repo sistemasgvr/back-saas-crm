@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/notifications/agenda-reminders/tick",
-      "schedule": "* * * * *"
+      "schedule": "0 15 * * *"
     }
   ]
 }
