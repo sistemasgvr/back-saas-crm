@@ -30,6 +30,7 @@ export class PrismaOrganizacionModulosAdminRepository implements OrganizacionMod
       id: modulo.id,
       codigo: modulo.codigo,
       nombre: modulo.nombre,
+      descripcion: modulo.descripcion,
       icono: modulo.icono,
       orden: modulo.orden,
       habilitado: porModuloId.get(modulo.id)?.habilitado === 1,

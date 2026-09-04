@@ -40,7 +40,7 @@ import { ActualizarInmuebleDto } from './dto/actualizar-inmueble.dto';
 @ApiBearerAuth('JWT-auth')
 @Controller('inmuebles')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@RequireModule('META_LEADS')
+@RequireModule('CRM')
 export class InmueblesController {
   constructor(
     private readonly listarInmuebles: ListarInmueblesUseCase,
@@ -54,6 +54,7 @@ export class InmueblesController {
   @Get()
   @ApiOperation({ summary: 'Listar inmuebles (paginado + filtros)' })
   @ApiResponse({ status: 200, description: 'Página de inmuebles.' })
+  @ApiResponse({ status: 403, description: 'Módulo CRM no habilitado.' })
   findAll(
     @CurrentUser() ctx: RequestContext,
     @Query() query: ListarInmueblesQueryDto,

@@ -91,7 +91,7 @@ SEPARACION → CERRADO_GANADO | CERRADO_PERDIDO | NEGOCIACION | DESCARTADO
 |------|--------|
 | **Fase 23** — Agenda + recordatorios | **Hecho en código**: UI `/agenda`, visitas + actividades, cron in-app + **WA al lead** (sesión 24h o plantilla env) |
 | **Fase 24** — Actividades / próxima acción | **Hecho**: `lead_actividades` + bloque «Próxima acción» en ficha lead |
-| **Fase 25** — Catálogo inmuebles | **Hecho**: CRUD `/inmuebles`, vínculo visita/`inmuebleInteresId`; `referencia_inmueble` texto se mantiene |
+| **Fase 25** — Catálogo inmuebles | **Hecho**: CRUD `/inmuebles` bajo módulo **`CRM`**; vínculo visita/`inmuebleInteresId`; `referencia_inmueble` texto se mantiene |
 | Dashboard KPIs embudo | **Hecho**: `GET /dashboard/embudo-kpis` + sección Embudo en `/dashboard` |
 | Heurística `tipo_lead` desde `field_data` | **Hecho**: solo si `tipoLead` null en ingest Meta |
 | Pipelines configurables por org | **Hecho (v1 JSON)**: `pipeline_config` + settings UI; meta/tablero respetan override |

@@ -4,20 +4,55 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const MODULOS = [
-  { codigo: 'META_LEADS', nombre: 'Meta Leads', icono: 'mdi:facebook', orden: 1, defaultHabilitado: 1 },
-  { codigo: 'DASHBOARD', nombre: 'Dashboard', icono: 'mdi:view-dashboard', orden: 2, defaultHabilitado: 1 },
-  { codigo: 'CRM', nombre: 'CRM', icono: 'mdi:account-group', orden: 3, defaultHabilitado: 0 },
-  { codigo: 'WHATSAPP', nombre: 'WhatsApp', icono: 'mdi:whatsapp', orden: 4, defaultHabilitado: 0 },
-  { codigo: 'AUTOMATIZACIONES', nombre: 'Automatizaciones', icono: 'mdi:robot', orden: 5, defaultHabilitado: 0 },
+  {
+    codigo: 'META_LEADS',
+    nombre: 'Meta Leads',
+    descripcion: 'Captura Meta Lead Ads, gestión de leads, agenda y pipeline',
+    icono: 'mdi:facebook',
+    orden: 1,
+    defaultHabilitado: 1,
+  },
+  {
+    codigo: 'DASHBOARD',
+    nombre: 'Dashboard',
+    descripcion: 'KPIs de leads, embudo e inversión publicitaria',
+    icono: 'mdi:view-dashboard',
+    orden: 2,
+    defaultHabilitado: 1,
+  },
+  {
+    codigo: 'CRM',
+    nombre: 'CRM',
+    descripcion: 'Catálogo de inmuebles (propiedades de la organización)',
+    icono: 'mdi:home-city',
+    orden: 3,
+    defaultHabilitado: 1,
+  },
+  {
+    codigo: 'WHATSAPP',
+    nombre: 'WhatsApp',
+    descripcion: 'Inbox y mensajería WhatsApp Cloud API',
+    icono: 'mdi:whatsapp',
+    orden: 4,
+    defaultHabilitado: 0,
+  },
+  {
+    codigo: 'AUTOMATIZACIONES',
+    nombre: 'Automatizaciones',
+    descripcion: 'Reservado — sin producto completo aún',
+    icono: 'mdi:robot',
+    orden: 5,
+    defaultHabilitado: 0,
+  },
 ];
 
 async function main() {
   const modulos = await Promise.all(
-    MODULOS.map(({ codigo, nombre, icono, orden }) =>
+    MODULOS.map(({ codigo, nombre, descripcion, icono, orden }) =>
       prisma.modulo.upsert({
         where: { codigo },
-        update: { nombre, icono, orden },
-        create: { codigo, nombre, icono, orden },
+        update: { nombre, descripcion, icono, orden },
+        create: { codigo, nombre, descripcion, icono, orden },
       }),
     ),
   );

@@ -44,7 +44,7 @@ Un SaaS multiempresa donde **tú** administras la plataforma y **cada cliente** 
 1. Existen empresas (`organizaciones`) aisladas por `organizacion_id`.
 2. Puedes crear/editar/desactivar empresas (`estado = 0`), ver usuarios y activar módulos desde `/admin`.
 3. Un usuario de empresa (creado/asignado por el admin de plataforma) puede iniciar sesión, conectar Meta, recibir leads por webhook y verlos en `/leads` y `/dashboard`.
-4. `META_LEADS` y `DASHBOARD` están activos por defecto; `WHATSAPP` es opt-in por org (implementado). CRM / Automatizaciones siguen en catálogo sin producto completo.
+4. `META_LEADS`, `DASHBOARD` y `CRM` (catálogo de inmuebles) están activos por defecto; `WHATSAPP` es opt-in por org. `AUTOMATIZACIONES` sigue en catálogo sin producto completo.
 5. **Alta de empresas solo por admin de plataforma.** No hay registro público que cree organizaciones.
 
 ---
@@ -264,10 +264,10 @@ Catálogo de funcionalidades del SaaS.
 
 | codigo | En MVP | Default al crear organización (`habilitado`) |
 |--------|--------|-----------------------------------------------|
-| `META_LEADS` | Sí | `1` |
+| `META_LEADS` | Sí (Meta + leads + agenda + pipeline) | `1` |
 | `DASHBOARD` | Sí | `1` |
+| `CRM` | Sí — catálogo de inmuebles | `1` |
 | `WHATSAPP` | Sí (Fase 19) | `0` (opt-in por org) |
-| `CRM` | Solo catálogo | `0` |
 | `AUTOMATIZACIONES` | Solo catálogo | `0` |
 
 ### 4.6 `organizacion_modulos`

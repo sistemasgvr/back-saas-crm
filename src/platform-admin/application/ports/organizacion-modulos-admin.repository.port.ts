@@ -6,6 +6,7 @@ export interface ModuloConHabilitado {
   id: string;
   codigo: string;
   nombre: string;
+  descripcion: string | null;
   icono: string | null;
   orden: number;
   habilitado: boolean;
