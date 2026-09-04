@@ -1,6 +1,7 @@
 # Guía — Configurar Webhooks Meta (Lead Ads + WhatsApp)
 
-Checklist operativo para la app de Meta del CRM.  
+Checklist **operativo** (Meta Developers). El comportamiento del CRM (verify, HMAC, enrutado page/WABA) ya está en código — ver [PLAN.md](./PLAN.md) §8 y fases 9 / 13 / 19.
+
 **Repos:** `back-saas-crm` (endpoint público) · Meta Developers.
 
 > La pantalla **Webhooks** es la correcta.  

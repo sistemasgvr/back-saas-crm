@@ -455,7 +455,7 @@ Snapshots diarios Ads Insights (nivel cuenta y/o campaña).
 
 Índices: UNIQUE(`organizacion_id`, `id_externo`) → idempotencia webhook; INDEX(`email`), INDEX(`telefono`), INDEX(`campana_id`), INDEX(`anuncio_id`), INDEX(`fecha_lead`), INDEX(`estado`), INDEX(`asignado_usuario_id`), INDEX(`tipo_lead`).
 
-**Visibilidad (Fase 18):** `PROPIETARIO` / `ADMINISTRADOR` ven todos; `USUARIO` ve asignados a él + pool sin asignar (para tomar). Sin `estado_gestion` aún (pipeline diferido).
+**Visibilidad (Fase 18):** `PROPIETARIO` / `ADMINISTRADOR` ven todos; `USUARIO` ve asignados a él + pool sin asignar (para tomar). Pipeline de gestión (`estado_gestion`) → fase 20 / [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md) (código en §13).
 
 ### 4.13 WhatsApp (Fase 19)
 
@@ -1089,7 +1089,7 @@ Chat centralizado ligado al lead (ex-subplan G3 / Oleada D parcial).
 
 **Done cuando:** lead asignado → chat en CRM → respuesta del cliente visible; roles respetados.
 
-**Diferido (no en 17–19):** pipeline `NUEVO → CONTACTADO → …`; otros rubros; multimúmero; bots/IA.
+**Diferido (histórico 17–19; pipeline ya en §13 fase 20):** otros rubros; multimúmero; bots/IA.
 
 ---
 
@@ -1097,8 +1097,8 @@ Chat centralizado ligado al lead (ex-subplan G3 / Oleada D parcial).
 
 Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)):
 
-- CAPI Conversion Leads / custom audiences (Oleada C)
-- Messenger inbox / multimúmero WA / bots (extensiones sobre Fase 19)
+- Custom audiences / remarketing completo (Oleada C restante) — CAPI Conversion Leads en cierre **sí está en código** (requiere dataset en org; §13)
+- Messenger inbox / multimúmero WA / bots / Embedded Signup (extensiones sobre Fase 19)
 - Ads manager / Ad Rules (crear/pausar campañas) (Oleada E) — scope `ads_management` puede pre-autorizarse en Fase 16; feature producto pendiente
 - Breakdowns Insights (edad/género/placement) / async Insights + cron
 - Granular scopes (`target_ids`) en panel permisos
@@ -1112,8 +1112,8 @@ Aún **no** implementado (ver [INVESTIGACION-META-API.md](./INVESTIGACION-META-A
 - Otros rubros distintos de inmobiliaria
 - App móvil
 
-**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md).  
-**Pipeline inmobiliario:** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md).
+**Roadmap / catálogo API:** [INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md) (solo pendientes + referencia).  
+**Pipeline residual (ops/backlog):** [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md).
 
 Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` + carpeta Nest + menú. **No se toca el kernel.**
 
@@ -1224,12 +1224,12 @@ Cuando se agregue un módulo nuevo: fila en `modulos` + `organizacion_modulos` +
 
 ## 14. Cómo usar este plan
 
-1. Las fases **0–19** están **cerradas en código**; este `PLAN.md` es la fuente de verdad (el subplan de gestión/WhatsApp ya se absorbó aquí).
+1. Las fases **0–20** (y extensiones listadas en §13) están **cerradas en código**; este `PLAN.md` es la fuente de verdad. Documentos hijos solo guardan **ops / backlog / catálogo pendiente** — no re-especificar lo hecho.
 2. No mezclar oleadas futuras ([INVESTIGACION-META-API.md](./INVESTIGACION-META-API.md)) con deuda operativa §13 sin ticket explícito.
 3. Cada cambio termina con `npm run build` en el repo tocado.
 4. Meta/WhatsApp en producción: smoke test E2E.
 
-**Siguiente paso concreto:** deploy migraciones pipeline en prod · smoke Meta + WhatsApp + gestión de estados E2E · dashboard KPIs de embudo (opcional).
+**Siguiente paso concreto:** smoke Meta + WhatsApp + gestión de estados E2E · dashboard KPIs de embudo (opcional) · backlog en [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md).
 
 ---
 

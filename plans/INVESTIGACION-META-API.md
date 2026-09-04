@@ -1,13 +1,16 @@
 # Investigación Meta API — Catálogo de capacidades
 
-Documento de **referencia de producto**: qué ofrece la plataforma Meta (Graph / Marketing / Messaging / Conversions / Commerce / sociales) y **qué podemos ir integrando** en el CRM.
+> **Implementado (núcleo Meta/WA):** Lead Ads, multi-origen, forms, Insights, permisos, WhatsApp inbox, CAPI parcial en cierre → ver [PLAN.md](./PLAN.md) fases 7–19 / §13.  
+> **Este archivo** = catálogo de capacidades Meta + **oleadas pendientes** únicamente (no re-especificar lo ya hecho como TODO).
+
+Documento de **referencia de producto**: qué ofrece la plataforma Meta (Graph / Marketing / Messaging / Conversions / Commerce / sociales) y **qué queda por integrar** en el CRM.
 
 **No es un dump exhaustivo de cada endpoint Graph** (miles de nodos/edges). Sí es un **inventario de productos oficiales** contrastado con [developers.facebook.com](https://developers.facebook.com/) (ago 2026), marcado por relevancia CRM.
 
 No sustituye a [PLAN.md](./PLAN.md) (fuente de verdad de lo ya construido).
 
 **Repos:** `back-saas-crm` · `front-saas-crm`  
-**Actualizado:** 2026-08-20 (auditoría web)  
+**Actualizado:** 2026-09-04  
 **Graph en código:** `META_GRAPH_VERSION` (default `v26.0`)  
 **Nota versión:** Código ya apunta a **Graph / Marketing API v26.0** (jul 2026). Remociones de protocolo legacy ya aplicadas (Batch para nombres; sin `ids=` / `pretty` / `debug` / `date_format` / ETag). Revisar changelog operativo (Commerce Order Management, placements IG Explore / Messenger Stories, etc.).
 
@@ -16,6 +19,7 @@ Leyenda de estado respecto a **este** CRM:
 | Marca | Significado |
 |-------|-------------|
 | ✅ | Ya integrado (detalle en PLAN.md) |
+| ✅ parcial | Código existe; falta config ops / dataset / ampliación |
 | 🔜 | Candidato a integrar (roadmap) |
 | — | Documentado / existe en Meta, **no priorizar** para este CRM |
 
@@ -26,8 +30,8 @@ Leyenda de estado respecto a **este** CRM:
 | Pregunta | Respuesta |
 |----------|-----------|
 | ¿Está *todo* lo que Meta ofrece? | **No a nivel de cada field/edge.** Sí a nivel de **familias de producto** oficiales relevantes para ads, leads, mensajería, medición y presencia. |
-| ¿Qué faltaba antes de esta auditoría? | Catalog/Commerce, Ad Rules, Pixel vs Dataset, Page/IG Insights orgánicos, Threads, Marketing Messages WA, Calling/Groups WA, Embedded Signup, creatives assets, batch Graph, etc. (ver §11). |
-| ¿Cómo usarlo? | Menú para decidir oleadas. Implementación = `PLAN-FASE-XX` → absorber en PLAN.md. |
+| ¿Qué faltaba antes de la auditoría? | Catalog/Commerce, Ad Rules, Pixel vs Dataset, Page/IG Insights orgánicos, Threads, Marketing Messages WA, Calling/Groups WA, Embedded Signup, creatives assets, batch Graph, etc. (ver §11). |
+| ¿Cómo usarlo? | Menú para decidir **oleadas pendientes**. Implementación = `PLAN-FASE-XX` → absorber en PLAN.md. Lo ya hecho → solo [PLAN.md](./PLAN.md). |
 
 ---
 
@@ -41,25 +45,25 @@ Leyenda de estado respecto a **este** CRM:
 | **Marketing API** | Ads: cuentas, campañas, insights, leads, audiencias, creatives | Lead Ads + reporting | ✅ estructura/leads/Insights · 🔜 audiencias (Oleada C) |
 | **Pages API** | Páginas FB: metadata, webhooks, leadgen forms | Páginas N + webhook | ✅ |
 | **Lead Ads** | Captura FB/IG; webhooks + bulk + forms | Core del producto | ✅ |
-| **Ads Insights API** | Impresiones, spend, CTR, CPL, ROAS… | Dashboard publicitario | ✅ Oleada B (Fase 15) |
-| **Conversions API (CAPI)** | Eventos S2S (web/app/offline/messaging) vía Dataset | Atribución / calidad | 🔜 Oleada C |
+| **Ads Insights API** | Impresiones, spend, CTR, CPL, ROAS… | Dashboard publicitario | ✅ Oleada B (Fase 15) · 🔜 breakdowns demográficos / ROAS |
+| **Conversions API (CAPI)** | Eventos S2S (web/app/offline/messaging) vía Dataset | Atribución / calidad | ✅ parcial (Conversion Leads en cierre; requiere dataset) · 🔜 resto Oleada C |
 | **Meta Pixel** | Eventos browser (complemento CAPI; dedupe `event_id`) | Medición web del cliente | — / 🔜 si hay web del anunciante |
 | **Custom Audiences** | Audiencias desde CRM (email/tel hash) + website/app/engagement | Remarketing | 🔜 Oleada C |
 | **Lookalike / Advantage+ audiences** | Expansión desde seed | Growth ads | 🔜 bajo |
-| **Business Management API** | BM, assets, usuarios, permisos, portfolios | Escala SaaS / agencias | 🔜 |
+| **Business Management API** | BM, assets, usuarios, permisos, portfolios | Escala SaaS / agencias | ✅ opt-in scopes · 🔜 System Users / portfolios |
 | **System Users** | Tokens de máquina sin login humano | Ops multi-cliente | 🔜 |
 
 ### 1.2 Mensajería
 
 | API / producto | Qué es | Relación CRM | Estado |
 |----------------|--------|--------------|--------|
-| **Messenger Platform** | Inbox Página, Send API, webhooks `messages` | Post-lead chat | 🔜 Oleada D |
+| **Messenger Platform** | Inbox Página, Send API, webhooks `messages` | Post-lead chat | 🔜 |
 | **Instagram Messaging** | DM IG (via Page o IG Login) | Engagement | 🔜 / — |
-| **WhatsApp Cloud API** | Mensajes, plantillas, webhooks WABA | Canal LatAm | 🔜 Oleada D |
-| **WhatsApp Business Management API** | WABA, números, plantillas, analytics | Ops WA | 🔜 con Oleada D |
+| **WhatsApp Cloud API** | Mensajes, plantillas, webhooks WABA | Canal LatAm | ✅ (Fase 19 / inbox) |
+| **WhatsApp Business Management API** | WABA, números, plantillas, analytics | Ops WA | ✅ parcial (conexión + plantillas; 1 número/org) |
 | **Marketing Messages API (WA / MM Lite)** | Marketing optimizado sobre Cloud API | Campañas WA | — / 🔜 tarde |
 | **WhatsApp Calling / Groups** | Llamadas y grupos vía Cloud API | Contact center | — |
-| **Embedded Signup** | Onboarding WABA embebido (partners) | SaaS multi-tenant WA | 🔜 si módulo WA partner |
+| **Embedded Signup** | Onboarding WABA embebido (partners) | SaaS multi-tenant WA | 🔜 |
 | **Meta Business Agent** | Agentes AI en WhatsApp | Automatización | — |
 
 ### 1.3 Comercio, catálogo, creatives, automatización ads
@@ -71,7 +75,7 @@ Leyenda de estado respecto a **este** CRM:
 | **Ad creatives / adimages / advideos** | Librería de assets y creativos | Ads Manager en CRM | — |
 | **Ad Previews** | Preview de anuncio | UX ads ops | — |
 | **Ad Rules Engine** | Reglas schedule/trigger (pausar, budget…) | Automatización ligera | 🔜 bajo (Oleada E+) |
-| **Batch + Async Marketing** | Hasta 50 calls/batch; insights async | Escala Insights | 🔜 post-15 / cola |
+| **Batch + Async Marketing** | Hasta 50 calls/batch; insights async | Escala Insights | 🔜 (requiere cola) |
 | **Ads Library API** (`ads_archive`) | Transparencia pública de anuncios | Research, no CRM ops | — |
 | **Threads Ads** | Placements/creatives Threads en Marketing API | Ads multi-superficie | — |
 
@@ -89,7 +93,7 @@ Leyenda de estado respecto a **este** CRM:
 
 | API / producto | Qué es | Estado |
 |----------------|--------|--------|
-| **Datasets (Events Manager)** | Unifica Pixel + app + offline + messaging bajo un `dataset_id` | 🔜 con CAPI |
+| **Datasets (Events Manager)** | Unifica Pixel + app + offline + messaging bajo un `dataset_id` | ✅ parcial (campo org + envío en cierre) · 🔜 ops Dataset completo |
 | **Offline Conversions API** | Legacy; Meta recomienda CAPI offline | — (usar CAPI) |
 | **App Events API** | Legacy app; Meta recomienda CAPI app events | — |
 | **Marketing Mix Modeling (MMM) guides** | Insights agregados / privacy | — |
@@ -112,7 +116,7 @@ Leyenda de estado respecto a **este** CRM:
 | Backfill histórico | `GET /{form-id}/leads` + fechas | Recuperar leads perdidos | ✅ |
 | Salud webhook | `subscribed_apps` + alerta in-app | Detectar corte de leads | ✅ |
 | Crear / archivar forms desde CRM | `POST /{page-id}/leadgen_forms` | Operar sin Ads Manager | 🔜 bajo (P2) |
-| Quality lead optimization (CAPI Conversion Leads) | Enviar calidad CRM → Meta | Mejor delivery de ads | 🔜 Oleada C |
+| Quality lead optimization (CAPI Conversion Leads) | Enviar calidad CRM → Meta | Mejor delivery de ads | ✅ parcial (cierre terminal; requiere dataset) · 🔜 Oleada C completa |
 
 **Permisos típicos Lead Ads:** `pages_show_list`, `pages_manage_metadata`, `leads_retrieval`, a menudo `pages_manage_ads` / `pages_read_engagement` para edges enriquecidos.
 
@@ -133,9 +137,9 @@ Leyenda de estado respecto a **este** CRM:
 | Funcionalidad | Endpoints | Valor | Estado |
 |---------------|-----------|-------|--------|
 | KPIs cuenta/campaña/ad | `GET /{id}/insights` | Spend, CTR, impressions | ✅ Fase 15 |
-| Breakdowns (día, edad, placement…) | `breakdowns`, `time_increment` | Dashboard avanzado | 🔜 (día ✅ vía `time_increment=1`; demográficos post-15) |
+| Breakdowns (día, edad, placement…) | `breakdowns`, `time_increment` | Dashboard avanzado | 🔜 (día ✅ vía `time_increment=1`; demográficos pendientes) |
 | Async insights (volumen alto) | Jobs asíncronos | Orgs grandes | 🔜 (requiere cola) |
-| Batch Graph (≤50) | `?batch=` | Menos round-trips | 🔜 post-15 |
+| Batch Graph (≤50) | `?batch=` | Menos round-trips | 🔜 |
 | CPL híbrido | spend Meta ÷ leads CRM | KPI inmobiliario clave | ✅ Fase 15 |
 | ROAS / conversiones ads | Insights + Pixel/CAPI | Si hay cierre de venta | 🔜 |
 | Product-level / catalog reporting | Insights + catalog | Solo si hay catálogo | — |
@@ -157,27 +161,29 @@ Requisitos: Business verification, hashing correcto, consentimiento.
 
 | Funcionalidad | Valor | Estado |
 |---------------|-------|--------|
-| Eventos Lead / CompleteRegistration desde CRM | Atribución server-side | 🔜 Oleada C (con estados de lead) |
-| Purchase / Schedule | Si hay cierre en CRM | 🔜 |
+| Conversion Leads en cierre terminal (`CERRADO_*` / `DESCARTADO`) | Calidad → Meta al cerrar en CRM | ✅ parcial (fire-and-forget; dataset CAPI en org) → [PLAN.md](./PLAN.md) §13 |
+| Eventos Lead / CompleteRegistration desde CRM | Atribución server-side en más puntos | 🔜 Oleada C |
+| Purchase / Schedule | Si hay cierre de venta | 🔜 |
 | Offline / physical_store | Visitas a oficina / firma | 🔜 bajo |
-| Messaging events vía CAPI | Atribución chat | 🔜 con Oleada D |
-| Dataset + dedupe con Pixel | Events Manager unificado | 🔜 al implementar |
-| Test Events / depuración | Ops | 🔜 al implementar |
+| Messaging events vía CAPI | Atribución chat | 🔜 |
+| Dataset + dedupe con Pixel | Events Manager unificado | 🔜 ops (código guarda `capiDatasetId`) |
+| Test Events / depuración | Ops | 🔜 |
 
-Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
+Pipeline de estados de gestión: **existe** (inmobiliaria) → [PLAN.md](./PLAN.md) / [PLAN-PIPELINE-INMOBILIARIA.md](./PLAN-PIPELINE-INMOBILIARIA.md). CAPI en cierre ya se dispara desde ese flujo; falta Dataset configurado por org + ampliación de eventos/audiencias (Oleada C).
 
 ### 2.6 Mensajería post-lead
 
 | Canal | Capacidad | Estado |
 |-------|-----------|--------|
-| **WhatsApp Cloud API** | Texto, media, interactivos, plantillas, ventana 24h, webhooks | 🔜 Oleada D (módulo aparte) |
-| **WA Business Management** | Templates, números, insights WA | 🔜 con D |
+| **WhatsApp Cloud API** | Texto, media, plantillas, ventana 24h, webhooks, inbox `/chats` | ✅ Fase 19 → [PLAN.md](./PLAN.md) |
+| **WA Business Management** | Templates, números (1/org v1), suscripción WABA | ✅ parcial |
 | **Marketing Messages (MM Lite)** | Marketing optimizado WA | — / tarde |
 | **WA Calling / Groups** | Llamadas y grupos | — |
-| **Embedded Signup** | Onboard clientes SaaS a WABA | 🔜 si partner |
-| **Messenger (Page)** | Texto / plantillas, inbox | 🔜 Oleada D |
+| **Embedded Signup** | Onboard clientes SaaS a WABA | 🔜 |
+| **Messenger (Page)** | Texto / plantillas, inbox | 🔜 |
 | Instagram DM | Messaging API IG | 🔜 |
 | Click-to-WA / Click-to-Messenger ads | Atribución conversacional | 🔜 |
+| Multinúmero / bots / IA | Extensiones sobre Fase 19 | 🔜 |
 
 ### 2.7 Página / Instagram / Threads orgánicos
 
@@ -206,7 +212,7 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 | System User + token Business | 🔜 escala agencias |
 | `business_management` | ✅ opt-in Fase 16 (OAuth dinámico) |
 | Salud permisos token (`debug_token`) en UI Conexión | ✅ Fase 16 (lectura + opt-in toggles) |
-| Webhooks no-leadgen (`messages`, `feed`, etc.) | 🔜 según oleada |
+| Webhooks no-leadgen (`messages` WA ya; Messenger `messages`, `feed`, etc.) | ✅ WA · 🔜 Messenger / feed |
 
 ---
 
@@ -214,15 +220,19 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 
 | Idea | ¿Encaja? | Notas |
 |------|----------|--------|
-| Lead Ads + multi página/cuenta + forms/backfill | ✅ Hecho | PLAN.md §8 |
+| Lead Ads + multi página/cuenta + forms/backfill | ✅ Hecho | PLAN.md §8 / fases 7–14 |
 | Insights + CPL | ✅ Hecho | PLAN.md Fase 15 |
 | Salud permisos + opt-in scopes | ✅ Hecho | PLAN.md Fase 16 |
-| CAPI calidad + audiencias | Sí | Tras estados de lead |
-| WhatsApp inbox (+ Embedded Signup si partner) | Sí, módulo aparte | Alto valor LatAm |
+| WhatsApp inbox (Cloud API) | ✅ Hecho | PLAN.md Fase 19 |
+| CAPI Conversion Leads en cierre | ✅ Parcial | Código listo; Dataset por org + smoke |
+| Custom Audiences / CAPI más eventos | Sí | Oleada C restante |
+| Embedded Signup (partner WABA) | Sí si modelo partner | 🔜 |
+| Messenger / IG DM | Opcional | Extensión conversación |
 | Pausar campañas / Ad Rules simples | Opcional | Oleada E |
 | Crear ads/creatives / catalog / commerce | No ahora | Competir con Ads Manager / Commerce |
 | IG/Threads publishing, Page Insights orgánicos | No | Fuera de visión CRM |
 | Ads Library / MMM / Brand safety profundo | No | Research / enterprise ads |
+| Billing / subscriptions CRM | No vía Meta API | Producto propio |
 
 ---
 
@@ -239,10 +249,10 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 | `pages_messaging` | — | Messenger |
 | `instagram_basic` / `instagram_manage_messages` | — | IG DM |
 | `instagram_content_publish` | — | Publishing IG |
-| `ads_management` | — | Pausar/crear ads / rules |
-| `business_management` | — | BM / system users (dependency frecuente) |
-| `whatsapp_business_management` | — | WABA / templates |
-| `whatsapp_business_messaging` | — | Envío Cloud API |
+| `ads_management` | — / opt-in posible | Pausar/crear ads / rules (Oleada E) |
+| `business_management` | ✅ opt-in | BM / system users |
+| `whatsapp_business_management` | ✅ (módulo WA) | WABA / templates |
+| `whatsapp_business_messaging` | ✅ (módulo WA) | Envío Cloud API |
 | Marketing API Access Tier | Revisar en App Dashboard | Cuotas Insights |
 | Advanced Access | Crítico en Live multi-cliente | App Review |
 
@@ -253,40 +263,54 @@ Hoy el CRM no tiene pipeline de estados; CAPI gana sentido cuando exista.
 - Marketing / Pages (page o system token) → **BUC** (`X-Business-Use-Case-Usage`).
 - Insights: BUC propio; reportes grandes → **async** (+ opcional batch ≤50).
 - Leadgen bulk: límites; preferir webhook + backfill puntual (ya así).
-- WhatsApp: límites por nivel de calidad / messaging limit del número.
+- WhatsApp: límites por nivel de calidad / messaging limit del número (inbox ya en producción de código; smoke E2E pendiente).
 - `429` → backoff; Insights agresivos o sync horario → **cola** (hoy sin Redis/BullMQ).
 
 ---
 
-## 6. Roadmap de integración
+## 6. Roadmap de integración (oleadas)
 
 ### Oleada A — Consolidar Lead Ads ✅
 
-Forms, backfill, salud webhook, versión Graph. → [PLAN.md](./PLAN.md) fases 12–14 / §8.4.
+Hecho. → [PLAN.md](./PLAN.md) fases 12–14 / §8.4.
 
 ### Oleada B — Dashboard publicitario ✅
 
-Insights diarios + CPL híbrido + sync on-demand. → [PLAN.md](./PLAN.md) Fase 15.
+Hecho (Insights diarios + CPL híbrido + sync on-demand). → [PLAN.md](./PLAN.md) Fase 15.  
+**Pendiente de ampliación (no reabrir B):** breakdowns demográficos, async/cron, ROAS.
 
-### Oleada C — Loop marketing ↔ CRM 🔜
+### Oleada C — Loop marketing ↔ CRM 🔜 (parcial)
 
-1. Estados mínimos de lead.  
-2. CAPI Conversion Leads (+ Dataset).  
-3. Custom Audiences (inclusión/exclusión).
+**Ya en código (no re-especificar):** CAPI Conversion Leads en cierre terminal → [PLAN.md](./PLAN.md) §13 / pipeline. Requiere Dataset CAPI configurado por org.
 
-### Oleada D — Conversación 🔜
+**Pendiente:**
 
-1. WhatsApp Cloud (+ Business Management; Embedded Signup si modelo partner).  
-2. Opcional Messenger.  
-3. Atribución click-to-WA / messaging events CAPI.
+1. Ops: Dataset / Events Manager por org + Test Events + smoke.  
+2. Más eventos CAPI (Lead / CompleteRegistration / Purchase según embudo).  
+3. Custom Audiences (inclusión/exclusión desde leads/cerrados).  
+4. Dedupe Pixel ↔ CAPI si el anunciante tiene web.
+
+### Oleada D — Conversación ✅ núcleo WA · 🔜 resto
+
+**Hecho (núcleo WhatsApp):** Cloud API + Business Management parcial + inbox `/chats` + webhook + plantillas + 1 número/org. → [PLAN.md](./PLAN.md) Fase 19.
+
+**Pendiente:**
+
+1. Embedded Signup (onboarding WABA partner / multi-tenant).  
+2. Messenger (Page inbox).  
+3. Instagram DM (si prioridad LatAm lo justifica).  
+4. Multinúmero / bots / IA.  
+5. Atribución click-to-WA / messaging events CAPI.  
+6. Marketing Messages (MM Lite) — tarde.
 
 ### Oleada E — Ads ops ligeros 🔜 / opcional
 
-1. Pausar/activar campañas.  
+1. Pausar/activar campañas (`ads_management`).  
 2. Ad Rules simples (opcional).  
-3. No Ads Manager / Catalog / Commerce completo.
+3. No Ads Manager / Catalog / Commerce completo.  
+4. Billing CRM: fuera de Meta API (producto propio).
 
-Al ejecutar una oleada: crear `PLAN-FASE-XX-….md` solo para esa fase; al cerrarla, **absorber en PLAN.md** y borrar el subplan.
+Al ejecutar una oleada pendiente: crear `PLAN-FASE-XX-….md` solo para esa fase; al cerrarla, **absorber en PLAN.md** y borrar el subplan.
 
 ---
 
@@ -305,10 +329,11 @@ Al ejecutar una oleada: crear `PLAN-FASE-XX-….md` solo para esa fase; al cerra
 | Campañas / ad sets / ads | `/act_{id}/campaigns` … | ✅ sync |
 | Insights | `/{object-id}/insights` | ✅ sync + persistencia diaria |
 | Custom audience | `/act_{id}/customaudiences` | 🔜 |
-| CAPI events | `/{pixel-or-dataset-id}/events` | 🔜 |
+| CAPI events | `/{pixel-or-dataset-id}/events` | ✅ parcial (cierre) |
 | Ad rules | `/act_{id}/adrules_library` | — |
 | Catalog | `/{business-id}/owned_product_catalogs` | — |
-| WA messages | `/{phone-number-id}/messages` | 🔜 Oleada D |
+| WA messages | `/{phone-number-id}/messages` | ✅ Fase 19 |
+| WA templates / WABA | `/{waba-id}/message_templates`, `subscribed_apps` | ✅ parcial |
 | Ads archive (Library) | `/ads_archive` | — |
 
 ---
@@ -381,15 +406,15 @@ Antes de esta pasada el doc cubría bien el **hilo CRM Lead Ads → Insights →
 | Pixel + Datasets unificados | CAPI ya no es solo `pixel_id` |
 | Page / IG Insights orgánicos vs Ads Insights | Dos productos distintos |
 | Instagram Publishing + Threads API/Ads | Social ≠ CRM leads |
-| WA: Business Management, MM Lite, Calling, Groups, Embedded Signup, Business Agent | Cloud API messaging ≠ plataforma WA completa |
+| WA: Business Management, MM Lite, Calling, Groups, Embedded Signup, Business Agent | Cloud API messaging (✅) ≠ plataforma WA completa |
 | Creatives / adimages / advideos / previews | Ads Manager completo |
-| Batch Graph + async insights | Diseño a escala post-Fase 15 |
+| Batch Graph + async insights | Diseño a escala (cola) |
 | Ads Library (`ads_archive`) | Transparencia, no ops del anunciante |
 | App Events / Offline legacy | Preferir CAPI |
 | Graph v26 (default en código) | Upgrade aplicado; validar smoke Meta real |
 
-**Conclusión:** para el CRM **no faltaba el camino crítico** (Lead Ads → Insights → CAPI → WA). Faltaba el **mapa periférico** para no reinventar Commerce/Social/Ads Manager ni subestimar el tamaño real de WhatsApp y medición.
+**Conclusión:** el camino crítico Lead Ads → Insights → WA inbox (+ CAPI parcial en cierre) **ya está en código** ([PLAN.md](./PLAN.md)). Este archivo sirve para el **mapa periférico** y las **oleadas pendientes** (C resto, D extensión, E), sin reinventar Commerce/Social/Ads Manager.
 
 ---
 
-**Uso:** este archivo es el **menú de la API (CRM + inventario oficial)**. [PLAN.md](./PLAN.md) es lo **ya construido** (fases 0–16). Siguiente: **Oleada C** (CAPI / audiencias) o smoke Meta real.
+**Uso:** este archivo es el **menú de la API + roadmap pendiente**. [PLAN.md](./PLAN.md) es lo **ya construido** (fases 0–20 / §13). Siguiente foco Meta: **Oleada C restante** (audiencias / Dataset ops) o **Oleada D restante** (Embedded Signup / Messenger), más smoke E2E Meta + WA en prod.
