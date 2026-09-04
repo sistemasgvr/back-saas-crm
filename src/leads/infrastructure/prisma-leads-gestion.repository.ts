@@ -145,6 +145,7 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
             programadaFin: v.programadaFin,
             duracionMinutos: v.duracionMinutos,
             referenciaInmueble: v.referenciaInmueble,
+            inmuebleId: v.inmuebleId ?? null,
             modalidad: v.modalidad,
             nota: v.nota,
             estado: 'PROGRAMADA',

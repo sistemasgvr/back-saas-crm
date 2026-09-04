@@ -200,6 +200,11 @@ export interface WhatsappConversacionesRepository {
     organizacionId: string,
     id: string,
   ): Promise<ConversacionResumen | null>;
+  /** Conversación activa vinculada al lead (la más reciente si hay varias). */
+  findActivaPorLeadId(
+    organizacionId: string,
+    leadId: string,
+  ): Promise<ConversacionResumen | null>;
   listarMensajes(
     whatsappConversacionId: string,
     limite: number,

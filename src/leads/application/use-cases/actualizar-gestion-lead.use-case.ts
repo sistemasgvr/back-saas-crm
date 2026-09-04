@@ -23,6 +23,7 @@ import {
   MOTIVOS_DESCARTE,
   MOTIVOS_PERDIDO,
   motivosGanado,
+  parsePipelineConfig,
   requiereTipoLeadDefinido,
   debeClasificarTipoDesdeNuevo,
   tipoLeadClasificado,
@@ -48,6 +49,8 @@ import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
+import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
+import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -83,6 +86,8 @@ export class ActualizarGestionLeadUseCase {
     private readonly visitas: LeadVisitasRepository,
     @Inject(LEAD_ACTIVIDADES_REPOSITORY)
     private readonly actividades: LeadActividadesRepository,
+    @Inject(ORGANIZACIONES_REPOSITORY)
+    private readonly organizaciones: OrganizacionesRepository,
     private readonly enviarEventoCapi: EnviarEventoConversionLeadUseCase,
   ) {}
 
@@ -114,6 +119,10 @@ export class ActualizarGestionLeadUseCase {
       );
     }
 
+    const override = parsePipelineConfig(
+      await this.organizaciones.obtenerPipelineConfig(organizacionId),
+    );
+
     // tipoLead efectivo tras este request (el nuevo si viene, si no el actual)
     // — determina qué matriz de transiciones aplica.
     const tipoLeadEfectivo = input.tipoLead ?? lead.tipoLead;
@@ -142,8 +151,8 @@ export class ActualizarGestionLeadUseCase {
 
     // 2) Cambio explícito de estadoGestion — valida transición o reapertura.
     if (input.estadoGestion !== undefined) {
-      const estadosValidos = estadosPorTipo(tipoLeadEfectivo);
-      if (!estadosValidos.includes(input.estadoGestion)) {
+      const estadosValidos = estadosPorTipo(tipoLeadEfectivo, override);
+      if (!(estadosValidos as readonly string[]).includes(input.estadoGestion)) {
         throw new BadRequestException(
           `estadoGestion inválido para este tipo de lead: ${input.estadoGestion}`,
         );
@@ -188,6 +197,7 @@ export class ActualizarGestionLeadUseCase {
             tipoLeadEfectivo,
             lead.estadoGestion,
             input.estadoGestion,
+            override,
           )
         ) {
           throw new BadRequestException(

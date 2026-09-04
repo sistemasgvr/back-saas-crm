@@ -51,6 +51,7 @@ export interface CrearVisitaRepoInput {
   programadaFin: Date;
   duracionMinutos: number;
   referenciaInmueble: string;
+  inmuebleId?: string | null;
   modalidad: string;
   nota: string | null;
   asignadoUsuarioId: string | null;
@@ -62,6 +63,7 @@ export interface ActualizarVisitaRepoInput {
   programadaFin?: Date;
   duracionMinutos?: number;
   referenciaInmueble?: string;
+  inmuebleId?: string | null;
   modalidad?: string;
   estado?: string;
   resultado?: string | null;

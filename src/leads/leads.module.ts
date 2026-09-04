@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MetaConnectionsModule } from '../meta/connections/meta-connections.module';
+import { OrganizationsModule } from '../organizations/organizations.module';
 import { LeadsController } from './presentation/leads.controller';
 import { ListarLeadsUseCase } from './application/use-cases/listar-leads.use-case';
 import { ObtenerLeadUseCase } from './application/use-cases/obtener-lead.use-case';
@@ -35,7 +36,7 @@ import {
 import { PrismaLeadAutoAsignacionRepository } from './infrastructure/prisma-lead-auto-asignacion.repository';
 
 @Module({
-  imports: [forwardRef(() => MetaConnectionsModule)],
+  imports: [forwardRef(() => MetaConnectionsModule), OrganizationsModule],
   controllers: [LeadsController],
   providers: [
     ListarLeadsUseCase,

@@ -100,6 +100,7 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
         programadaFin: input.programadaFin,
         duracionMinutos: input.duracionMinutos,
         referenciaInmueble: input.referenciaInmueble,
+        inmuebleId: input.inmuebleId ?? null,
         modalidad: input.modalidad,
         nota: input.nota,
         estado: 'PROGRAMADA',
@@ -133,6 +134,9 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
           : {}),
         ...(cambios.referenciaInmueble !== undefined
           ? { referenciaInmueble: cambios.referenciaInmueble }
+          : {}),
+        ...(cambios.inmuebleId !== undefined
+          ? { inmuebleId: cambios.inmuebleId }
           : {}),
         ...(cambios.modalidad !== undefined
           ? { modalidad: cambios.modalidad }

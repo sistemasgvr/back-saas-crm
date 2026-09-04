@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
+import { EnviarRecordatorioAgendaWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/enviar-recordatorio-agenda-whatsapp.use-case';
 import { CrearNotificacionUseCase } from './crear-notificacion.use-case';
 import { ETIQUETAS_TIPO_ACTIVIDAD } from '../../../shared/domain/agenda-actividades';
 
@@ -22,7 +23,8 @@ type CandidatoAgenda = {
 
 /**
  * Busca visitas/actividades PROGRAMADAS cuya hora de aviso (programadaEn − offset)
- * acaba de pasar, crea notificaciones AGENDA_PROXIMA y marca idempotencia.
+ * acaba de pasar, crea notificaciones AGENDA_PROXIMA, intenta WhatsApp al lead
+ * y marca idempotencia (fila + whatsappEnviado).
  */
 @Injectable()
 export class DispararRecordatoriosAgendaUseCase {
@@ -31,6 +33,7 @@ export class DispararRecordatoriosAgendaUseCase {
   constructor(
     private readonly prisma: PrismaService,
     private readonly crearNotificacion: CrearNotificacionUseCase,
+    private readonly enviarWhatsApp: EnviarRecordatorioAgendaWhatsAppUseCase,
   ) {}
 
   async execute(ahora = new Date()): Promise<number> {
@@ -139,6 +142,7 @@ export class DispararRecordatoriosAgendaUseCase {
     const destinatario = c.asignadoUsuarioId ?? c.creadoPorUsuarioId;
     if (!destinatario) return false;
 
+    let esNuevo = false;
     try {
       await this.prisma.agendaRecordatorioEnviado.create({
         data: {
@@ -147,9 +151,9 @@ export class DispararRecordatoriosAgendaUseCase {
           offsetMinutos,
         },
       });
+      esNuevo = true;
     } catch {
-      // Unique violation → ya enviado
-      return false;
+      // Unique violation → notificación in-app ya disparada; puede faltar WA
     }
 
     const cuando = c.programadaEn.toLocaleString('es-PE', {
@@ -167,38 +171,87 @@ export class DispararRecordatoriosAgendaUseCase {
         : `En ${offsetMinutos} min — ${c.titulo}`;
     const mensaje = `${lead} · ${cuando}`;
 
-    const resultado = await this.crearNotificacion.execute({
-      organizacionId: c.organizacionId,
-      tipo: 'AGENDA_PROXIMA',
-      titulo: titulo.slice(0, 200),
-      mensaje: mensaje.slice(0, 500),
-      payload: {
-        leadId: c.leadId,
-        origen: c.origen,
-        ...(c.origen === 'VISITA'
-          ? { visitaId: c.itemId }
-          : { actividadId: c.itemId }),
-        programadaEn: c.programadaEn.toISOString(),
-        offsetMinutos,
-      },
-      usuarioIds: [destinatario],
-    });
+    if (esNuevo) {
+      const resultado = await this.crearNotificacion.execute({
+        organizacionId: c.organizacionId,
+        tipo: 'AGENDA_PROXIMA',
+        titulo: titulo.slice(0, 200),
+        mensaje: mensaje.slice(0, 500),
+        payload: {
+          leadId: c.leadId,
+          origen: c.origen,
+          ...(c.origen === 'VISITA'
+            ? { visitaId: c.itemId }
+            : { actividadId: c.itemId }),
+          programadaEn: c.programadaEn.toISOString(),
+          offsetMinutos,
+        },
+        usuarioIds: [destinatario],
+      });
 
-    if (resultado?.id) {
-      await this.prisma.agendaRecordatorioEnviado
-        .update({
-          where: {
-            origen_itemId_offsetMinutos: {
-              origen: c.origen,
-              itemId: c.itemId,
-              offsetMinutos,
+      if (resultado?.id) {
+        await this.prisma.agendaRecordatorioEnviado
+          .update({
+            where: {
+              origen_itemId_offsetMinutos: {
+                origen: c.origen,
+                itemId: c.itemId,
+                offsetMinutos,
+              },
             },
-          },
-          data: { notificacionId: resultado.id },
-        })
-        .catch(() => undefined);
+            data: { notificacionId: resultado.id },
+          })
+          .catch(() => undefined);
+      }
     }
 
-    return true;
+    await this.intentarWhatsApp(c, offsetMinutos, cuando);
+
+    return esNuevo;
+  }
+
+  /**
+   * Claim atómico con `whatsappEnviado`: solo un worker envía.
+   * Se marca antes del Graph call para no duplicar si el cron se solapa.
+   */
+  private async intentarWhatsApp(
+    c: CandidatoAgenda,
+    offsetMinutos: number,
+    cuando: string,
+  ): Promise<void> {
+    const claimed = await this.prisma.agendaRecordatorioEnviado.updateMany({
+      where: {
+        origen: c.origen,
+        itemId: c.itemId,
+        offsetMinutos,
+        whatsappEnviado: 0,
+      },
+      data: { whatsappEnviado: 1 },
+    });
+    if (claimed.count === 0) return;
+
+    const texto =
+      `Recordatorio: en ${offsetMinutos} min — ${c.titulo} (${cuando})`.slice(
+        0,
+        1000,
+      );
+
+    const resultado = await this.enviarWhatsApp.execute({
+      organizacionId: c.organizacionId,
+      leadId: c.leadId,
+      texto,
+    });
+
+    if (resultado.ok) {
+      this.logger.log(
+        `WhatsApp agenda (${resultado.via}) → lead ${c.leadId} conversación ${resultado.conversacionId}`,
+      );
+      return;
+    }
+
+    // Claim ya consumido: no reintentar en el siguiente tick (evita spam de logs).
+    this.logger.debug(
+      `WhatsApp agenda omitido lead ${c.leadId}: ${resultado.motivo}`,
+    );
   }
 }

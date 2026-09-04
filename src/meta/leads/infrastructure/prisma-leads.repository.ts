@@ -36,6 +36,9 @@ export class PrismaLeadsRepository implements LeadsRepository {
           telefono: input.telefono,
           datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
           fechaLead: input.fechaLead,
+          ...(existente.tipoLead == null && input.tipoLead
+            ? { tipoLead: input.tipoLead }
+            : {}),
         },
       });
       return { id: lead.id, creado: false };
@@ -55,6 +58,7 @@ export class PrismaLeadsRepository implements LeadsRepository {
         telefono: input.telefono,
         datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
         fechaLead: input.fechaLead,
+        ...(input.tipoLead ? { tipoLead: input.tipoLead } : {}),
       },
     });
     return { id: lead.id, creado: true };
@@ -64,10 +68,34 @@ export class PrismaLeadsRepository implements LeadsRepository {
     organizacionId: string,
     idExterno: string,
   ): Promise<string | null> {
+    const existente = await this.buscarPorIdExterno(organizacionId, idExterno);
+    return existente?.id ?? null;
+  }
+
+  async buscarPorIdExterno(
+    organizacionId: string,
+    idExterno: string,
+  ): Promise<{ id: string; tipoLead: string | null } | null> {
     const existente = await this.prisma.lead.findUnique({
       where: { organizacionId_idExterno: { organizacionId, idExterno } },
-      select: { id: true },
+      select: { id: true, tipoLead: true },
     });
-    return existente?.id ?? null;
+    return existente;
+  }
+
+  async actualizarTipoLeadSiNulo(
+    organizacionId: string,
+    leadId: string,
+    tipoLead: string,
+  ): Promise<boolean> {
+    const result = await this.prisma.lead.updateMany({
+      where: {
+        id: leadId,
+        organizacionId,
+        tipoLead: null,
+      },
+      data: { tipoLead },
+    });
+    return result.count > 0;
   }
 }

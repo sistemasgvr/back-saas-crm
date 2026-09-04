@@ -53,6 +53,19 @@ export interface LeadDetalle extends LeadResumen {
   estadoGestionEn: Date | null;
   motivoCierre: string | null;
   notaCierre: string | null;
+  /** Próxima visita o actividad PROGRAMADA (la más cercana por fecha). */
+  proximaAccion: ProximaAccionLead | null;
+}
+
+/** Ítem unificado para el bloque “Próxima acción” en ficha lead. */
+export interface ProximaAccionLead {
+  origen: 'visita' | 'actividad';
+  id: string;
+  /** VISITA (pipeline) o tipo de LeadActividad (LLAMADA, REUNION, …). */
+  tipo: string;
+  titulo: string;
+  programadaEn: Date;
+  programadaFin: Date;
 }
 
 /** Fila liviana para una tarjeta de tablero kanban — no trae todo lo que

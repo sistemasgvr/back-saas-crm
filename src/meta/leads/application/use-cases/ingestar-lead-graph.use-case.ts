@@ -13,6 +13,7 @@ import type { AnunciosRepository } from '../../../ads/application/ports/anuncios
 import { LEADS_REPOSITORY } from '../ports/leads.repository.port';
 import type { LeadsRepository } from '../ports/leads.repository.port';
 import { extraerContactoLead } from '../extraer-contacto-lead';
+import { inferirTipoLeadDesdeFieldData } from '../../../../shared/domain/inferir-tipo-lead-meta';
 import { VincularLeadConversacionesWhatsAppUseCase } from '../../../../whatsapp/messaging/application/use-cases/vincular-lead-conversaciones-whatsapp.use-case';
 
 export interface ResultadoIngestarLead {
@@ -45,15 +46,25 @@ export class IngestarLeadGraphUseCase {
      * la misma llamada a Graph y disparar su rate limit (PLAN-FASE-14 §4.3). */
     cacheNombres: Map<string, string | null> = new Map(),
   ): Promise<ResultadoIngestarLead> {
+    const tipoInferido = inferirTipoLeadDesdeFieldData(lead.fieldData);
+
     // Si ya lo importamos antes, su campaña/conjunto/anuncio ya están
     // resueltos en BD — no hace falta volver a golpear Graph por él.
-    const idExistente = await this.leads.buscarIdPorIdExterno(
+    // Solo aplicamos la heurística si tipoLead sigue null (nunca pisar manual).
+    const existente = await this.leads.buscarPorIdExterno(
       organizacionId,
       lead.leadgenId,
     );
-    if (idExistente) {
-      await this.vincularConversaciones.execute(organizacionId, idExistente);
-      return { leadId: idExistente, creado: false };
+    if (existente) {
+      if (existente.tipoLead == null && tipoInferido) {
+        await this.leads.actualizarTipoLeadSiNulo(
+          organizacionId,
+          existente.id,
+          tipoInferido,
+        );
+      }
+      await this.vincularConversaciones.execute(organizacionId, existente.id);
+      return { leadId: existente.id, creado: false };
     }
 
     const nombreDe = async (metaId: string): Promise<string | null> => {
@@ -115,6 +126,7 @@ export class IngestarLeadGraphUseCase {
       telefono: contacto.telefono,
       datosCrudos: lead.raw,
       fechaLead: lead.createdTime,
+      tipoLead: tipoInferido,
     });
 
     await this.vincularConversaciones.execute(

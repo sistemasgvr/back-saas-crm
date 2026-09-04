@@ -1,10 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
-import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
 import {
-  TODOS_LOS_ESTADOS_GESTION,
-  TODOS_LOS_MOTIVOS,
-} from '../../../shared/domain/pipeline-inmobiliaria';
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
+import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
+import { TODOS_LOS_MOTIVOS } from '../../../shared/domain/pipeline-inmobiliaria';
 
 export class ActualizarGestionLeadDto {
   @ApiPropertyOptional({
@@ -17,13 +21,16 @@ export class ActualizarGestionLeadDto {
   tipoLead?: string;
 
   @ApiPropertyOptional({
-    enum: TODOS_LOS_ESTADOS_GESTION,
     description:
       'Próximo estado del pipeline — debe ser una transición válida desde el estado actual para el ' +
-      'tipoLead vigente (ver GET /leads/pipeline/meta). El backend valida la matriz completa.',
+      'tipoLead vigente (ver GET /leads/pipeline/meta). Valida contra override de org si existe.',
   })
   @IsOptional()
-  @IsIn(TODOS_LOS_ESTADOS_GESTION)
+  @IsString()
+  @Matches(/^[A-Z][A-Z0-9_]*$/, {
+    message: 'estadoGestion debe ser un código en MAYÚSCULAS_SNAKE',
+  })
+  @MaxLength(64)
   estadoGestion?: string;
 
   @ApiPropertyOptional({

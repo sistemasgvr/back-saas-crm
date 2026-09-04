@@ -27,6 +27,7 @@ import { VincularLeadConversacionesWhatsAppUseCase } from './application/use-cas
 import { BloquearContactoWhatsAppUseCase } from './application/use-cases/bloquear-contacto-whatsapp.use-case';
 import { EliminarMensajeWhatsAppCrmUseCase } from './application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
 import { ReenviarMensajeWhatsAppUseCase } from './application/use-cases/reenviar-mensaje-whatsapp.use-case';
+import { EnviarRecordatorioAgendaWhatsAppUseCase } from './application/use-cases/enviar-recordatorio-agenda-whatsapp.use-case';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
 import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-whatsapp-conversaciones.repository';
 
@@ -34,7 +35,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
   imports: [
     forwardRef(() => MetaConnectionsModule),
     WhatsappConnectionsModule,
-    NotificationsModule,
+    forwardRef(() => NotificationsModule),
     LeadsModule,
   ],
   controllers: [WhatsappChatsController],
@@ -62,6 +63,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     BloquearContactoWhatsAppUseCase,
     EliminarMensajeWhatsAppCrmUseCase,
     ReenviarMensajeWhatsAppUseCase,
+    EnviarRecordatorioAgendaWhatsAppUseCase,
     {
       provide: WHATSAPP_CONVERSACIONES_REPOSITORY,
       useClass: PrismaWhatsappConversacionesRepository,
@@ -74,6 +76,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarReaccionWhatsAppUseCase,
     ProcesarEdicionWhatsAppUseCase,
     VincularLeadConversacionesWhatsAppUseCase,
+    EnviarRecordatorioAgendaWhatsAppUseCase,
   ],
 })
 export class WhatsappMessagingModule {}

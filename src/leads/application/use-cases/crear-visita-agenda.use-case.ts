@@ -44,6 +44,7 @@ export class CrearVisitaAgendaUseCase {
       programadaEn: string;
       duracionMinutos?: number;
       referenciaInmueble: string;
+      inmuebleId?: string;
       modalidad?: string;
       nota?: string;
       asignadoUsuarioId?: string;
@@ -121,6 +122,7 @@ export class CrearVisitaAgendaUseCase {
       programadaFin,
       duracionMinutos,
       referenciaInmueble,
+      inmuebleId: input.inmuebleId ?? null,
       modalidad,
       nota: input.nota?.trim() || null,
       asignadoUsuarioId,

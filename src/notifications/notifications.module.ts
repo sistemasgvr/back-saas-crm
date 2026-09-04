@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
+import { WhatsappMessagingModule } from '../whatsapp/messaging/whatsapp-messaging.module';
 import { NotificationsController } from './presentation/notifications.controller';
 import { AgendaRecordatoriosCronController } from './presentation/agenda-recordatorios-cron.controller';
 import { NotificacionesGateway } from './presentation/notificaciones.gateway';
@@ -20,7 +21,10 @@ import { RegistrarSuscripcionPushUseCase } from './application/use-cases/registr
 import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar-suscripcion-push.use-case';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [
+    JwtModule.register({}),
+    forwardRef(() => WhatsappMessagingModule),
+  ],
   controllers: [NotificationsController, AgendaRecordatoriosCronController],
   providers: [
     CrearNotificacionUseCase,

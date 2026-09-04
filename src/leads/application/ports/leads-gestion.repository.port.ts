@@ -34,6 +34,7 @@ export interface RegistrarHistorialInput {
     programadaFin: Date;
     duracionMinutos: number;
     referenciaInmueble: string;
+    inmuebleId?: string | null;
     modalidad: string;
     nota?: string | null;
     asignadoUsuarioId: string | null;

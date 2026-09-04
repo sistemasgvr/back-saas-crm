@@ -79,6 +79,10 @@ export const envValidationSchema = Joi.object({
    * Authorization: Bearer <CRON_SECRET>). Obligatorio en producción Vercel.
    */
   CRON_SECRET: Joi.string().min(16).optional(),
+
+  /** Plantilla Meta APPROVED para recordatorios de agenda fuera de ventana 24h. */
+  WHATSAPP_AGENDA_REMINDER_TEMPLATE: Joi.string().allow('').optional(),
+  WHATSAPP_AGENDA_REMINDER_TEMPLATE_LANG: Joi.string().allow('').optional(),
 });
 
 export const envValidationOptions = {

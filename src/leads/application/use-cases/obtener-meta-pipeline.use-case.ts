@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   camposAlEntrarEstado,
   camposReapertura,
@@ -11,8 +11,12 @@ import {
   MOTIVOS_DESCARTE,
   MOTIVOS_PERDIDO,
   motivosGanado,
+  parsePipelineConfig,
   transicionesPermitidas,
+  type PipelineConfigOverride,
 } from '../../../shared/domain/pipeline-inmobiliaria';
+import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
+import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
 
 export interface CampoTransicionMeta {
   codigo: string;
@@ -44,6 +48,8 @@ export interface MetaPipeline {
   motivosPerdido: MotivoMeta[];
   motivosGanado: MotivoMeta[];
   camposReapertura: CampoTransicionMeta[];
+  /** true si la org tiene override JSON activo. */
+  usandoOverride: boolean;
 }
 
 function mapearCampos(campos: CampoTransicionDef[]): CampoTransicionMeta[] {
@@ -61,16 +67,27 @@ function mapearCampos(campos: CampoTransicionDef[]): CampoTransicionMeta[] {
 }
 
 /** GET /leads/pipeline/meta — catálogo de estados/transiciones/motivos para
- * un tipoLead dado, así el front no hardcodea el copy compra/venta
- * (PLAN-PIPELINE-INMOBILIARIA.md §8.3). Sin acceso a datos: es 100% dominio. */
+ * un tipoLead dado. Usa `pipeline_config` de la org si existe; si no, las
+ * matrices de código. */
 @Injectable()
 export class ObtenerMetaPipelineUseCase {
-  execute(tipoLead: string | null | undefined): MetaPipeline {
-    const etiquetas = etiquetasPorTipo(tipoLead);
-    const estados = estadosPorTipo(tipoLead).map((codigo) => ({
+  constructor(
+    @Inject(ORGANIZACIONES_REPOSITORY)
+    private readonly organizaciones: OrganizacionesRepository,
+  ) {}
+
+  async execute(
+    organizacionId: string,
+    tipoLead: string | null | undefined,
+  ): Promise<MetaPipeline> {
+    const raw = await this.organizaciones.obtenerPipelineConfig(organizacionId);
+    const override: PipelineConfigOverride | null = parsePipelineConfig(raw);
+
+    const etiquetas = etiquetasPorTipo(tipoLead, override);
+    const estados = estadosPorTipo(tipoLead, override).map((codigo) => ({
       codigo,
       etiqueta: etiquetas[codigo] ?? codigo,
-      siguientes: transicionesPermitidas(tipoLead, codigo),
+      siguientes: transicionesPermitidas(tipoLead, codigo, override),
       camposAlEntrar: mapearCampos(camposAlEntrarEstado(tipoLead, codigo)),
     }));
 
@@ -85,6 +102,7 @@ export class ObtenerMetaPipelineUseCase {
       motivosPerdido: MOTIVOS_PERDIDO.map(motivo),
       motivosGanado: motivosGanado(tipoLead).map(motivo),
       camposReapertura: mapearCampos(camposReapertura()),
+      usandoOverride: override !== null,
     };
   }
 }

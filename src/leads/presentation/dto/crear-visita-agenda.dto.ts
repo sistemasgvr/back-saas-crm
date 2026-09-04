@@ -38,6 +38,13 @@ export class CrearVisitaAgendaDto {
   referenciaInmueble: string;
 
   @ApiPropertyOptional({
+    description: 'FK al catálogo de inmuebles (opcional)',
+  })
+  @IsOptional()
+  @IsUUID()
+  inmuebleId?: string;
+
+  @ApiPropertyOptional({
     enum: ['PRESENCIAL', 'VIRTUAL'],
     default: 'PRESENCIAL',
   })

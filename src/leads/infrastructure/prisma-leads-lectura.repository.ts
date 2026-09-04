@@ -198,6 +198,8 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
     });
     if (!lead) return null;
 
+    const proximaAccion = await this.obtenerProximaAccion(organizacionId, id);
+
     return {
       ...toResumen(lead),
       conjuntoAnuncio: refOpcional(lead.conjuntoAnuncio),
@@ -208,7 +210,65 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       estadoGestionEn: lead.estadoGestionEn,
       motivoCierre: lead.motivoCierre,
       notaCierre: lead.notaCierre,
+      proximaAccion,
     };
+  }
+
+  private async obtenerProximaAccion(
+    organizacionId: string,
+    leadId: string,
+  ): Promise<LeadDetalle['proximaAccion']> {
+    const [visita, actividad] = await Promise.all([
+      this.prisma.leadVisita.findFirst({
+        where: { organizacionId, leadId, estado: 'PROGRAMADA' },
+        orderBy: { programadaEn: 'asc' },
+        select: {
+          id: true,
+          programadaEn: true,
+          programadaFin: true,
+          referenciaInmueble: true,
+        },
+      }),
+      this.prisma.leadActividad.findFirst({
+        where: { organizacionId, leadId, estado: 'PROGRAMADA' },
+        orderBy: { programadaEn: 'asc' },
+        select: {
+          id: true,
+          tipo: true,
+          titulo: true,
+          programadaEn: true,
+          programadaFin: true,
+        },
+      }),
+    ]);
+
+    type Candidato = NonNullable<LeadDetalle['proximaAccion']>;
+    const candidatos: Candidato[] = [];
+    if (visita) {
+      candidatos.push({
+        origen: 'visita',
+        id: visita.id,
+        tipo: 'VISITA',
+        titulo: visita.referenciaInmueble,
+        programadaEn: visita.programadaEn,
+        programadaFin: visita.programadaFin,
+      });
+    }
+    if (actividad) {
+      candidatos.push({
+        origen: 'actividad',
+        id: actividad.id,
+        tipo: actividad.tipo,
+        titulo: actividad.titulo,
+        programadaEn: actividad.programadaEn,
+        programadaFin: actividad.programadaFin,
+      });
+    }
+    if (candidatos.length === 0) return null;
+    candidatos.sort(
+      (a, b) => a.programadaEn.getTime() - b.programadaEn.getTime(),
+    );
+    return candidatos[0] ?? null;
   }
 
   async listarMiembrosAsignables(

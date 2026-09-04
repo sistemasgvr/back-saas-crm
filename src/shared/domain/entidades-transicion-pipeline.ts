@@ -12,6 +12,7 @@ export interface CrearVisitaTransicionInput {
   programadaFin: Date;
   duracionMinutos: number;
   referenciaInmueble: string;
+  inmuebleId?: string | null;
   modalidad: string;
   nota?: string | null;
   asignadoUsuarioId: string | null;
@@ -38,6 +39,7 @@ export interface CrearCalificacionTransicionInput {
 const CAMPOS_VISITA = new Set([
   'visitaProgramadaEn',
   'referenciaInmueble',
+  'inmuebleId',
   'modalidadVisita',
   'duracionMinutos',
 ]);
@@ -97,6 +99,7 @@ export function construirVisitaDesdeMetadata(
     programadaFin: calcularProgramadaFin(programadaEn, duracionMinutos),
     duracionMinutos,
     referenciaInmueble: metadata.referenciaInmueble,
+    inmuebleId: metadata.inmuebleId?.trim() || null,
     modalidad: metadata.modalidadVisita ?? 'PRESENCIAL',
     nota: ctx.notaTransicion ?? null,
     asignadoUsuarioId: ctx.asignadoUsuarioId,

@@ -15,8 +15,10 @@ import { ObtenerKpisUseCase } from '../application/use-cases/obtener-kpis.use-ca
 import { ObtenerSeriesUseCase } from '../application/use-cases/obtener-series.use-case';
 import { ObtenerKpisPublicitariosUseCase } from '../application/use-cases/obtener-kpis-publicitarios.use-case';
 import { ObtenerSeriesPublicitariasUseCase } from '../application/use-cases/obtener-series-publicitarias.use-case';
+import { ObtenerEmbudoKpisUseCase } from '../application/use-cases/obtener-embudo-kpis.use-case';
 import { FiltroDashboardQueryDto } from './dto/filtro-dashboard.query.dto';
 import { FiltroSeriesQueryDto } from './dto/filtro-series.query.dto';
+import { FiltroEmbudoQueryDto } from './dto/filtro-embudo.query.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
@@ -29,6 +31,7 @@ export class DashboardController {
     private readonly obtenerSeries: ObtenerSeriesUseCase,
     private readonly obtenerKpisPublicitarios: ObtenerKpisPublicitariosUseCase,
     private readonly obtenerSeriesPublicitarias: ObtenerSeriesPublicitariasUseCase,
+    private readonly obtenerEmbudoKpis: ObtenerEmbudoKpisUseCase,
   ) {}
 
   @Get('kpis')
@@ -103,5 +106,25 @@ export class DashboardController {
     @Query() query: FiltroSeriesQueryDto,
   ) {
     return this.obtenerSeriesPublicitarias.execute(ctx.organizacionId!, query);
+  }
+
+  @Get('embudo-kpis')
+  @ApiOperation({
+    summary: 'KPIs del embudo de gestión',
+    description:
+      'Conteo por estadoGestion, tasa de contacto, conversión a ganado y tiempo promedio en etapa. ' +
+      'Filtros de fecha, tipoLead y asignado (mismos criterios que listado de leads).',
+  })
+  @ApiResponse({ status: 200, description: 'KPIs de embudo calculados.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'La organización no tiene el módulo DASHBOARD activo.',
+  })
+  getEmbudoKpis(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: FiltroEmbudoQueryDto,
+  ) {
+    return this.obtenerEmbudoKpis.execute(ctx, query);
   }
 }

@@ -5,9 +5,13 @@ import {
   esTransicionValida,
   estadoAlCambiarTipo,
   debeClasificarTipoDesdeNuevo,
+  ESTADOS_COMPRA,
+  parsePipelineConfig,
+  pipelineConfigPorDefecto,
   puedeCambiarTipoLead,
   requiereTipoLeadDefinido,
   transicionesPermitidas,
+  validarPipelineConfig,
 } from './pipeline-inmobiliaria';
 
 describe('pipeline-inmobiliaria — embudo COMPRA', () => {
@@ -231,5 +235,42 @@ describe('estadoAlCambiarTipo (§4.1.5)', () => {
     expect(estadoAlCambiarTipo('VISITA_AGENDADA')).toBe('CONTACTADO');
     expect(estadoAlCambiarTipo('CAPTACION')).toBe('CONTACTADO');
     expect(estadoAlCambiarTipo('EN_COMERCIALIZACION')).toBe('CONTACTADO');
+  });
+});
+
+describe('pipeline_config override', () => {
+  const defaults = pipelineConfigPorDefecto();
+
+  it('pipelineConfigPorDefecto coincide con las matrices de código', () => {
+    expect(defaults.COMPRA.estados).toEqual([...ESTADOS_COMPRA]);
+    expect(esTransicionValida('COMPRA', 'CALIFICADO', 'VISITA_AGENDADA', defaults)).toBe(
+      true,
+    );
+  });
+
+  it('validarPipelineConfig acepta el snapshot por defecto', () => {
+    expect(validarPipelineConfig(defaults)).toEqual(defaults);
+  });
+
+  it('rechaza embudo sin NUEVO o sin terminales', () => {
+    const malo = structuredClone(defaults);
+    malo.COMPRA.estados = malo.COMPRA.estados.filter((e) => e !== 'NUEVO');
+    expect(() => validarPipelineConfig(malo)).toThrow(/NUEVO/);
+  });
+
+  it('usa transiciones del override cuando se pasa', () => {
+    const override = structuredClone(defaults);
+    override.COMPRA.transiciones.CALIFICADO = ['DESCARTADO'];
+    expect(
+      transicionesPermitidas('COMPRA', 'CALIFICADO', override),
+    ).toEqual(['DESCARTADO']);
+    expect(
+      esTransicionValida('COMPRA', 'CALIFICADO', 'VISITA_AGENDADA', override),
+    ).toBe(false);
+  });
+
+  it('parsePipelineConfig devuelve null ante JSON corrupto', () => {
+    expect(parsePipelineConfig({ foo: 1 })).toBeNull();
+    expect(parsePipelineConfig(null)).toBeNull();
   });
 });

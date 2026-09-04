@@ -4,18 +4,31 @@ import type { TipoLeadInmobiliaria } from './tipos-lead-inmobiliaria';
 /**
  * Pipeline profesional de leads — PLAN-PIPELINE-INMOBILIARIA.md.
  *
- * Las matrices de transición viven acá, en código (no en BD) — así lo pide
- * el plan (§4, "vive en código, no en BD en v1"): un catálogo por org
- * configurable es fase futura, hoy alcanza con la vertical INMOBILIARIA.
+ * Matrices por defecto viven en código. Desde v1 una org puede guardar un
+ * override JSON en `organizaciones.pipeline_config` (null = estas matrices).
  *
  * Se probó modelar esto con una librería de state machines (xstate), pero
  * cada matriz es literalmente un grafo dirigido de "desde estado X, hacia
  * estos estados" — un Record<string,string[]> más una función que revisa
- * membership es toda la máquina de estados que hace falta. Traer una
- * dependencia para eso sería peor: más código, más superficie para bugs,
- * sin ganar nada (no hay actores, efectos paralelos, ni jerarquías que
- * xstate resuelva mejor que un objeto plano + `includes()`).
+ * membership es toda la máquina de estados que hace falta.
  */
+
+/** Embudo de un tipoLead en el JSON de override por org. */
+export interface EmbudoPipelineConfig {
+  estados: string[];
+  /** Clave = estado origen; valor = destinos permitidos. */
+  transiciones: Record<string, string[]>;
+  /** Etiquetas UI opcionales; si falta un código se usa el default de código. */
+  etiquetas?: Record<string, string>;
+}
+
+/** Shape persistido en `organizaciones.pipeline_config`. */
+export type PipelineConfigOverride = Record<
+  TipoLeadInmobiliaria,
+  EmbudoPipelineConfig
+>;
+
+const CODIGO_ESTADO_RE = /^[A-Z][A-Z0-9_]*$/;
 
 export const ESTADOS_TERMINALES = [
   'CERRADO_GANADO',
@@ -242,10 +255,21 @@ function normalizarTipo(
     : null;
 }
 
-/** null/undefined y 'OTRO' comparten el embudo corto — un lead sin tipoLead
- * aún clasificado solo puede moverse por NUEVO/CONTACTADO/DESCARTADO, ver
- * requiereTipoLeadDefinido(). */
-export function matrizPorTipo(
+function claveEmbudo(
+  tipoLead: string | null | undefined,
+): TipoLeadInmobiliaria {
+  return normalizarTipo(tipoLead) ?? 'OTRO';
+}
+
+function embudoOverride(
+  tipoLead: string | null | undefined,
+  override?: PipelineConfigOverride | null,
+): EmbudoPipelineConfig | null {
+  if (!override) return null;
+  return override[claveEmbudo(tipoLead)] ?? null;
+}
+
+function matrizCodigo(
   tipoLead: string | null | undefined,
 ): Record<string, readonly string[]> {
   const tipo = normalizarTipo(tipoLead);
@@ -254,13 +278,228 @@ export function matrizPorTipo(
   return TRANSICIONES_OTRO;
 }
 
-export function etiquetasPorTipo(
+function etiquetasCodigo(
   tipoLead: string | null | undefined,
 ): Record<string, string> {
   const tipo = normalizarTipo(tipoLead);
   if (tipo === 'COMPRA') return ETIQUETAS_COMPRA;
   if (tipo === 'VENTA') return ETIQUETAS_VENTA;
   return ETIQUETAS_OTRO;
+}
+
+function estadosCodigo(
+  tipoLead: string | null | undefined,
+): readonly string[] {
+  const tipo = normalizarTipo(tipoLead);
+  if (tipo === 'COMPRA') return ESTADOS_COMPRA;
+  if (tipo === 'VENTA') return ESTADOS_VENTA;
+  return ESTADOS_OTRO;
+}
+
+/** Snapshot del pipeline por defecto (código) — para UI "restaurar" y GET. */
+export function pipelineConfigPorDefecto(): PipelineConfigOverride {
+  const build = (
+    estados: readonly string[],
+    transiciones: Record<string, readonly string[]>,
+    etiquetas: Record<string, string>,
+  ): EmbudoPipelineConfig => ({
+    estados: [...estados],
+    transiciones: Object.fromEntries(
+      Object.entries(transiciones).map(([desde, hacia]) => [desde, [...hacia]]),
+    ),
+    etiquetas: { ...etiquetas },
+  });
+
+  return {
+    COMPRA: build(ESTADOS_COMPRA, TRANSICIONES_COMPRA, ETIQUETAS_COMPRA),
+    VENTA: build(ESTADOS_VENTA, TRANSICIONES_VENTA, ETIQUETAS_VENTA),
+    OTRO: build(ESTADOS_OTRO, TRANSICIONES_OTRO, ETIQUETAS_OTRO),
+  };
+}
+
+function esRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function validarEmbudo(
+  tipo: TipoLeadInmobiliaria,
+  raw: unknown,
+): EmbudoPipelineConfig {
+  if (!esRecord(raw)) {
+    throw new Error(`pipeline_config.${tipo} debe ser un objeto`);
+  }
+
+  if (!Array.isArray(raw.estados) || raw.estados.length === 0) {
+    throw new Error(
+      `pipeline_config.${tipo}.estados debe ser un arreglo no vacío`,
+    );
+  }
+
+  const estados: string[] = [];
+  const vistos = new Set<string>();
+  for (const item of raw.estados) {
+    if (typeof item !== 'string' || !CODIGO_ESTADO_RE.test(item)) {
+      throw new Error(
+        `pipeline_config.${tipo}.estados: código inválido (${String(item)})`,
+      );
+    }
+    if (vistos.has(item)) {
+      throw new Error(
+        `pipeline_config.${tipo}.estados: código duplicado (${item})`,
+      );
+    }
+    vistos.add(item);
+    estados.push(item);
+  }
+
+  if (!vistos.has('NUEVO')) {
+    throw new Error(`pipeline_config.${tipo}.estados debe incluir NUEVO`);
+  }
+  for (const terminal of ESTADOS_TERMINALES) {
+    if (!vistos.has(terminal)) {
+      throw new Error(
+        `pipeline_config.${tipo}.estados debe incluir ${terminal}`,
+      );
+    }
+  }
+
+  if (!esRecord(raw.transiciones)) {
+    throw new Error(`pipeline_config.${tipo}.transiciones debe ser un objeto`);
+  }
+
+  const transiciones: Record<string, string[]> = {};
+  for (const estado of estados) {
+    const destinosRaw = raw.transiciones[estado];
+    if (destinosRaw === undefined) {
+      throw new Error(
+        `pipeline_config.${tipo}.transiciones falta la clave ${estado}`,
+      );
+    }
+    if (!Array.isArray(destinosRaw)) {
+      throw new Error(
+        `pipeline_config.${tipo}.transiciones.${estado} debe ser un arreglo`,
+      );
+    }
+    const destinos: string[] = [];
+    for (const d of destinosRaw) {
+      if (typeof d !== 'string' || !vistos.has(d)) {
+        throw new Error(
+          `pipeline_config.${tipo}.transiciones.${estado}: destino inválido (${String(d)})`,
+        );
+      }
+      if (!destinos.includes(d)) destinos.push(d);
+    }
+    if (
+      (ESTADOS_TERMINALES as readonly string[]).includes(estado) &&
+      destinos.length > 0
+    ) {
+      throw new Error(
+        `pipeline_config.${tipo}.transiciones.${estado}: un estado terminal no puede tener salidas`,
+      );
+    }
+    transiciones[estado] = destinos;
+  }
+
+  for (const clave of Object.keys(raw.transiciones)) {
+    if (!vistos.has(clave)) {
+      throw new Error(
+        `pipeline_config.${tipo}.transiciones tiene clave desconocida (${clave})`,
+      );
+    }
+  }
+
+  let etiquetas: Record<string, string> | undefined;
+  if (raw.etiquetas !== undefined) {
+    if (!esRecord(raw.etiquetas)) {
+      throw new Error(`pipeline_config.${tipo}.etiquetas debe ser un objeto`);
+    }
+    etiquetas = {};
+    for (const [codigo, etiqueta] of Object.entries(raw.etiquetas)) {
+      if (!vistos.has(codigo)) {
+        throw new Error(
+          `pipeline_config.${tipo}.etiquetas tiene código desconocido (${codigo})`,
+        );
+      }
+      if (typeof etiqueta !== 'string' || !etiqueta.trim()) {
+        throw new Error(
+          `pipeline_config.${tipo}.etiquetas.${codigo} debe ser texto no vacío`,
+        );
+      }
+      etiquetas[codigo] = etiqueta.trim();
+    }
+  }
+
+  return etiquetas
+    ? { estados, transiciones, etiquetas }
+    : { estados, transiciones };
+}
+
+/**
+ * Valida y normaliza el JSON de override. Lanza Error con mensaje en español
+ * si la forma es inválida.
+ */
+export function validarPipelineConfig(raw: unknown): PipelineConfigOverride {
+  if (!esRecord(raw)) {
+    throw new Error('pipeline_config debe ser un objeto');
+  }
+
+  const resultado = {} as PipelineConfigOverride;
+  for (const tipo of TIPOS_LEAD_INMOBILIARIA) {
+    if (!(tipo in raw)) {
+      throw new Error(`pipeline_config debe incluir ${tipo}`);
+    }
+    resultado[tipo] = validarEmbudo(tipo, raw[tipo]);
+  }
+
+  const extras = Object.keys(raw).filter(
+    (k) => !(TIPOS_LEAD_INMOBILIARIA as readonly string[]).includes(k),
+  );
+  if (extras.length > 0) {
+    throw new Error(
+      `pipeline_config tiene claves desconocidas: ${extras.join(', ')}`,
+    );
+  }
+
+  return resultado;
+}
+
+/** Lectura segura: null si está vacío o corrupto (fallback a código). */
+export function parsePipelineConfig(
+  raw: unknown,
+): PipelineConfigOverride | null {
+  if (raw === null || raw === undefined) return null;
+  try {
+    return validarPipelineConfig(raw);
+  } catch {
+    return null;
+  }
+}
+
+/** null/undefined y 'OTRO' comparten el embudo corto — un lead sin tipoLead
+ * aún clasificado solo puede moverse por NUEVO/CONTACTADO/DESCARTADO, ver
+ * requiereTipoLeadDefinido(). */
+export function matrizPorTipo(
+  tipoLead: string | null | undefined,
+  override?: PipelineConfigOverride | null,
+): Record<string, readonly string[]> {
+  const embudo = embudoOverride(tipoLead, override);
+  if (embudo) return embudo.transiciones;
+  return matrizCodigo(tipoLead);
+}
+
+export function etiquetasPorTipo(
+  tipoLead: string | null | undefined,
+  override?: PipelineConfigOverride | null,
+): Record<string, string> {
+  const base = etiquetasCodigo(tipoLead);
+  const embudo = embudoOverride(tipoLead, override);
+  if (!embudo) return base;
+  const map: Record<string, string> = {};
+  for (const codigo of embudo.estados) {
+    map[codigo] =
+      embudo.etiquetas?.[codigo] ?? base[codigo] ?? codigo;
+  }
+  return map;
 }
 
 /** Columnas del kanban cuando se listan todos los tipos a la vez. */
@@ -279,40 +518,71 @@ export const ESTADOS_TABLERO_UNIFICADO = [
   'DESCARTADO',
 ] as const;
 
-function etiquetasTableroUnificado(): Record<string, string> {
+function etiquetasTableroUnificado(
+  override?: PipelineConfigOverride | null,
+): Record<string, string> {
+  if (!override) {
+    const map: Record<string, string> = {};
+    for (const codigo of ESTADOS_TABLERO_UNIFICADO) {
+      map[codigo] =
+        ETIQUETAS_COMPRA[codigo] ??
+        ETIQUETAS_VENTA[codigo] ??
+        ETIQUETAS_OTRO[codigo] ??
+        codigo;
+    }
+    return map;
+  }
+
   const map: Record<string, string> = {};
-  for (const codigo of ESTADOS_TABLERO_UNIFICADO) {
-    map[codigo] =
-      ETIQUETAS_COMPRA[codigo] ??
-      ETIQUETAS_VENTA[codigo] ??
-      ETIQUETAS_OTRO[codigo] ??
-      codigo;
+  for (const tipo of TIPOS_LEAD_INMOBILIARIA) {
+    const etiquetas = etiquetasPorTipo(tipo, override);
+    for (const [codigo, etiqueta] of Object.entries(etiquetas)) {
+      if (!(codigo in map)) map[codigo] = etiqueta;
+    }
   }
   return map;
+}
+
+function estadosTableroUnificado(
+  override?: PipelineConfigOverride | null,
+): readonly string[] {
+  if (!override) return ESTADOS_TABLERO_UNIFICADO;
+  const vistos = new Set<string>();
+  const resultado: string[] = [];
+  for (const tipo of TIPOS_LEAD_INMOBILIARIA) {
+    for (const codigo of override[tipo].estados) {
+      if (vistos.has(codigo)) continue;
+      vistos.add(codigo);
+      resultado.push(codigo);
+    }
+  }
+  return resultado;
 }
 
 /** `tipoLead` undefined = tablero unificado (todos los tipos). */
 export function estadosColumnasTablero(
   tipoLead: string | undefined,
+  override?: PipelineConfigOverride | null,
 ): readonly string[] {
-  if (tipoLead === undefined) return ESTADOS_TABLERO_UNIFICADO;
-  return estadosPorTipo(tipoLead);
+  if (tipoLead === undefined) return estadosTableroUnificado(override);
+  return estadosPorTipo(tipoLead, override);
 }
 
 export function etiquetasColumnasTablero(
   tipoLead: string | undefined,
+  override?: PipelineConfigOverride | null,
 ): Record<string, string> {
-  if (tipoLead === undefined) return etiquetasTableroUnificado();
-  return etiquetasPorTipo(tipoLead);
+  if (tipoLead === undefined) return etiquetasTableroUnificado(override);
+  return etiquetasPorTipo(tipoLead, override);
 }
 
 export function estadosPorTipo(
   tipoLead: string | null | undefined,
+  override?: PipelineConfigOverride | null,
 ): readonly string[] {
-  const tipo = normalizarTipo(tipoLead);
-  if (tipo === 'COMPRA') return ESTADOS_COMPRA;
-  if (tipo === 'VENTA') return ESTADOS_VENTA;
-  return ESTADOS_OTRO;
+  const embudo = embudoOverride(tipoLead, override);
+  if (embudo) return embudo.estados;
+  return estadosCodigo(tipoLead);
 }
 
 export function motivosGanado(
@@ -334,16 +604,18 @@ export function esEstadoTerminal(estado: string): estado is EstadoTerminal {
 export function transicionesPermitidas(
   tipoLead: string | null | undefined,
   estadoActual: string,
+  override?: PipelineConfigOverride | null,
 ): readonly string[] {
-  return matrizPorTipo(tipoLead)[estadoActual] ?? [];
+  return matrizPorTipo(tipoLead, override)[estadoActual] ?? [];
 }
 
 export function esTransicionValida(
   tipoLead: string | null | undefined,
   desde: string,
   hacia: string,
+  override?: PipelineConfigOverride | null,
 ): boolean {
-  return transicionesPermitidas(tipoLead, desde).includes(hacia);
+  return transicionesPermitidas(tipoLead, desde, override).includes(hacia);
 }
 
 /** CALIFICADO en adelante exige tipoLead definido (COMPRA/VENTA/OTRO) — regla

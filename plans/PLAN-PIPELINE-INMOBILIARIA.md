@@ -14,7 +14,7 @@ Documento residual de producto/ops. **Fases 20–22 (código)** ya absorbidas en
 | Compra ≠ venta | Misma columna de estado; catálogo/transiciones distintos por tipo |
 | Terminales | `CERRADO_GANADO`, `CERRADO_PERDIDO`, `DESCARTADO` (reabrir solo admin) |
 | Soft delete | `leads.estado` (0/1) **nunca** mezclar con pipeline |
-| Matrices | Código (`pipeline-inmobiliaria.ts`); no BD en v1 |
+| Matrices | Código (`pipeline-inmobiliaria.ts`) + override opcional `organizaciones.pipeline_config` (JSON v1) |
 
 **Salida de NUEVO/CONTACTADO hacia etapas avanzadas:** `tipo_lead` definido (`COMPRA`/`VENTA`; `OTRO` = flujo corto).
 
@@ -78,22 +78,23 @@ SEPARACION → CERRADO_GANADO | CERRADO_PERDIDO | NEGOCIACION | DESCARTADO
 
 ## 2. Operativo pendiente
 
-- [ ] `prisma migrate deploy` en producción (pipeline + visitas/calificaciones + actividades)
+- [ ] `prisma migrate deploy` en producción (incl. `20260904194500_pipeline_backlog`: inmuebles, FKs, WA flag, `pipeline_config`)
 - [ ] Smoke: mover lead COMPRA y VENTA por UI + historial + tablero
 - [ ] Dataset CAPI configurado en org si se quiere Conversion Leads en cierres
+- [ ] Configurar `WHATSAPP_AGENDA_REMINDER_TEMPLATE` (+ idioma) si se quieren recordatorios WA fuera de ventana 24h
 
 ---
 
-## 3. Backlog futuro
+## 3. Backlog — checklist post-implementación
 
 | Ítem | Estado |
 |------|--------|
-| **Fase 23** — Agenda + recordatorios | **Parcial en código** (ver PLAN.md): UI `/agenda`, visitas + `lead_actividades`, cron notificaciones in-app (`AGENDA_PROXIMA`). **Falta:** recordatorios WhatsApp al asesor/cliente |
-| **Fase 24** — Actividades / próxima acción | **Hecho en código** (`lead_actividades` + crear desde agenda). Residual: “próxima acción” destacada en ficha lead / KPIs de seguimiento si se prioriza |
-| **Fase 25** — Catálogo inmuebles | Pendiente (`Property` / `Listing`); hoy solo `referencia_inmueble` texto |
-| Dashboard KPIs embudo | Pendiente (tiempo en etapa, conversión por tipo; datos ya en BD) |
-| Heurística `tipo_lead` desde `field_data` | Pendiente, no bloqueante al webhook |
-| Pipelines configurables por org | Pendiente (hoy matrices fijas en código) |
+| **Fase 23** — Agenda + recordatorios | **Hecho en código**: UI `/agenda`, visitas + actividades, cron in-app + **WA al lead** (sesión 24h o plantilla env) |
+| **Fase 24** — Actividades / próxima acción | **Hecho**: `lead_actividades` + bloque «Próxima acción» en ficha lead |
+| **Fase 25** — Catálogo inmuebles | **Hecho**: CRUD `/inmuebles`, vínculo visita/`inmuebleInteresId`; `referencia_inmueble` texto se mantiene |
+| Dashboard KPIs embudo | **Hecho**: `GET /dashboard/embudo-kpis` + sección Embudo en `/dashboard` |
+| Heurística `tipo_lead` desde `field_data` | **Hecho**: solo si `tipoLead` null en ingest Meta |
+| Pipelines configurables por org | **Hecho (v1 JSON)**: `pipeline_config` + settings UI; meta/tablero respetan override |
 
 ---
 
@@ -103,9 +104,10 @@ SEPARACION → CERRADO_GANADO | CERRADO_PERDIDO | NEGOCIACION | DESCARTADO
 - Comisiones / proformas
 - Automatizar estado solo porque llegó un WhatsApp
 - Forzar transiciones fuera de matriz
+- Editor visual de pipeline (solo JSON/form v1)
 
 **Ya no fuera de alcance:** kanban (`/leads/tablero`) y CAPI en código (requiere dataset en org) — ver PLAN.md §13.
 
 ---
 
-*Código 20–22 cerrado en PLAN.md. Este archivo = spec de embudos + ops + roadmap residual.*
+*Código 20–25 + backlog embudo/WA/heurística/pipeline JSON cerrado en código. Este archivo = spec de embudos + ops residual.*

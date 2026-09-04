@@ -181,8 +181,11 @@ export class LeadsController {
   })
   @ApiResponse({ status: 200, description: 'Catálogo del pipeline.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
-  metaPipeline(@Query('tipoLead') tipoLead?: string) {
-    return this.obtenerMetaPipeline.execute(tipoLead);
+  metaPipeline(
+    @CurrentUser() ctx: RequestContext,
+    @Query('tipoLead') tipoLead?: string,
+  ) {
+    return this.obtenerMetaPipeline.execute(ctx.organizacionId!, tipoLead);
   }
 
   /** Antes de :id — mismo motivo que /asignables. */
@@ -324,10 +327,16 @@ export class LeadsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Obtener un lead por id' })
+  @ApiOperation({
+    summary: 'Obtener un lead por id',
+    description:
+      'Detalle del lead, incluyendo estado del pipeline y la próxima acción ' +
+      'PROGRAMADA (visita o actividad) si existe.',
+  })
   @ApiResponse({
     status: 200,
-    description: 'Detalle del lead, incluyendo estado del pipeline.',
+    description:
+      'Detalle del lead. Campo `proximaAccion`: { origen, id, tipo, titulo, programadaEn, programadaFin } | null.',
   })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   @ApiResponse({

@@ -97,6 +97,40 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       },
     });
     if (!c) return null;
+    return this.mapearResumen(c);
+  }
+
+  async findActivaPorLeadId(
+    organizacionId: string,
+    leadId: string,
+  ): Promise<ConversacionResumen | null> {
+    const c = await this.prisma.whatsappConversacion.findFirst({
+      where: { organizacionId, leadId, estado: 1 },
+      include: {
+        lead: { select: { id: true, nombre: true, asignadoUsuarioId: true } },
+        mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
+      },
+      orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+    });
+    if (!c) return null;
+    return this.mapearResumen(c);
+  }
+
+  private mapearResumen(c: {
+    id: string;
+    waId: string;
+    nombreContacto: string | null;
+    ultimoMensajeEn: Date | null;
+    ventanaExpiraEn: Date | null;
+    noLeidos: number;
+    bloqueado: number;
+    lead: {
+      id: string;
+      nombre: string | null;
+      asignadoUsuarioId: string | null;
+    } | null;
+    mensajes: { texto: string | null }[];
+  }): ConversacionResumen {
     return {
       id: c.id,
       waId: c.waId,

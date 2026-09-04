@@ -13,6 +13,13 @@ export interface UpsertLeadInput {
   telefono?: string;
   datosCrudos: unknown;
   fechaLead?: Date;
+  /** Solo se aplica en create, o en update si el lead aún no tiene tipoLead. */
+  tipoLead?: string | null;
+}
+
+export interface LeadIdExternoRow {
+  id: string;
+  tipoLead: string | null;
 }
 
 export interface LeadsRepository {
@@ -27,4 +34,15 @@ export interface LeadsRepository {
     organizacionId: string,
     idExterno: string,
   ): Promise<string | null>;
+  /** Igual que buscarIdPorIdExterno pero incluye tipoLead (heurística ingest). */
+  buscarPorIdExterno(
+    organizacionId: string,
+    idExterno: string,
+  ): Promise<LeadIdExternoRow | null>;
+  /** Solo escribe si `tipo_lead` sigue null — nunca pisa clasificación manual. */
+  actualizarTipoLeadSiNulo(
+    organizacionId: string,
+    leadId: string,
+    tipoLead: string,
+  ): Promise<boolean>;
 }

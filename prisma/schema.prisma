@@ -94,6 +94,11 @@ model Organizacion {
    */
   rubro            String  @default("INMOBILIARIA") @db.VarChar(40)
   notas            String?
+  /**
+   * Override opcional de matrices de pipeline (COMPRA/VENTA/OTRO).
+   * Null = usar shared/domain/pipeline-inmobiliaria.ts.
+   */
+  pipelineConfig Json? @map("pipeline_config")
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
@@ -110,6 +115,7 @@ model Organizacion {
   metaInsightsDiarios      MetaInsightDiario[]
   campanas                 Campana[]
   leads                    Lead[]
+  inmuebles                Inmueble[]
   leadAutoAsignacionConfig LeadAutoAsignacionConfig?
   leadAutoAsignacionQueue  LeadAutoAsignacionQueue[]
   notificaciones           Notificacion[]
@@ -121,6 +127,44 @@ model Organizacion {
   @@index([estado])
   @@index([rubro])
   @@map("organizaciones")
+}
+
+/**
+ * Catálogo de propiedades de la org (Fase 25).
+ */
+model Inmueble {
+  id             String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+
+  codigo    String  @db.VarChar(80)
+  titulo    String  @db.VarChar(200)
+  /** DEPARTAMENTO | CASA | TERRENO | LOCAL | OFICINA | OTRO */
+  tipo      String  @db.VarChar(40)
+  /** VENTA | ALQUILER */
+  operacion String  @db.VarChar(20)
+  zona      String? @db.VarChar(120)
+  direccion String? @db.VarChar(300)
+  precio    Decimal? @db.Decimal(14, 2)
+  moneda    String  @default("PEN") @db.VarChar(3)
+  /** DISPONIBLE | RESERVADO | VENDIDO | INACTIVO */
+  estadoInmueble String @default("DISPONIBLE") @map("estado_inmueble") @db.VarChar(20)
+  notas     String?
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id])
+  leadsInteres Lead[]       @relation("LeadInmuebleInteres")
+  visitas      LeadVisita[]
+
+  @@unique([organizacionId, codigo])
+  @@index([organizacionId, estado])
+  @@index([organizacionId, estadoInmueble])
+  @@index([organizacionId, operacion])
+  @@map("inmuebles")
 }
 
 model Campana {
@@ -236,6 +280,8 @@ model Lead {
   /** Catálogo corto en código — ver MOTIVOS_DESCARTE/PERDIDO/GANADO. */
   motivoCierre              String?   @map("motivo_cierre") @db.VarChar(80)
   notaCierre                String?   @map("nota_cierre") @db.VarChar(500)
+  /** Inmueble de interés (catálogo); texto libre sigue en visitas.referenciaInmueble. */
+  inmuebleInteresId         String?   @map("inmueble_interes_id") @db.Uuid
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
@@ -250,6 +296,7 @@ model Lead {
   anuncio                Anuncio?               @relation(fields: [anuncioId], references: [id])
   asignadoUsuario        Usuario?               @relation("LeadAsignado", fields: [asignadoUsuarioId], references: [id])
   asignadoPorUsuario     Usuario?               @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
+  inmuebleInteres        Inmueble?              @relation("LeadInmuebleInteres", fields: [inmuebleInteresId], references: [id])
   whatsappConversaciones WhatsappConversacion[]
   estadoHistorial        LeadEstadoHistorial[]
   visitas                LeadVisita[]
@@ -269,6 +316,7 @@ model Lead {
   @@index([asignadoUsuarioId])
   @@index([tipoLead])
   @@index([estadoGestion])
+  @@index([inmuebleInteresId])
   @@index([organizacionId, estadoGestion])
   @@index([organizacionId, tipoLead, estadoGestion])
   @@map("leads")
@@ -378,6 +426,7 @@ model LeadVisita {
   /** Duración de la cita en minutos (30–180; default 60). */
   duracionMinutos    Int      @default(60) @map("duracion_minutos") @db.SmallInt
   referenciaInmueble String   @map("referencia_inmueble") @db.VarChar(300)
+  inmuebleId         String?  @map("inmueble_id") @db.Uuid
   direccion          String?  @db.VarChar(300)
   modalidad          String   @default("PRESENCIAL") @db.VarChar(20)
   puntoEncuentro     String?  @map("punto_encuentro") @db.VarChar(300)
@@ -399,6 +448,7 @@ model LeadVisita {
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   lead            Lead                 @relation(fields: [leadId], references: [id])
+  inmueble        Inmueble?            @relation(fields: [inmuebleId], references: [id])
   historialAgendo LeadEstadoHistorial? @relation("VisitaHistorialAgendo", fields: [historialAgendoId], references: [id])
   historialCierra LeadEstadoHistorial? @relation("VisitaHistorialCierra", fields: [historialCierraId], references: [id])
   asignadoUsuario Usuario?             @relation("LeadVisitaAsignado", fields: [asignadoUsuarioId], references: [id])
@@ -406,6 +456,7 @@ model LeadVisita {
 
   @@index([organizacionId, programadaEn])
   @@index([leadId, programadaEn])
+  @@index([inmuebleId])
   @@index([asignadoUsuarioId, programadaEn])
   @@index([asignadoUsuarioId, estado, programadaEn, programadaFin])
   @@index([organizacionId, estado, programadaEn])
@@ -826,6 +877,8 @@ model AgendaRecordatorioEnviado {
   itemId         String   @map("item_id") @db.Uuid
   offsetMinutos  Int      @map("offset_minutos") @db.SmallInt
   notificacionId String?  @map("notificacion_id") @db.Uuid
+  /** 1 = ya se intentó/envió recordatorio WhatsApp al lead. */
+  whatsappEnviado Int      @default(0) @map("whatsapp_enviado") @db.SmallInt
   fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
   @@unique([origen, itemId, offsetMinutos])

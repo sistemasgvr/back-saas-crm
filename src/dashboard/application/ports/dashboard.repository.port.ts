@@ -5,7 +5,16 @@ export interface FiltroDashboard {
   conjuntoAnuncioId?: string;
   anuncioId?: string;
   metaCuentaId?: string;
+  tipoLead?: string;
+  /** Filtro de asignación ya resuelto (rol-aware en el use-case). */
+  asignacion?: FiltroAsignacionDashboard;
 }
+
+export type FiltroAsignacionDashboard =
+  | { modo: 'todos' }
+  | { modo: 'sin_asignar' }
+  | { modo: 'usuario'; usuarioId: string }
+  | { modo: 'mios_y_pool'; usuarioId: string };
 
 export interface RangoFechas {
   desde: Date;
@@ -36,6 +45,35 @@ export interface DashboardSeries {
   porAnuncio: PuntoSerieNombrado[];
 }
 
+export interface ConteoEstadoGestion {
+  estadoGestion: string;
+  total: number;
+}
+
+export interface TiempoPromedioEstado {
+  estadoGestion: string;
+  /** Promedio en horas; null si no hay muestras. */
+  horasPromedio: number | null;
+  muestras: number;
+}
+
+export interface EmbudoKpisPorTipo {
+  tipoLead: string | null;
+  total: number;
+  contactados: number;
+  cerradosGanados: number;
+  porEstado: ConteoEstadoGestion[];
+}
+
+export interface EmbudoKpisRaw {
+  total: number;
+  contactados: number;
+  cerradosGanados: number;
+  porEstado: ConteoEstadoGestion[];
+  tiempoPromedioPorEstado: TiempoPromedioEstado[];
+  porTipoLead: EmbudoKpisPorTipo[];
+}
+
 export interface DashboardRepository {
   contarLeads(
     organizacionId: string,
@@ -59,4 +97,9 @@ export interface DashboardRepository {
     filtro: FiltroDashboard,
     rango: RangoFechas,
   ): Promise<PuntoSerieNombrado[]>;
+  embudoKpis(
+    organizacionId: string,
+    filtro: FiltroDashboard,
+    rango: RangoFechas,
+  ): Promise<EmbudoKpisRaw>;
 }

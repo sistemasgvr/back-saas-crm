@@ -15,6 +15,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { MetaModule } from './meta/meta.module';
 import { LeadsModule } from './leads/leads.module';
+import { InmueblesModule } from './inmuebles/inmuebles.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 
@@ -37,6 +38,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     PlatformAdminModule,
     MetaModule,
     LeadsModule,
+    InmueblesModule,
     NotificationsModule,
     WhatsappModule,
   ],

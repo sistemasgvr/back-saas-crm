@@ -10,7 +10,10 @@ import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmob
 import {
   estadosColumnasTablero,
   etiquetasColumnasTablero,
+  parsePipelineConfig,
 } from '../../../shared/domain/pipeline-inmobiliaria';
+import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
+import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -30,6 +33,8 @@ export class ListarTableroLeadsUseCase {
   constructor(
     @Inject(LEADS_LECTURA_REPOSITORY)
     private readonly leads: LeadsLecturaRepository,
+    @Inject(ORGANIZACIONES_REPOSITORY)
+    private readonly organizaciones: OrganizacionesRepository,
   ) {}
 
   private resolverAsignacion(
@@ -62,17 +67,23 @@ export class ListarTableroLeadsUseCase {
       ? (tipoLeadParam as string)
       : undefined;
 
+    const override = parsePipelineConfig(
+      await this.organizaciones.obtenerPipelineConfig(organizacionId),
+    );
+
     const filas = await this.leads.listarParaTablero(organizacionId, {
       tipoLead: tipoFiltro,
       asignacion: this.resolverAsignacion(asignadoParam, ctx),
     });
 
-    const etiquetas = etiquetasColumnasTablero(tipoFiltro);
-    const columnas = estadosColumnasTablero(tipoFiltro).map((codigo) => ({
-      codigo,
-      etiqueta: etiquetas[codigo] ?? codigo,
-      leads: filas.filter((f) => f.estadoGestion === codigo),
-    }));
+    const etiquetas = etiquetasColumnasTablero(tipoFiltro, override);
+    const columnas = estadosColumnasTablero(tipoFiltro, override).map(
+      (codigo) => ({
+        codigo,
+        etiqueta: etiquetas[codigo] ?? codigo,
+        leads: filas.filter((f) => f.estadoGestion === codigo),
+      }),
+    );
 
     return { columnas };
   }
