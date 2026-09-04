@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ForbiddenException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -23,6 +24,9 @@ import type {
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { categoriaMediaPorMimeType } from '../limites-media-whatsapp';
 
+/** Tope alineado con el multi-forward de la app WhatsApp (~30). */
+export const MAX_MENSAJES_REENVIAR = 30;
+
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
 const TIPOS_MEDIA = new Set([
@@ -33,9 +37,14 @@ const TIPOS_MEDIA = new Set([
   'sticker',
 ]);
 
+export type ReenviarLoteResultado = {
+  enviados: number;
+  fallidos: { mensajeId: string; error: string }[];
+};
+
 /**
- * Reenvía el contenido de un mensaje a otra conversación (la Cloud API no
- * tiene "forward" nativo: se vuelve a enviar el mismo payload).
+ * Reenvía el contenido de uno o varios mensajes a otra conversación (la Cloud
+ * API no tiene "forward" nativo: se vuelve a enviar el mismo payload).
  */
 @Injectable()
 export class ReenviarMensajeWhatsAppUseCase {
@@ -57,6 +66,36 @@ export class ReenviarMensajeWhatsAppUseCase {
     conversacionDestinoId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ): Promise<void> {
+    const resultado = await this.executeLote(
+      organizacionId,
+      conversacionOrigenId,
+      [mensajeId],
+      conversacionDestinoId,
+      ctx,
+    );
+    if (resultado.enviados !== 1) {
+      throw new BadRequestException(
+        resultado.fallidos[0]?.error ?? 'No se pudo reenviar el mensaje',
+      );
+    }
+  }
+
+  async executeLote(
+    organizacionId: string,
+    conversacionOrigenId: string,
+    mensajeIds: string[],
+    conversacionDestinoId: string,
+    ctx: { usuarioId: string; rol: RolOrganizacion },
+  ): Promise<ReenviarLoteResultado> {
+    if (
+      mensajeIds.length < 1 ||
+      mensajeIds.length > MAX_MENSAJES_REENVIAR
+    ) {
+      throw new BadRequestException(
+        `Puedes reenviar entre 1 y ${MAX_MENSAJES_REENVIAR} mensajes a la vez`,
+      );
+    }
+
     if (conversacionOrigenId === conversacionDestinoId) {
       throw new BadRequestException(
         'Elige otro chat para reenviar — no se puede reenviar al mismo',
@@ -92,6 +131,53 @@ export class ReenviarMensajeWhatsAppUseCase {
       );
     }
 
+    const { phoneNumberId, accessToken } = await this.credenciales(
+      organizacionId,
+    );
+
+    let enviados = 0;
+    const fallidos: { mensajeId: string; error: string }[] = [];
+
+    for (const mensajeId of mensajeIds) {
+      try {
+        await this.reenviarUno(
+          organizacionId,
+          conversacionOrigenId,
+          mensajeId,
+          conversacionDestinoId,
+          destino.waId,
+          phoneNumberId,
+          accessToken,
+          ctx,
+        );
+        enviados += 1;
+      } catch (err) {
+        fallidos.push({
+          mensajeId,
+          error: mensajeError(err),
+        });
+      }
+    }
+
+    if (enviados === 0) {
+      throw new BadRequestException(
+        fallidos[0]?.error ?? 'No se pudo reenviar ningún mensaje',
+      );
+    }
+
+    return { enviados, fallidos };
+  }
+
+  private async reenviarUno(
+    organizacionId: string,
+    conversacionOrigenId: string,
+    mensajeId: string,
+    conversacionDestinoId: string,
+    destinoWaId: string,
+    phoneNumberId: string,
+    accessToken: string,
+    ctx: { usuarioId: string; rol: RolOrganizacion },
+  ): Promise<void> {
     const mensaje = await this.conversaciones.buscarMensajeParaReenviar(
       organizacionId,
       mensajeId,
@@ -104,10 +190,6 @@ export class ReenviarMensajeWhatsAppUseCase {
         'No se pueden reenviar plantillas ni mensajes interactivos',
       );
     }
-
-    const { phoneNumberId, accessToken } = await this.credenciales(
-      organizacionId,
-    );
 
     if (TIPOS_MEDIA.has(mensaje.tipo)) {
       if (!mensaje.mediaBytes || !mensaje.mediaMimeType) {
@@ -131,7 +213,7 @@ export class ReenviarMensajeWhatsAppUseCase {
       const enviado = await this.graph.enviarMediaWhatsApp(
         phoneNumberId,
         accessToken,
-        destino.waId,
+        destinoWaId,
         categoria,
         subido.mediaId,
         {
@@ -181,7 +263,7 @@ export class ReenviarMensajeWhatsAppUseCase {
       const enviado = await this.graph.enviarUbicacionWhatsApp(
         phoneNumberId,
         accessToken,
-        destino.waId,
+        destinoWaId,
         ubicacion,
       );
       await this.conversaciones.registrarMensaje({
@@ -214,7 +296,7 @@ export class ReenviarMensajeWhatsAppUseCase {
       const enviado = await this.graph.enviarContactoWhatsApp(
         phoneNumberId,
         accessToken,
-        destino.waId,
+        destinoWaId,
         lista,
       );
       await this.conversaciones.registrarMensaje({
@@ -243,7 +325,7 @@ export class ReenviarMensajeWhatsAppUseCase {
     const enviado = await this.graph.enviarMensajeTextoWhatsApp(
       phoneNumberId,
       accessToken,
-      destino.waId,
+      destinoWaId,
       texto,
     );
     await this.conversaciones.registrarMensaje({
@@ -308,4 +390,18 @@ function normalizarContactos(
 ): ContactoMensajeRow[] {
   if (!contactos) return [];
   return Array.isArray(contactos) ? contactos : [contactos];
+}
+
+function mensajeError(err: unknown): string {
+  if (err instanceof HttpException) {
+    const res = err.getResponse();
+    if (typeof res === 'string') return res;
+    if (typeof res === 'object' && res !== null && 'message' in res) {
+      const msg = (res as { message: string | string[] }).message;
+      return Array.isArray(msg) ? msg.join(', ') : String(msg);
+    }
+    return err.message;
+  }
+  if (err instanceof Error) return err.message;
+  return 'Error al reenviar';
 }

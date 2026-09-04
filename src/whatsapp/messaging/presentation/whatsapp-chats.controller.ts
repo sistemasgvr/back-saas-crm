@@ -54,7 +54,11 @@ import { SubirMediaDto } from './dto/subir-media.dto';
 import { EnviarUbicacionDto } from './dto/enviar-ubicacion.dto';
 import { EnviarContactoDto } from './dto/enviar-contacto.dto';
 import { EnviarInteractivoDto } from './dto/enviar-interactivo.dto';
-import { ReenviarMensajeDto } from './dto/reenviar-mensaje.dto';
+import {
+  ReenviarMensajeDto,
+  ReenviarMensajesLoteDto,
+  MAX_MENSAJES_REENVIAR,
+} from './dto/reenviar-mensaje.dto';
 import { BloquearContactoWhatsAppUseCase } from '../application/use-cases/bloquear-contacto-whatsapp.use-case';
 import { EliminarMensajeWhatsAppCrmUseCase } from '../application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
 import { ReenviarMensajeWhatsAppUseCase } from '../application/use-cases/reenviar-mensaje-whatsapp.use-case';
@@ -485,12 +489,35 @@ export class WhatsappChatsController {
     });
   }
 
+  @Post(':id/messages/forward')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Reenviar uno o varios mensajes a otro chat',
+    description:
+      `Hasta ${MAX_MENSAJES_REENVIAR} mensajes (tope multi-forward típico de WhatsApp). ` +
+      'La Cloud API no tiene forward nativo: se reenvía el contenido en orden (ventana 24h).',
+  })
+  @ApiResponse({ status: 200, description: 'Resultado del lote (enviados + fallidos parciales).' })
+  forwardMessages(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReenviarMensajesLoteDto,
+  ) {
+    return this.reenviarMensaje.executeLote(
+      ctx.organizacionId!,
+      id,
+      dto.mensajeIds,
+      dto.conversacionDestinoId,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
+  }
+
   @Post(':id/messages/:mensajeId/forward')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Reenviar un mensaje a otro chat',
     description:
-      'La Cloud API no tiene forward nativo: se vuelve a enviar el contenido al destino (dentro de ventana 24h).',
+      'Compat. Preferir POST …/messages/forward con mensajeIds. Cloud API sin forward nativo.',
   })
   @ApiResponse({ status: 204, description: 'Mensaje reenviado.' })
   forwardMessage(
