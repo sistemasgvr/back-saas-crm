@@ -117,6 +117,7 @@ export class ObtenerEmbudoKpisUseCase {
       conjuntoAnuncioId: input.conjuntoAnuncioId,
       anuncioId: input.anuncioId,
       metaCuentaId: input.metaCuentaId,
+      inmuebleId: input.inmuebleId,
       tipoLead: input.tipoLead,
       asignacion: this.resolverAsignacion(input.asignado, ctx),
     };

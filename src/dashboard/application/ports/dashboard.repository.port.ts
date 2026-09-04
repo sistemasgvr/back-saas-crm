@@ -5,6 +5,8 @@ export interface FiltroDashboard {
   conjuntoAnuncioId?: string;
   anuncioId?: string;
   metaCuentaId?: string;
+  /** Filtra leads por inmueble de interés (`leads.inmueble_interes_id`). */
+  inmuebleId?: string;
   tipoLead?: string;
   /** Filtro de asignación ya resuelto (rol-aware en el use-case). */
   asignacion?: FiltroAsignacionDashboard;
@@ -43,6 +45,8 @@ export interface DashboardSeries {
   porDia: PuntoSerieDia[];
   porCampana: PuntoSerieNombrado[];
   porAnuncio: PuntoSerieNombrado[];
+  /** Top inmuebles por leads interesados en el rango (máx. 10). */
+  porInmueble: PuntoSerieNombrado[];
 }
 
 export interface ConteoEstadoGestion {
@@ -96,6 +100,12 @@ export interface DashboardRepository {
     organizacionId: string,
     filtro: FiltroDashboard,
     rango: RangoFechas,
+  ): Promise<PuntoSerieNombrado[]>;
+  serieInmuebles(
+    organizacionId: string,
+    filtro: FiltroDashboard,
+    rango: RangoFechas,
+    limite?: number,
   ): Promise<PuntoSerieNombrado[]>;
   embudoKpis(
     organizacionId: string,

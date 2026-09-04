@@ -29,6 +29,14 @@ export class FiltroSeriesQueryDto {
   metaCuentaId?: string;
 
   @ApiPropertyOptional({
+    description:
+      'Filtra leads por inmueble de interés (`leads.inmueble_interes_id`, UUID interno)',
+  })
+  @IsOptional()
+  @IsUUID()
+  inmuebleId?: string;
+
+  @ApiPropertyOptional({
     example: '2026-08-01',
     description: 'Fecha de inicio del rango, formato YYYY-MM-DD',
   })

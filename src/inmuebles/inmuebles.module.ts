@@ -3,6 +3,7 @@ import { InmueblesController } from './presentation/inmuebles.controller';
 import { ListarInmueblesUseCase } from './application/use-cases/listar-inmuebles.use-case';
 import { ListarInmueblesFiltroUseCase } from './application/use-cases/listar-inmuebles-filtro.use-case';
 import { ObtenerInmuebleUseCase } from './application/use-cases/obtener-inmueble.use-case';
+import { ListarInteresadosInmuebleUseCase } from './application/use-cases/listar-interesados-inmueble.use-case';
 import { CrearInmuebleUseCase } from './application/use-cases/crear-inmueble.use-case';
 import { ActualizarInmuebleUseCase } from './application/use-cases/actualizar-inmueble.use-case';
 import { EliminarInmuebleUseCase } from './application/use-cases/eliminar-inmueble.use-case';
@@ -15,6 +16,7 @@ import { PrismaInmueblesRepository } from './infrastructure/prisma-inmuebles.rep
     ListarInmueblesUseCase,
     ListarInmueblesFiltroUseCase,
     ObtenerInmuebleUseCase,
+    ListarInteresadosInmuebleUseCase,
     CrearInmuebleUseCase,
     ActualizarInmuebleUseCase,
     EliminarInmuebleUseCase,

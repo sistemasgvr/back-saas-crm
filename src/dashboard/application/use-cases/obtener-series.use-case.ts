@@ -37,9 +37,10 @@ export class ObtenerSeriesUseCase {
       conjuntoAnuncioId: input.conjuntoAnuncioId,
       anuncioId: input.anuncioId,
       metaCuentaId: input.metaCuentaId,
+      inmuebleId: input.inmuebleId,
     };
 
-    const [porDia, porCampana, porAnuncio] = await Promise.all([
+    const [porDia, porCampana, porAnuncio, porInmueble] = await Promise.all([
       this.dashboard.serieDiaria(
         organizacionId,
         filtro,
@@ -49,8 +50,9 @@ export class ObtenerSeriesUseCase {
       ),
       this.dashboard.serieCampanas(organizacionId, filtro, rango),
       this.dashboard.serieAnuncios(organizacionId, filtro, rango),
+      this.dashboard.serieInmuebles(organizacionId, filtro, rango, 10),
     ]);
 
-    return { porDia, porCampana, porAnuncio };
+    return { porDia, porCampana, porAnuncio, porInmueble };
   }
 }

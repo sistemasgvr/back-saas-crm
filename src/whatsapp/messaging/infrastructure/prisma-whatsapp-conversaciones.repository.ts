@@ -6,6 +6,7 @@ import type {
   ConversacionResumen,
   FiltroVisibilidadChats,
   InteractivoMensajeRow,
+  LeadEnConversacion,
   MediaMensaje,
   MensajeParaReenviar,
   MensajeResuelto,
@@ -16,6 +17,37 @@ import type {
 import { ultimosDigitos, telefonoAWaId } from './normalizar-telefono';
 
 const VENTANA_HORAS = 24;
+
+const LEAD_CON_INMUEBLE_SELECT = {
+  id: true,
+  nombre: true,
+  asignadoUsuarioId: true,
+  inmuebleInteres: { select: { id: true, codigo: true, titulo: true } },
+} as const;
+
+function mapearLead(
+  lead: {
+    id: string;
+    nombre: string | null;
+    asignadoUsuarioId: string | null;
+    inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
+  } | null,
+  waIdFallback: string,
+): LeadEnConversacion | null {
+  if (!lead) return null;
+  return {
+    id: lead.id,
+    nombre: lead.nombre ?? waIdFallback,
+    asignadoUsuarioId: lead.asignadoUsuarioId,
+    inmuebleInteres: lead.inmuebleInteres
+      ? {
+          id: lead.inmuebleInteres.id,
+          codigo: lead.inmuebleInteres.codigo,
+          titulo: lead.inmuebleInteres.titulo,
+        }
+      : null,
+  };
+}
 
 @Injectable()
 export class PrismaWhatsappConversacionesRepository implements WhatsappConversacionesRepository {
@@ -39,7 +71,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         ...this.whereVisibilidad(filtro),
       },
       include: {
-        lead: { select: { id: true, nombre: true, asignadoUsuarioId: true } },
+        lead: { select: LEAD_CON_INMUEBLE_SELECT },
         mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
       },
       // Postgres pone los NULL primero en un ORDER BY ... DESC por defecto —
@@ -53,13 +85,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       id: c.id,
       waId: c.waId,
       nombreContacto: c.nombreContacto,
-      lead: c.lead
-        ? {
-            id: c.lead.id,
-            nombre: c.lead.nombre ?? c.waId,
-            asignadoUsuarioId: c.lead.asignadoUsuarioId,
-          }
-        : null,
+      lead: mapearLead(c.lead, c.waId),
       ultimoMensajeEn: c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
@@ -92,7 +118,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     const c = await this.prisma.whatsappConversacion.findFirst({
       where: { id, organizacionId, estado: 1 },
       include: {
-        lead: { select: { id: true, nombre: true, asignadoUsuarioId: true } },
+        lead: { select: LEAD_CON_INMUEBLE_SELECT },
         mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
       },
     });
@@ -107,7 +133,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     const c = await this.prisma.whatsappConversacion.findFirst({
       where: { organizacionId, leadId, estado: 1 },
       include: {
-        lead: { select: { id: true, nombre: true, asignadoUsuarioId: true } },
+        lead: { select: LEAD_CON_INMUEBLE_SELECT },
         mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
       },
       orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
@@ -128,6 +154,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       id: string;
       nombre: string | null;
       asignadoUsuarioId: string | null;
+      inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
     } | null;
     mensajes: { texto: string | null }[];
   }): ConversacionResumen {
@@ -135,13 +162,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       id: c.id,
       waId: c.waId,
       nombreContacto: c.nombreContacto,
-      lead: c.lead
-        ? {
-            id: c.lead.id,
-            nombre: c.lead.nombre ?? c.waId,
-            asignadoUsuarioId: c.lead.asignadoUsuarioId,
-          }
-        : null,
+      lead: mapearLead(c.lead, c.waId),
       ultimoMensajeEn: c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,

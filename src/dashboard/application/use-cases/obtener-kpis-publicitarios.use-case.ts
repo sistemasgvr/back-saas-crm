@@ -59,6 +59,7 @@ export class ObtenerKpisPublicitariosUseCase {
       conjuntoAnuncioId: input.conjuntoAnuncioId,
       anuncioId: input.anuncioId,
       metaCuentaId: input.metaCuentaId,
+      inmuebleId: input.inmuebleId,
     };
 
     const leads = await this.dashboard.contarLeads(

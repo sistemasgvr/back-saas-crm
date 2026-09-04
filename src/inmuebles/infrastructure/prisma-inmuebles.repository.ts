@@ -9,6 +9,7 @@ import type {
   InmuebleFiltroOption,
   InmuebleRow,
   InmueblesRepository,
+  LeadCandidatoInteres,
   ListaInmueblesResultado,
 } from '../application/ports/inmuebles.repository.port';
 
@@ -107,6 +108,50 @@ export class PrismaInmueblesRepository implements InmueblesRepository {
       where: { id, organizacionId, estado: 1 },
     });
     return f ? this.toRow(f) : null;
+  }
+
+  async listarCandidatosInteres(
+    organizacionId: string,
+    inmuebleId: string,
+  ): Promise<LeadCandidatoInteres[]> {
+    const leads = await this.prisma.lead.findMany({
+      where: {
+        organizacionId,
+        estado: 1,
+        OR: [
+          { inmuebleInteresId: inmuebleId },
+          { visitas: { some: { inmuebleId, organizacionId } } },
+        ],
+      },
+      select: {
+        id: true,
+        nombre: true,
+        telefono: true,
+        estadoGestion: true,
+        tipoLead: true,
+        estadoGestionEn: true,
+        inmuebleInteresId: true,
+        visitas: {
+          where: { inmuebleId, organizacionId },
+          select: {
+            estado: true,
+            programadaEn: true,
+            fechaModificacion: true,
+          },
+        },
+      },
+    });
+
+    return leads.map((l) => ({
+      id: l.id,
+      nombre: l.nombre,
+      telefono: l.telefono,
+      estadoGestion: l.estadoGestion,
+      tipoLead: l.tipoLead,
+      estadoGestionEn: l.estadoGestionEn,
+      interesExplicito: l.inmuebleInteresId === inmuebleId,
+      visitas: l.visitas,
+    }));
   }
 
   async existeCodigo(

@@ -64,6 +64,7 @@ function whereFiltro(
     ...(filtro.metaCuentaId
       ? { campana: { metaCuentaPublicitariaId: filtro.metaCuentaId } }
       : {}),
+    ...(filtro.inmuebleId ? { inmuebleInteresId: filtro.inmuebleId } : {}),
     ...(filtro.tipoLead ? { tipoLead: filtro.tipoLead } : {}),
     ...whereAsignacion(filtro.asignacion),
     ...(rango ? { fechaLead: { gte: rango.desde, lte: rango.hasta } } : {}),
@@ -178,6 +179,48 @@ export class PrismaDashboardRepository implements DashboardRepository {
         total: g._count._all,
       }))
       .sort((a, b) => b.total - a.total);
+  }
+
+  async serieInmuebles(
+    organizacionId: string,
+    filtro: FiltroDashboard,
+    rango: RangoFechas,
+    limite = 10,
+  ): Promise<PuntoSerieNombrado[]> {
+    const grupos = await this.prisma.lead.groupBy({
+      by: ['inmuebleInteresId'],
+      where: {
+        ...whereFiltro(organizacionId, filtro, rango),
+        // Si ya filtra por un inmueble concreto, whereFiltro ya fijó inmuebleInteresId.
+        ...(filtro.inmuebleId ? {} : { inmuebleInteresId: { not: null } }),
+      },
+      _count: { _all: true },
+    });
+
+    const ids = grupos
+      .map((g) => g.inmuebleInteresId)
+      .filter((id): id is string => id !== null);
+    const inmuebles = await this.prisma.inmueble.findMany({
+      where: { id: { in: ids }, organizacionId },
+      select: { id: true, codigo: true, titulo: true, zona: true },
+    });
+    const nombrePorId = new Map(
+      inmuebles.map((i) => {
+        const zona = i.zona ? ` · ${i.zona}` : '';
+        return [i.id, `${i.codigo} — ${i.titulo}${zona}`];
+      }),
+    );
+
+    return grupos
+      .filter((g) => g.inmuebleInteresId !== null)
+      .map((g) => ({
+        id: g.inmuebleInteresId as string,
+        nombre:
+          nombrePorId.get(g.inmuebleInteresId as string) ?? '(desconocido)',
+        total: g._count._all,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limite);
   }
 
   async embudoKpis(

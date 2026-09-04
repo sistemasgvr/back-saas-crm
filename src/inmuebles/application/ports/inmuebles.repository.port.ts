@@ -87,6 +87,22 @@ export interface ListaInmueblesResultado {
   totalPages: number;
 }
 
+/** Lead candidato a ranking de interesados de un inmueble. */
+export interface LeadCandidatoInteres {
+  id: string;
+  nombre: string | null;
+  telefono: string | null;
+  estadoGestion: string;
+  tipoLead: string | null;
+  estadoGestionEn: Date | null;
+  interesExplicito: boolean;
+  visitas: {
+    estado: string;
+    programadaEn: Date;
+    fechaModificacion: Date;
+  }[];
+}
+
 export interface InmueblesRepository {
   listar(
     organizacionId: string,
@@ -99,6 +115,14 @@ export interface InmueblesRepository {
     organizacionId: string,
     id: string,
   ): Promise<InmuebleRow | null>;
+
+  /**
+   * Leads con interés explícito en el inmueble y/o visitas a ese inmueble.
+   */
+  listarCandidatosInteres(
+    organizacionId: string,
+    inmuebleId: string,
+  ): Promise<LeadCandidatoInteres[]>;
 
   existeCodigo(
     organizacionId: string,

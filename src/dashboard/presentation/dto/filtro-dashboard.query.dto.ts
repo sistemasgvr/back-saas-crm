@@ -27,4 +27,12 @@ export class FiltroDashboardQueryDto {
   @IsOptional()
   @IsUUID()
   metaCuentaId?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Filtra leads por inmueble de interés (`leads.inmueble_interes_id`, UUID interno)',
+  })
+  @IsOptional()
+  @IsUUID()
+  inmuebleId?: string;
 }

@@ -38,7 +38,7 @@ export class DashboardController {
   @ApiOperation({
     summary: 'KPIs de leads',
     description:
-      'Totales de leads (nuevos, contactados, convertidos, etc.) para el rango y filtros dados.',
+      'Totales de leads (total/hoy/semana/mes) con filtros Meta e inmuebleId opcional (`leads.inmueble_interes_id`).',
   })
   @ApiResponse({ status: 200, description: 'KPIs calculados.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
@@ -56,7 +56,9 @@ export class DashboardController {
   @Get('series')
   @ApiOperation({
     summary: 'Serie temporal de leads',
-    description: 'Conteo de leads agrupado por día para graficar tendencia.',
+    description:
+      'Conteo por día, campaña, anuncio y top inmuebles (porInmueble). ' +
+      'Filtros Meta, fechas e inmuebleId opcional (`leads.inmueble_interes_id`).',
   })
   @ApiResponse({ status: 200, description: 'Puntos de la serie.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
@@ -75,7 +77,8 @@ export class DashboardController {
   @ApiOperation({
     summary: 'KPIs publicitarios',
     description:
-      'Gasto, impresiones, clics y costo por lead agregados desde Meta Insights.',
+      'Gasto/impresiones/clics desde Meta Insights + conteo de leads (CPL). ' +
+      'inmuebleId filtra solo el denominador de leads; el spend sigue a nivel cuenta/campaña.',
   })
   @ApiResponse({ status: 200, description: 'KPIs publicitarios calculados.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
@@ -113,7 +116,7 @@ export class DashboardController {
     summary: 'KPIs del embudo de gestión',
     description:
       'Conteo por estadoGestion, tasa de contacto, conversión a ganado y tiempo promedio en etapa. ' +
-      'Filtros de fecha, tipoLead y asignado (mismos criterios que listado de leads).',
+      'Filtros: fechas, Meta, tipoLead, asignado e inmuebleId (`leads.inmueble_interes_id`).',
   })
   @ApiResponse({ status: 200, description: 'KPIs de embudo calculados.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })

@@ -29,6 +29,7 @@ import { RequireModule } from '../../shared/presentation/decorators/require-modu
 import { ListarInmueblesUseCase } from '../application/use-cases/listar-inmuebles.use-case';
 import { ListarInmueblesFiltroUseCase } from '../application/use-cases/listar-inmuebles-filtro.use-case';
 import { ObtenerInmuebleUseCase } from '../application/use-cases/obtener-inmueble.use-case';
+import { ListarInteresadosInmuebleUseCase } from '../application/use-cases/listar-interesados-inmueble.use-case';
 import { CrearInmuebleUseCase } from '../application/use-cases/crear-inmueble.use-case';
 import { ActualizarInmuebleUseCase } from '../application/use-cases/actualizar-inmueble.use-case';
 import { EliminarInmuebleUseCase } from '../application/use-cases/eliminar-inmueble.use-case';
@@ -46,6 +47,7 @@ export class InmueblesController {
     private readonly listarInmuebles: ListarInmueblesUseCase,
     private readonly listarFiltro: ListarInmueblesFiltroUseCase,
     private readonly obtenerInmueble: ObtenerInmuebleUseCase,
+    private readonly listarInteresados: ListarInteresadosInmuebleUseCase,
     private readonly crearInmueble: CrearInmuebleUseCase,
     private readonly actualizarInmueble: ActualizarInmuebleUseCase,
     private readonly eliminarInmueble: EliminarInmuebleUseCase,
@@ -89,6 +91,23 @@ export class InmueblesController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.obtenerInmueble.execute(ctx.organizacionId!, id);
+  }
+
+  @Get(':id/interesados')
+  @ApiOperation({
+    summary: 'Leads interesados rankeados por probabilidad de adquisición',
+    description:
+      'Orden: interés explícito → visitas (realizadas > agendadas) → etapa de ' +
+      'pipeline → tip vs operación → recencia. Terminales perdidos/descartados al final. ' +
+      'Lectura permitida a USUARIO (misma gate CRM que el catálogo).',
+  })
+  @ApiResponse({ status: 200, description: 'Lista ordenada de interesados.' })
+  @ApiResponse({ status: 404, description: 'Inmueble no encontrado.' })
+  findInteresados(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.listarInteresados.execute(ctx.organizacionId!, id);
   }
 
   @Post()
