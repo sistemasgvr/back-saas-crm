@@ -49,11 +49,16 @@ export class WebPushSender implements PushSender, OnModuleInit {
   async enviarAUsuarios(
     usuarioIds: string[],
     data: PushNotificationPayload,
+    organizacionId?: string,
   ): Promise<void> {
     if (!this.ready || usuarioIds.length === 0) return;
 
     const subs = await this.prisma.suscripcionPush.findMany({
-      where: { usuarioId: { in: usuarioIds }, estado: 1 },
+      where: {
+        usuarioId: { in: usuarioIds },
+        estado: 1,
+        ...(organizacionId ? { organizacionId } : {}),
+      },
     });
     if (subs.length === 0) return;
 

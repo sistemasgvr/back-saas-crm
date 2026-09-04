@@ -14,5 +14,6 @@ export interface PushSender {
   enviarAUsuarios(
     usuarioIds: string[],
     data: PushNotificationPayload,
+    organizacionId?: string,
   ): Promise<void>;
 }

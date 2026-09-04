@@ -58,13 +58,17 @@ export class CrearNotificacionUseCase {
 
     this.wsEmitter.emitirAUsuarios(usuarioIds, 'notificacion:nueva', evento);
 
-    void this.pushSender.enviarAUsuarios(usuarioIds, {
-      id: creada.id,
-      tipo: creada.tipo,
-      titulo: creada.titulo,
-      mensaje: creada.mensaje,
-      payload: creada.payload as Record<string, unknown> | null,
-    });
+    void this.pushSender.enviarAUsuarios(
+      usuarioIds,
+      {
+        id: creada.id,
+        tipo: creada.tipo,
+        titulo: creada.titulo,
+        mensaje: creada.mensaje,
+        payload: creada.payload as Record<string, unknown> | null,
+      },
+      input.organizacionId,
+    );
 
     return { id: creada.id };
   }
