@@ -125,6 +125,27 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       conversacionId,
     );
 
+    const preview =
+      evento.texto?.trim() ||
+      evento.media?.caption?.trim() ||
+      (evento.tipo === 'image'
+        ? 'Imagen'
+        : evento.tipo === 'video'
+          ? 'Video'
+          : evento.tipo === 'audio'
+            ? evento.media?.esVoz
+              ? 'Nota de voz'
+              : 'Audio'
+            : evento.tipo === 'document'
+              ? 'Documento'
+              : evento.tipo === 'sticker'
+                ? 'Sticker'
+                : evento.tipo === 'location'
+                  ? 'Ubicación'
+                  : evento.tipo === 'contacts'
+                    ? 'Contacto'
+                    : 'Nuevo mensaje');
+
     void this.crearNotificacion
       .execute({
         organizacionId: conexion.organizacionId,
@@ -133,7 +154,11 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         mensaje: conversacion?.lead
           ? `${conversacion.lead.nombre} te escribió por WhatsApp.`
           : `Mensaje nuevo de ${conversacion?.nombreContacto ?? evento.waId} — sin lead vinculado.`,
-        payload: { whatsappConversacionId: conversacionId },
+        payload: {
+          whatsappConversacionId: conversacionId,
+          /** Preview para pintar la lista de chats al instante en el front. */
+          ultimoMensajeTexto: preview.slice(0, 200),
+        },
         // Con lead asignado: solo a su dueño. Sin lead o sin asignar: toda
         // la org (nadie es responsable todavía, cualquiera puede tomarlo).
         usuarioIds: conversacion?.lead?.asignadoUsuarioId
