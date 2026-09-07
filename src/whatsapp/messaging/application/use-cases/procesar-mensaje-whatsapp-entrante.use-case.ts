@@ -10,6 +10,7 @@ import type { MetaConexionesRepository } from '../../../../meta/connections/appl
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
+import { previewUltimoMensajeWhatsApp } from '../preview-ultimo-mensaje';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -126,25 +127,12 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     );
 
     const preview =
-      evento.texto?.trim() ||
-      evento.media?.caption?.trim() ||
-      (evento.tipo === 'image'
-        ? 'Imagen'
-        : evento.tipo === 'video'
-          ? 'Video'
-          : evento.tipo === 'audio'
-            ? evento.media?.esVoz
-              ? 'Nota de voz'
-              : 'Audio'
-            : evento.tipo === 'document'
-              ? 'Documento'
-              : evento.tipo === 'sticker'
-                ? 'Sticker'
-                : evento.tipo === 'location'
-                  ? 'Ubicación'
-                  : evento.tipo === 'contacts'
-                    ? 'Contacto'
-                    : 'Nuevo mensaje');
+      previewUltimoMensajeWhatsApp({
+        texto: evento.texto,
+        mediaCaption: evento.media?.caption,
+        tipo: evento.tipo,
+        mediaEsVoz: evento.media?.esVoz,
+      }) ?? 'Nuevo mensaje';
 
     void this.crearNotificacion
       .execute({

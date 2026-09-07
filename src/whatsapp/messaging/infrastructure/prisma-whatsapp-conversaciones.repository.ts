@@ -15,6 +15,7 @@ import type {
   WhatsappConversacionesRepository,
 } from '../application/ports/whatsapp-conversaciones.repository.port';
 import { ultimosDigitos, telefonoAWaId } from './normalizar-telefono';
+import { previewUltimoMensajeWhatsApp } from '../application/preview-ultimo-mensaje';
 
 const VENTANA_HORAS = 24;
 
@@ -89,7 +90,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ultimoMensajeEn: c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
-      ultimoMensajeTexto: c.mensajes[0]?.texto ?? null,
+      ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
       bloqueado: c.bloqueado === 1,
     }));
   }
@@ -156,7 +157,12 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       asignadoUsuarioId: string | null;
       inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
     } | null;
-    mensajes: { texto: string | null }[];
+    mensajes: {
+      texto: string | null;
+      mediaCaption: string | null;
+      tipo: string;
+      mediaEsVoz: boolean | null;
+    }[];
   }): ConversacionResumen {
     return {
       id: c.id,
@@ -166,7 +172,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ultimoMensajeEn: c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
-      ultimoMensajeTexto: c.mensajes[0]?.texto ?? null,
+      ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
       bloqueado: c.bloqueado === 1,
     };
   }
