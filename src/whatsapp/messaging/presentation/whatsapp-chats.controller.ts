@@ -47,7 +47,9 @@ import { ObtenerMediaMensajeUseCase } from '../application/use-cases/obtener-med
 import { ListarPlantillasUseCase } from '../application/use-cases/listar-plantillas.use-case';
 import { CrearPlantillaUseCase } from '../application/use-cases/crear-plantilla.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from '../application/use-cases/iniciar-conversacion-desde-lead.use-case';
+import { CrearLeadDesdeConversacionWhatsAppUseCase } from '../application/use-cases/crear-lead-desde-conversacion-whatsapp.use-case';
 import { EnviarMensajeDto } from './dto/enviar-mensaje.dto';
+import { CrearLeadDesdeChatDto } from './dto/crear-lead-desde-chat.dto';
 import { EnviarReaccionDto } from './dto/enviar-reaccion.dto';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { SubirMediaDto } from './dto/subir-media.dto';
@@ -89,6 +91,7 @@ export class WhatsappChatsController {
     private readonly listarPlantillas: ListarPlantillasUseCase,
     private readonly crearPlantilla: CrearPlantillaUseCase,
     private readonly iniciarDesdeLead: IniciarConversacionDesdeLeadUseCase,
+    private readonly crearLeadDesdeChat: CrearLeadDesdeConversacionWhatsAppUseCase,
     private readonly bloquearContacto: BloquearContactoWhatsAppUseCase,
     private readonly eliminarMensajeCrm: EliminarMensajeWhatsAppCrmUseCase,
     private readonly reenviarMensaje: ReenviarMensajeWhatsAppUseCase,
@@ -209,6 +212,37 @@ export class WhatsappChatsController {
     @Param('leadId', ParseUUIDPipe) leadId: string,
   ) {
     return this.iniciarDesdeLead.execute(ctx.organizacionId!, leadId);
+  }
+
+  @Post(':id/crear-lead')
+  @ApiOperation({
+    summary: 'Crear lead desde un chat de WhatsApp',
+    description:
+      'Alta manual de lead a partir de un chat sin vincular (nombre/teléfono del contacto). El lead queda asignado al usuario que lo crea.',
+  })
+  @ApiParam({ name: 'id', description: 'Id de la conversación' })
+  @ApiResponse({ status: 201, description: 'Lead creado y vinculado.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin permiso o módulo WHATSAPP no activo.',
+  })
+  @ApiResponse({ status: 404, description: 'Conversación no encontrada.' })
+  @ApiResponse({
+    status: 409,
+    description: 'El chat ya tiene lead vinculado.',
+  })
+  crearLead(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CrearLeadDesdeChatDto,
+  ) {
+    return this.crearLeadDesdeChat.execute(
+      ctx.organizacionId!,
+      id,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      dto,
+    );
   }
 
   @Get(':id')

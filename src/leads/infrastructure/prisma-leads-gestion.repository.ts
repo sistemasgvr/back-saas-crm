@@ -312,4 +312,64 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     });
     return lead?.idExterno ?? null;
   }
+
+  async crearDesdeWhatsApp(input: {
+    organizacionId: string;
+    idExterno: string;
+    nombre: string | null;
+    email: string | null;
+    telefono: string | null;
+    tipoLead: string | null;
+    datosCrudos: unknown;
+    usuarioId: string;
+    historialId: string;
+  }): Promise<{ id: string; creado: boolean }> {
+    const existente = await this.prisma.lead.findUnique({
+      where: {
+        organizacionId_idExterno: {
+          organizacionId: input.organizacionId,
+          idExterno: input.idExterno,
+        },
+      },
+      select: { id: true },
+    });
+    if (existente) {
+      return { id: existente.id, creado: false };
+    }
+
+    const ahora = new Date();
+    const lead = await this.prisma.lead.create({
+      data: {
+        organizacionId: input.organizacionId,
+        idExterno: input.idExterno,
+        nombre: input.nombre,
+        email: input.email,
+        telefono: input.telefono,
+        tipoLead: input.tipoLead,
+        datosCrudos: input.datosCrudos as object,
+        fechaLead: ahora,
+        estadoGestion: 'NUEVO',
+        estadoGestionEn: ahora,
+        estadoGestionPorUsuarioId: input.usuarioId,
+        asignadoUsuarioId: input.usuarioId,
+        asignadoEn: ahora,
+        asignadoPorUsuarioId: null,
+        usuarioCreacion: input.usuarioId,
+        estadoHistorial: {
+          create: {
+            id: input.historialId,
+            organizacionId: input.organizacionId,
+            tipoLead: input.tipoLead,
+            desde: null,
+            hacia: 'NUEVO',
+            nota: 'Lead creado desde chat de WhatsApp',
+            metadata: { origen: 'whatsapp_chat' },
+            usuarioId: input.usuarioId,
+          },
+        },
+      },
+      select: { id: true },
+    });
+    return { id: lead.id, creado: true };
+  }
 }

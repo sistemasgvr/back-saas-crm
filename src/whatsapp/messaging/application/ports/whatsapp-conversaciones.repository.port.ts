@@ -240,6 +240,14 @@ export interface WhatsappConversacionesRepository {
     telefono: string,
   ): Promise<number>;
 
+  /** Vincula una conversación concreta si aún no tiene lead. Devuelve false
+   * si no existe, no es de la org, o ya tenía lead_id. */
+  asignarLeadSiLibre(
+    organizacionId: string,
+    conversacionId: string,
+    leadId: string,
+  ): Promise<boolean>;
+
   /** Crea la conversación si no existe (por wa_id). Si `leadIdConocido` viene
    * dado (CTA "Iniciar chat" desde una ficha de lead puntual), se vincula
    * directo a ese lead; si no, intenta emparejar por teléfono (heurística,

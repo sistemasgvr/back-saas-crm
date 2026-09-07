@@ -346,6 +346,23 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     return resultado.count;
   }
 
+  async asignarLeadSiLibre(
+    organizacionId: string,
+    conversacionId: string,
+    leadId: string,
+  ): Promise<boolean> {
+    const resultado = await this.prisma.whatsappConversacion.updateMany({
+      where: {
+        id: conversacionId,
+        organizacionId,
+        estado: 1,
+        leadId: null,
+      },
+      data: { leadId },
+    });
+    return resultado.count === 1;
+  }
+
   async findOCrearConversacion(input: {
     organizacionId: string;
     whatsappConexionId: string;

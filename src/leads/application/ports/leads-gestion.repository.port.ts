@@ -137,4 +137,19 @@ export interface LeadsGestionRepository {
     organizacionId: string,
     leadId: string,
   ): Promise<string | null>;
+  /**
+   * Alta manual desde un chat de WhatsApp (idExterno sintético `wa:…`).
+   * Crea el lead + historial NUEVO y lo asigna al usuario creador.
+   */
+  crearDesdeWhatsApp(input: {
+    organizacionId: string;
+    idExterno: string;
+    nombre: string | null;
+    email: string | null;
+    telefono: string | null;
+    tipoLead: string | null;
+    datosCrudos: unknown;
+    usuarioId: string;
+    historialId: string;
+  }): Promise<{ id: string; creado: boolean }>;
 }

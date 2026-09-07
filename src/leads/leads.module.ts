@@ -85,6 +85,10 @@ import { PrismaLeadAutoAsignacionRepository } from './infrastructure/prisma-lead
       useClass: PrismaLeadAutoAsignacionRepository,
     },
   ],
-  exports: [LEADS_LECTURA_REPOSITORY, AutoAsignarLeadUseCase],
+  exports: [
+    LEADS_LECTURA_REPOSITORY,
+    LEADS_GESTION_REPOSITORY,
+    AutoAsignarLeadUseCase,
+  ],
 })
 export class LeadsModule {}
