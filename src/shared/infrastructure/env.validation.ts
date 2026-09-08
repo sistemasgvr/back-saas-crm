@@ -23,12 +23,14 @@ export const envValidationSchema = Joi.object({
     .valid('development', 'production', 'test')
     .default('production'),
 
+  // postgres:// y postgresql:// son equivalentes; EasyPanel/algunos paneles
+  // suelen emitir postgres:// y Joi no debe tumbar el arranque por eso.
   DATABASE_URL: Joi.string()
-    .pattern(/^postgresql:\/\/.+/i)
+    .pattern(/^postgres(ql)?:\/\/.+/i)
     .required()
     .messages({
       'string.pattern.base':
-        'DATABASE_URL debe ser una URL postgresql:// válida',
+        'DATABASE_URL debe ser una URL postgres:// o postgresql:// válida',
     }),
 
   /** Solo Hostinger/Passenger — no fijar manualmente en hPanel. */
