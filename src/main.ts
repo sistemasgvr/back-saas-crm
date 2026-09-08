@@ -5,6 +5,22 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigIoAdapter } from './shared/infrastructure/config-io.adapter';
 
+/** EasyPanel a veces guarda DATABASE_URL con comillas literales; Prisma lee process.env. */
+function stripEnvQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+if (process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = stripEnvQuotes(process.env.DATABASE_URL);
+}
+
 async function bootstrap() {
   // rawBody: true — el webhook de Meta necesita los bytes exactos del body
   // para verificar la firma HMAC (X-Hub-Signature-256), antes de que Nest

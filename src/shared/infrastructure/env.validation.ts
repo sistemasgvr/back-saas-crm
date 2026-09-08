@@ -12,6 +12,18 @@ function metaEncryptionKeyValidator(value: string, helpers: Joi.CustomHelpers) {
   return value;
 }
 
+/** EasyPanel / .env a veces guardan el valor con comillas literales. */
+function stripEnvQuotes(value: string): string {
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 /**
  * Valida variables de entorno al arranque.
  * En Hostinger un fallo aquí aparece en stderr.log / Runtime logs (causa típica de 503).
@@ -26,11 +38,17 @@ export const envValidationSchema = Joi.object({
   // postgres:// y postgresql:// son equivalentes; EasyPanel/algunos paneles
   // suelen emitir postgres:// y Joi no debe tumbar el arranque por eso.
   DATABASE_URL: Joi.string()
-    .pattern(/^postgres(ql)?:\/\/.+/i)
+    .custom((value, helpers) => {
+      const cleaned = stripEnvQuotes(String(value ?? ''));
+      if (!/^postgres(ql)?:\/\/.+/i.test(cleaned)) {
+        return helpers.error('any.invalid');
+      }
+      return cleaned;
+    })
     .required()
     .messages({
-      'string.pattern.base':
-        'DATABASE_URL debe ser una URL postgres:// o postgresql:// válida',
+      'any.invalid':
+        'DATABASE_URL debe ser una URL postgres:// o postgresql:// válida (sin comillas)',
     }),
 
   /** Solo Hostinger/Passenger — no fijar manualmente en hPanel. */
