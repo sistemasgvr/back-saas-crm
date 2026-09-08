@@ -1,0 +1,17 @@
+# Dependencias y artefactos que no deben ir al contexto de build
+node_modules
+dist
+build
+coverage
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.md
+.vscode
+.idea
+test
+**/__tests__
+*.log
+.DS_Store
