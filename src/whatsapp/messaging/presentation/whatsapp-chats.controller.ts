@@ -526,10 +526,10 @@ export class WhatsappChatsController {
   @Post(':id/messages/forward')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'Reenviar uno o varios mensajes a otro chat',
+    summary: 'Reenviar uno o varios mensajes a uno o varios chats',
     description:
-      `Hasta ${MAX_MENSAJES_REENVIAR} mensajes (tope multi-forward típico de WhatsApp). ` +
-      'La Cloud API no tiene forward nativo: se reenvía el contenido en orden (ventana 24h).',
+      `Hasta ${MAX_MENSAJES_REENVIAR} mensajes y varios destinos (ventana 24h por chat). ` +
+      'La Cloud API no tiene forward nativo: se reenvía el contenido en orden.',
   })
   @ApiResponse({ status: 200, description: 'Resultado del lote (enviados + fallidos parciales).' })
   forwardMessages(
@@ -537,11 +537,17 @@ export class WhatsappChatsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReenviarMensajesLoteDto,
   ) {
+    const destinaciones =
+      dto.conversacionDestinoIds?.length
+        ? dto.conversacionDestinoIds
+        : dto.conversacionDestinoId
+          ? [dto.conversacionDestinoId]
+          : [];
     return this.reenviarMensaje.executeLote(
       ctx.organizacionId!,
       id,
       dto.mensajeIds,
-      dto.conversacionDestinoId,
+      destinaciones,
       { usuarioId: ctx.usuarioId, rol: ctx.rol! },
     );
   }

@@ -19,6 +19,7 @@ import type { WhatsappConexionesRepository } from '../../../connections/applicat
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type {
   ContactoMensajeRow,
+  ConversacionResumen,
   WhatsappConversacionesRepository,
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
@@ -26,6 +27,9 @@ import { categoriaMediaPorMimeType } from '../limites-media-whatsapp';
 
 /** Tope alineado con el multi-forward de la app WhatsApp (~30). */
 export const MAX_MENSAJES_REENVIAR = 30;
+
+/** Tope de chats destino por reenvío (WhatsApp multi-forward típico: 5). */
+export const MAX_DESTINOS_REENVIAR = 5;
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -37,14 +41,21 @@ const TIPOS_MEDIA = new Set([
   'sticker',
 ]);
 
+export type ReenviarLoteFallido = {
+  conversacionDestinoId: string;
+  mensajeId: string;
+  error: string;
+};
+
 export type ReenviarLoteResultado = {
   enviados: number;
-  fallidos: { mensajeId: string; error: string }[];
+  fallidos: ReenviarLoteFallido[];
 };
 
 /**
- * Reenvía el contenido de uno o varios mensajes a otra conversación (la Cloud
+ * Reenvía el contenido de uno o varios mensajes a uno o varios chats (la Cloud
  * API no tiene "forward" nativo: se vuelve a enviar el mismo payload).
+ * Cada destino debe estar dentro de la ventana de 24h.
  */
 @Injectable()
 export class ReenviarMensajeWhatsAppUseCase {
@@ -70,7 +81,7 @@ export class ReenviarMensajeWhatsAppUseCase {
       organizacionId,
       conversacionOrigenId,
       [mensajeId],
-      conversacionDestinoId,
+      [conversacionDestinoId],
       ctx,
     );
     if (resultado.enviados !== 1) {
@@ -84,7 +95,7 @@ export class ReenviarMensajeWhatsAppUseCase {
     organizacionId: string,
     conversacionOrigenId: string,
     mensajeIds: string[],
-    conversacionDestinoId: string,
+    conversacionDestinoIds: string[],
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ): Promise<ReenviarLoteResultado> {
     if (
@@ -96,7 +107,17 @@ export class ReenviarMensajeWhatsAppUseCase {
       );
     }
 
-    if (conversacionOrigenId === conversacionDestinoId) {
+    const destinosUnicos = [...new Set(conversacionDestinoIds.filter(Boolean))];
+    if (
+      destinosUnicos.length < 1 ||
+      destinosUnicos.length > MAX_DESTINOS_REENVIAR
+    ) {
+      throw new BadRequestException(
+        `Elige entre 1 y ${MAX_DESTINOS_REENVIAR} chats destino`,
+      );
+    }
+
+    if (destinosUnicos.includes(conversacionOrigenId)) {
       throw new BadRequestException(
         'Elige otro chat para reenviar — no se puede reenviar al mismo',
       );
@@ -106,29 +127,8 @@ export class ReenviarMensajeWhatsAppUseCase {
       organizacionId,
       conversacionOrigenId,
     );
-    const destino = await this.conversaciones.findPorId(
-      organizacionId,
-      conversacionDestinoId,
-    );
-    if (!origen || !destino) {
-      throw new NotFoundException('Conversación no encontrada');
-    }
-
-    this.assertPuedeEscribir(destino, ctx);
-
-    if (destino.bloqueado) {
-      throw new BadRequestException(
-        'Ese contacto está bloqueado — desbloquéalo antes de reenviar',
-      );
-    }
-
-    const dentroDeVentana =
-      destino.ventanaExpiraEn !== null &&
-      destino.ventanaExpiraEn.getTime() > Date.now();
-    if (!dentroDeVentana) {
-      throw new BadRequestException(
-        'El chat destino está fuera de la ventana de 24h — solo se pueden enviar plantillas',
-      );
+    if (!origen) {
+      throw new NotFoundException('Conversación de origen no encontrada');
     }
 
     const { phoneNumberId, accessToken } = await this.credenciales(
@@ -136,26 +136,56 @@ export class ReenviarMensajeWhatsAppUseCase {
     );
 
     let enviados = 0;
-    const fallidos: { mensajeId: string; error: string }[] = [];
+    const fallidos: ReenviarLoteFallido[] = [];
 
-    for (const mensajeId of mensajeIds) {
-      try {
-        await this.reenviarUno(
-          organizacionId,
-          conversacionOrigenId,
-          mensajeId,
-          conversacionDestinoId,
-          destino.waId,
-          phoneNumberId,
-          accessToken,
-          ctx,
-        );
-        enviados += 1;
-      } catch (err) {
-        fallidos.push({
-          mensajeId,
-          error: mensajeError(err),
-        });
+    for (const destinoId of destinosUnicos) {
+      const destino = await this.conversaciones.findPorId(
+        organizacionId,
+        destinoId,
+      );
+      if (!destino) {
+        for (const mensajeId of mensajeIds) {
+          fallidos.push({
+            conversacionDestinoId: destinoId,
+            mensajeId,
+            error: 'Conversación destino no encontrada',
+          });
+        }
+        continue;
+      }
+
+      const rechazoDestino = this.validarDestino(destino, ctx);
+      if (rechazoDestino) {
+        for (const mensajeId of mensajeIds) {
+          fallidos.push({
+            conversacionDestinoId: destinoId,
+            mensajeId,
+            error: rechazoDestino,
+          });
+        }
+        continue;
+      }
+
+      for (const mensajeId of mensajeIds) {
+        try {
+          await this.reenviarUno(
+            organizacionId,
+            conversacionOrigenId,
+            mensajeId,
+            destinoId,
+            destino.waId,
+            phoneNumberId,
+            accessToken,
+            ctx,
+          );
+          enviados += 1;
+        } catch (err) {
+          fallidos.push({
+            conversacionDestinoId: destinoId,
+            mensajeId,
+            error: mensajeError(err),
+          });
+        }
       }
     }
 
@@ -166,6 +196,28 @@ export class ReenviarMensajeWhatsAppUseCase {
     }
 
     return { enviados, fallidos };
+  }
+
+  /** null = ok; string = motivo de rechazo (ventana 24h, bloqueado, etc.). */
+  private validarDestino(
+    destino: ConversacionResumen,
+    ctx: { usuarioId: string; rol: RolOrganizacion },
+  ): string | null {
+    try {
+      this.assertPuedeEscribir(destino, ctx);
+    } catch (err) {
+      return mensajeError(err);
+    }
+    if (destino.bloqueado) {
+      return 'Ese contacto está bloqueado — desbloquéalo antes de reenviar';
+    }
+    const dentroDeVentana =
+      destino.ventanaExpiraEn !== null &&
+      destino.ventanaExpiraEn.getTime() > Date.now();
+    if (!dentroDeVentana) {
+      return 'Fuera de la ventana de 24h — solo se pueden enviar plantillas';
+    }
+    return null;
   }
 
   private async reenviarUno(
@@ -240,10 +292,6 @@ export class ReenviarMensajeWhatsAppUseCase {
         fechaMensaje: new Date(),
         usuarioCreacion: ctx.usuarioId,
       });
-      await this.conversaciones.actualizarTrasSaliente(
-        conversacionDestinoId,
-        new Date(),
-      );
       return;
     }
 
@@ -281,10 +329,6 @@ export class ReenviarMensajeWhatsAppUseCase {
         ubicacionNombre: ubicacion.nombre,
         ubicacionDireccion: ubicacion.direccion,
       });
-      await this.conversaciones.actualizarTrasSaliente(
-        conversacionDestinoId,
-        new Date(),
-      );
       return;
     }
 
@@ -311,10 +355,6 @@ export class ReenviarMensajeWhatsAppUseCase {
         usuarioCreacion: ctx.usuarioId,
         contactos: lista,
       });
-      await this.conversaciones.actualizarTrasSaliente(
-        conversacionDestinoId,
-        new Date(),
-      );
       return;
     }
 
@@ -340,10 +380,6 @@ export class ReenviarMensajeWhatsAppUseCase {
       fechaMensaje: new Date(),
       usuarioCreacion: ctx.usuarioId,
     });
-    await this.conversaciones.actualizarTrasSaliente(
-      conversacionDestinoId,
-      new Date(),
-    );
   }
 
   private assertPuedeEscribir(
