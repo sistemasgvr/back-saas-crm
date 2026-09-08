@@ -17,8 +17,35 @@ function stripEnvQuotes(value: string): string {
   return trimmed;
 }
 
+/**
+ * Evita P2024 (pool timeout) cuando el front pollea chats/media en paralelo.
+ * No pisa params ya definidos en DATABASE_URL.
+ */
+function ensurePrismaPoolParams(url: string): string {
+  try {
+    const u = new URL(url);
+    if (!u.searchParams.has('connection_limit')) {
+      u.searchParams.set(
+        'connection_limit',
+        process.env.PRISMA_CONNECTION_LIMIT?.trim() || '25',
+      );
+    }
+    if (!u.searchParams.has('pool_timeout')) {
+      u.searchParams.set('pool_timeout', '30');
+    }
+    if (!u.searchParams.has('connect_timeout')) {
+      u.searchParams.set('connect_timeout', '15');
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 if (process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = stripEnvQuotes(process.env.DATABASE_URL);
+  process.env.DATABASE_URL = ensurePrismaPoolParams(
+    stripEnvQuotes(process.env.DATABASE_URL),
+  );
 }
 
 async function bootstrap() {
