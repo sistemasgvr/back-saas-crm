@@ -82,17 +82,24 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
     });
 
-    return conversaciones.map((c) => ({
-      id: c.id,
-      waId: c.waId,
-      nombreContacto: c.nombreContacto,
-      lead: mapearLead(c.lead, c.waId),
-      ultimoMensajeEn: c.ultimoMensajeEn,
-      ventanaExpiraEn: c.ventanaExpiraEn,
-      noLeidos: c.noLeidos,
-      ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
-      bloqueado: c.bloqueado === 1,
-    }));
+    return conversaciones
+      .map((c) => ({
+        id: c.id,
+        waId: c.waId,
+        nombreContacto: c.nombreContacto,
+        lead: mapearLead(c.lead, c.waId),
+        // Preferir la fecha del último mensaje real (sanación si ultimoMensajeEn quedó atrasado).
+        ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
+        ventanaExpiraEn: c.ventanaExpiraEn,
+        noLeidos: c.noLeidos,
+        ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
+        bloqueado: c.bloqueado === 1,
+      }))
+      .sort((a, b) => {
+        const ta = a.ultimoMensajeEn?.getTime() ?? 0;
+        const tb = b.ultimoMensajeEn?.getTime() ?? 0;
+        return tb - ta;
+      });
   }
 
   async contarNoLeidos(
@@ -162,6 +169,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       mediaCaption: string | null;
       tipo: string;
       mediaEsVoz: boolean | null;
+      fechaMensaje?: Date;
     }[];
   }): ConversacionResumen {
     return {
@@ -169,7 +177,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       waId: c.waId,
       nombreContacto: c.nombreContacto,
       lead: mapearLead(c.lead, c.waId),
-      ultimoMensajeEn: c.ultimoMensajeEn,
+      ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
       ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
@@ -481,6 +489,15 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           : {}),
       },
     });
+
+    // Lista de chats ordena/muestra por ultimoMensajeEn. Varios envíos
+    // salientes del CRM olvidaban llamar actualizarTrasSaliente — al
+    // actualizar aquí el preview y la hora quedan alineados con el mensaje.
+    await this.prisma.whatsappConversacion.update({
+      where: { id: input.whatsappConversacionId },
+      data: { ultimoMensajeEn: input.fechaMensaje },
+    });
+
     return { id: mensaje.id, creado: true };
   }
 
