@@ -47,6 +47,11 @@ export interface NotificacionesRepository {
     notificacionUsuarioId: string,
   ): Promise<boolean>;
   marcarTodasLeidas(organizacionId: string, usuarioId: string): Promise<number>;
+  marcarLeidasPorWhatsappConversacion(
+    organizacionId: string,
+    usuarioId: string,
+    conversacionId: string,
+  ): Promise<number>;
   findUsuarioIdsActivosDeOrganizacion(
     organizacionId: string,
   ): Promise<string[]>;

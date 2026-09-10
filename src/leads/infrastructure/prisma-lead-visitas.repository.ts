@@ -165,6 +165,9 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
         ...(cambios.feedback !== undefined
           ? { feedback: cambios.feedback }
           : {}),
+        ...(cambios.asignadoUsuarioId !== undefined
+          ? { asignadoUsuarioId: cambios.asignadoUsuarioId }
+          : {}),
       },
     });
 

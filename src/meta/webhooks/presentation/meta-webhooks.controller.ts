@@ -285,7 +285,7 @@ export class MetaWebhooksController {
               tipo: 'LEAD_NUEVO',
               titulo: 'Nuevo lead',
               mensaje: 'Llegó un nuevo lead desde Meta.',
-              payload: { leadId: resultado.leadId },
+              payload: { leadId: resultado.leadId, url: `/leads/${resultado.leadId}` },
               usuarioIds,
             })
             .catch((error: unknown) =>

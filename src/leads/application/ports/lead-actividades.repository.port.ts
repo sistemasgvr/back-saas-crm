@@ -57,6 +57,7 @@ export interface ActualizarActividadRepoInput {
   modalidad?: string | null;
   estado?: string;
   nota?: string | null;
+  asignadoUsuarioId?: string | null;
 }
 
 export interface LeadActividadesRepository {

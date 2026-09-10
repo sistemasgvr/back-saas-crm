@@ -2,6 +2,7 @@ export const LEADS_GESTION_REPOSITORY = Symbol('LEADS_GESTION_REPOSITORY');
 
 export interface LeadParaGestion {
   id: string;
+  nombre: string | null;
   asignadoUsuarioId: string | null;
   tipoLead: string | null;
   estadoGestion: string;

@@ -79,6 +79,7 @@ export interface ActualizarVisitaRepoInput {
   resultado?: string | null;
   nota?: string | null;
   feedback?: string | null;
+  asignadoUsuarioId?: string | null;
 }
 
 export interface LeadVisitasRepository {

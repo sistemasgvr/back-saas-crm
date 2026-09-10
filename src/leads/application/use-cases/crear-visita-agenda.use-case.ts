@@ -17,6 +17,7 @@ import {
   mensajeVisitaPasado,
   normalizarDuracionMinutos,
 } from '../../../shared/domain/agenda-visitas';
+import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
@@ -25,6 +26,17 @@ import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+
+function formatearCuandoAgenda(programadaEn: Date): string {
+  return programadaEn.toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
 
 @Injectable()
 export class CrearVisitaAgendaUseCase {
@@ -35,6 +47,7 @@ export class CrearVisitaAgendaUseCase {
     private readonly actividades: LeadActividadesRepository,
     @Inject(LEADS_GESTION_REPOSITORY)
     private readonly leads: LeadsGestionRepository,
+    private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
   async execute(
@@ -115,7 +128,7 @@ export class CrearVisitaAgendaUseCase {
 
     await this.visitas.cancelarProgramadasDelLead(organizacionId, input.leadId);
 
-    return this.visitas.crear(organizacionId, {
+    const creada = await this.visitas.crear(organizacionId, {
       id: randomUUID(),
       leadId: input.leadId,
       programadaEn,
@@ -128,5 +141,28 @@ export class CrearVisitaAgendaUseCase {
       asignadoUsuarioId,
       creadoPorUsuarioId: ctx.usuarioId,
     });
+
+    if (asignadoUsuarioId && asignadoUsuarioId !== ctx.usuarioId) {
+      const cuandoIso = programadaEn.toISOString();
+      const leadNombre = creada.leadNombre?.trim() || 'Lead';
+      void this.crearNotificacion
+        .execute({
+          organizacionId,
+          tipo: 'AGENDA_ASIGNADA',
+          titulo: 'Nueva visita asignada',
+          mensaje: `${leadNombre} · ${formatearCuandoAgenda(programadaEn)}`,
+          payload: {
+            url: `/agenda?visitaId=${creada.id}&cuando=${encodeURIComponent(cuandoIso)}`,
+            cuando: cuandoIso,
+            visitaId: creada.id,
+            leadId: creada.leadId,
+            origen: 'VISITA',
+          },
+          usuarioIds: [asignadoUsuarioId],
+        })
+        .catch(() => undefined);
+    }
+
+    return creada;
   }
 }

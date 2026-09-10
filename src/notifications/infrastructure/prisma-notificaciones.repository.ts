@@ -107,6 +107,30 @@ export class PrismaNotificacionesRepository implements NotificacionesRepository 
     return resultado.count;
   }
 
+  async marcarLeidasPorWhatsappConversacion(
+    organizacionId: string,
+    usuarioId: string,
+    conversacionId: string,
+  ): Promise<number> {
+    const resultado = await this.prisma.notificacionUsuario.updateMany({
+      where: {
+        organizacionId,
+        usuarioId,
+        leida: 0,
+        estado: 1,
+        notificacion: {
+          tipo: 'WHATSAPP_MENSAJE',
+          payload: {
+            path: ['whatsappConversacionId'],
+            equals: conversacionId,
+          },
+        },
+      },
+      data: { leida: 1, fechaLectura: new Date() },
+    });
+    return resultado.count;
+  }
+
   async findUsuarioIdsActivosDeOrganizacion(
     organizacionId: string,
   ): Promise<string[]> {

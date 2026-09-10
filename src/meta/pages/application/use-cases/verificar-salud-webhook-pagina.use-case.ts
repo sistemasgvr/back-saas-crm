@@ -97,7 +97,10 @@ export class VerificarSaludWebhookPaginaUseCase {
           metaPaginaId: pagina.id,
           pageId: pagina.pageId,
           nombre: pagina.nombre,
+          url: `/settings/meta/pages/${pagina.id}`,
         },
+        // Quien verificó (admin/propietario típico); no toda la org.
+        usuarioIds: [usuarioEdicion],
       });
     }
 

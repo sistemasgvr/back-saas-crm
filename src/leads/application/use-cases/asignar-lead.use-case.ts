@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
 
@@ -15,6 +16,7 @@ export class AsignarLeadUseCase {
   constructor(
     @Inject(LEADS_GESTION_REPOSITORY)
     private readonly leads: LeadsGestionRepository,
+    private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
   async execute(
@@ -26,6 +28,10 @@ export class AsignarLeadUseCase {
     const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
     if (!lead) {
       throw new NotFoundException('Lead no encontrado');
+    }
+
+    if (lead.asignadoUsuarioId === usuarioDestinoId) {
+      return;
     }
 
     const esMiembro = await this.leads.esMiembroActivo(
@@ -44,5 +50,21 @@ export class AsignarLeadUseCase {
       usuarioDestinoId,
       asignadoPorUsuarioId,
     );
+
+    if (usuarioDestinoId !== asignadoPorUsuarioId) {
+      const nombre = lead.nombre?.trim();
+      void this.crearNotificacion
+        .execute({
+          organizacionId,
+          tipo: 'LEAD_ASIGNADO',
+          titulo: 'Lead asignado',
+          mensaje: nombre
+            ? `Te asignaron el lead "${nombre}"`
+            : 'Te asignaron un lead',
+          payload: { leadId, url: `/leads/${leadId}` },
+          usuarioIds: [usuarioDestinoId],
+        })
+        .catch(() => undefined);
+    }
   }
 }

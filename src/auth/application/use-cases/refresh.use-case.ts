@@ -15,6 +15,9 @@ export interface RefreshInput {
   userAgent?: string;
 }
 
+/** Evita logout cuando dos requests del proxy rotan el mismo refresh a la vez. */
+const GRACIA_ROTACION_MS = 30_000;
+
 @Injectable()
 export class RefreshUseCase {
   constructor(
@@ -33,9 +36,18 @@ export class RefreshUseCase {
     }
 
     const tokenHash = this.tokens.hashToken(input.refreshToken);
-    const fila = await this.tokensRefresco.findVigentePorHash(tokenHash);
+    let fila = await this.tokensRefresco.findVigentePorHash(tokenHash);
+    let yaRotado = false;
     if (!fila) {
-      throw new UnauthorizedException('Refresh token inválido o revocado');
+      const reciente = await this.tokensRefresco.findRevocadoRecientePorHash(
+        tokenHash,
+        GRACIA_ROTACION_MS,
+      );
+      if (!reciente) {
+        throw new UnauthorizedException('Refresh token inválido o revocado');
+      }
+      fila = reciente;
+      yaRotado = true;
     }
 
     const usuario = await this.usuarios.findActivoById(payload.sub);
@@ -50,14 +62,15 @@ export class RefreshUseCase {
         usuario.id,
         payload.organizacionId,
       );
-      // Si la membresía/org ya no está activa, la sesión continúa sin org activa.
       if (membresia) {
         organizacionId = membresia.organizacionId;
         rol = membresia.rol;
       }
     }
 
-    await this.tokensRefresco.revocar(fila.id);
+    if (!yaRotado) {
+      await this.tokensRefresco.revocar(fila.id);
+    }
 
     const accessToken = this.tokens.firmarAccessToken({
       sub: usuario.id,

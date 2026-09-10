@@ -18,6 +18,7 @@ type CandidatoAgenda = {
   programadaEn: Date;
   asignadoUsuarioId: string | null;
   creadoPorUsuarioId: string | null;
+  leadAsignadoUsuarioId: string | null;
   leadNombre: string | null;
 };
 
@@ -74,7 +75,7 @@ export class DispararRecordatoriosAgendaUseCase {
           asignadoUsuarioId: true,
           creadoPorUsuarioId: true,
           referenciaInmueble: true,
-          lead: { select: { nombre: true } },
+          lead: { select: { nombre: true, asignadoUsuarioId: true } },
         },
       }),
       this.prisma.leadActividad.findMany({
@@ -91,7 +92,7 @@ export class DispararRecordatoriosAgendaUseCase {
           programadaEn: true,
           asignadoUsuarioId: true,
           creadoPorUsuarioId: true,
-          lead: { select: { nombre: true } },
+          lead: { select: { nombre: true, asignadoUsuarioId: true } },
         },
       }),
     ]);
@@ -110,6 +111,7 @@ export class DispararRecordatoriosAgendaUseCase {
         programadaEn: v.programadaEn,
         asignadoUsuarioId: v.asignadoUsuarioId,
         creadoPorUsuarioId: v.creadoPorUsuarioId,
+        leadAsignadoUsuarioId: v.lead.asignadoUsuarioId,
         leadNombre: v.lead.nombre,
       });
     }
@@ -128,6 +130,7 @@ export class DispararRecordatoriosAgendaUseCase {
         programadaEn: a.programadaEn,
         asignadoUsuarioId: a.asignadoUsuarioId,
         creadoPorUsuarioId: a.creadoPorUsuarioId,
+        leadAsignadoUsuarioId: a.lead.asignadoUsuarioId,
         leadNombre: a.lead.nombre,
       });
     }
@@ -135,12 +138,25 @@ export class DispararRecordatoriosAgendaUseCase {
     return out;
   }
 
+  /** Asignado de la cita, quien la creó y dueño del lead (sin duplicados). */
+  private destinatariosRecordatorio(c: CandidatoAgenda): string[] {
+    return [
+      ...new Set(
+        [
+          c.asignadoUsuarioId,
+          c.creadoPorUsuarioId,
+          c.leadAsignadoUsuarioId,
+        ].filter((id): id is string => Boolean(id)),
+      ),
+    ];
+  }
+
   private async intentarEnviar(
     c: CandidatoAgenda,
     offsetMinutos: number,
   ): Promise<boolean> {
-    const destinatario = c.asignadoUsuarioId ?? c.creadoPorUsuarioId;
-    if (!destinatario) return false;
+    const destinatarios = this.destinatariosRecordatorio(c);
+    if (destinatarios.length === 0) return false;
 
     let esNuevo = false;
     try {
@@ -170,6 +186,11 @@ export class DispararRecordatoriosAgendaUseCase {
         ? `En ${offsetMinutos} min: ${c.titulo}`
         : `En ${offsetMinutos} min — ${c.titulo}`;
     const mensaje = `${lead} · ${cuando}`;
+    const cuandoIso = c.programadaEn.toISOString();
+    const deepLink =
+      c.origen === 'VISITA'
+        ? `/agenda?visitaId=${c.itemId}&cuando=${encodeURIComponent(cuandoIso)}`
+        : `/agenda?actividadId=${c.itemId}&cuando=${encodeURIComponent(cuandoIso)}`;
 
     if (esNuevo) {
       const resultado = await this.crearNotificacion.execute({
@@ -180,13 +201,14 @@ export class DispararRecordatoriosAgendaUseCase {
         payload: {
           leadId: c.leadId,
           origen: c.origen,
+          url: deepLink,
           ...(c.origen === 'VISITA'
             ? { visitaId: c.itemId }
             : { actividadId: c.itemId }),
           programadaEn: c.programadaEn.toISOString(),
           offsetMinutos,
         },
-        usuarioIds: [destinatario],
+        usuarioIds: destinatarios,
       });
 
       if (resultado?.id) {

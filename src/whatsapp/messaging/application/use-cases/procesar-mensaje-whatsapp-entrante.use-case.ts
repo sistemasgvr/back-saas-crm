@@ -148,8 +148,11 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         mensaje: truncarConEllipsis(preview, 120),
         payload: {
           whatsappConversacionId: conversacionId,
+          url: `/chats/${conversacionId}`,
           /** Preview para pintar la lista de chats al instante en el front. */
           ultimoMensajeTexto: preview.slice(0, 200),
+          /** Tras incrementar: el SW agrupa el toast del SO ("N mensajes · …"). */
+          noLeidos: conversacion?.noLeidos ?? 1,
         },
         // Con lead asignado: solo a su dueño. Sin lead o sin asignar: toda
         // la org (nadie es responsable todavía, cualquiera puede tomarlo).

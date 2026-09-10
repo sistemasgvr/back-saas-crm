@@ -117,6 +117,9 @@ export class PrismaLeadActividadesRepository implements LeadActividadesRepositor
           : {}),
         ...(cambios.estado !== undefined ? { estado: cambios.estado } : {}),
         ...(cambios.nota !== undefined ? { nota: cambios.nota } : {}),
+        ...(cambios.asignadoUsuarioId !== undefined
+          ? { asignadoUsuarioId: cambios.asignadoUsuarioId }
+          : {}),
       },
     });
 

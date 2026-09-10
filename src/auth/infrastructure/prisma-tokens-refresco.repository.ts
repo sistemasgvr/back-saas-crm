@@ -32,6 +32,17 @@ export class PrismaTokensRefrescoRepository implements TokensRefrescoRepository 
     });
   }
 
+  findRevocadoRecientePorHash(tokenHash: string, graciaMs: number) {
+    const desde = new Date(Date.now() - graciaMs);
+    return this.prisma.tokenRefresco.findFirst({
+      where: {
+        tokenHash,
+        revocadoEn: { gte: desde },
+      },
+      orderBy: { revocadoEn: 'desc' },
+    });
+  }
+
   async revocar(id: string): Promise<void> {
     await this.prisma.tokenRefresco.update({
       where: { id },

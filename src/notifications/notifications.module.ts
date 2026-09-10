@@ -16,6 +16,7 @@ import { ListarNotificacionesUseCase } from './application/use-cases/listar-noti
 import { ContarNoLeidasUseCase } from './application/use-cases/contar-no-leidas.use-case';
 import { MarcarLeidaUseCase } from './application/use-cases/marcar-leida.use-case';
 import { MarcarTodasLeidasUseCase } from './application/use-cases/marcar-todas-leidas.use-case';
+import { MarcarLeidasWhatsappConversacionUseCase } from './application/use-cases/marcar-leidas-whatsapp-conversacion.use-case';
 import { DispararRecordatoriosAgendaUseCase } from './application/use-cases/disparar-recordatorios-agenda.use-case';
 import { RegistrarSuscripcionPushUseCase } from './application/use-cases/registrar-suscripcion-push.use-case';
 import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar-suscripcion-push.use-case';
@@ -32,6 +33,7 @@ import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar
     ContarNoLeidasUseCase,
     MarcarLeidaUseCase,
     MarcarTodasLeidasUseCase,
+    MarcarLeidasWhatsappConversacionUseCase,
     DispararRecordatoriosAgendaUseCase,
     RegistrarSuscripcionPushUseCase,
     EliminarSuscripcionPushUseCase,

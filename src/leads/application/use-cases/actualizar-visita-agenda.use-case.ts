@@ -16,6 +16,7 @@ import {
   mensajeVisitaPasado,
   normalizarDuracionMinutos,
 } from '../../../shared/domain/agenda-visitas';
+import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
@@ -30,6 +31,17 @@ const ESTADOS_VISITA = new Set([
   'CANCELADA',
 ]);
 
+function formatearCuandoAgenda(programadaEn: Date): string {
+  return programadaEn.toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
 @Injectable()
 export class ActualizarVisitaAgendaUseCase {
   constructor(
@@ -37,6 +49,7 @@ export class ActualizarVisitaAgendaUseCase {
     private readonly visitas: LeadVisitasRepository,
     @Inject(LEAD_ACTIVIDADES_REPOSITORY)
     private readonly actividades: LeadActividadesRepository,
+    private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
   async execute(
@@ -51,6 +64,7 @@ export class ActualizarVisitaAgendaUseCase {
       resultado?: string;
       feedback?: string;
       nota?: string;
+      asignadoUsuarioId?: string;
     },
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ) {
@@ -69,6 +83,17 @@ export class ActualizarVisitaAgendaUseCase {
     }
 
     const cambios: Parameters<LeadVisitasRepository['actualizar']>[2] = {};
+    let nuevoAsignadoId: string | null | undefined;
+
+    if (input.asignadoUsuarioId !== undefined) {
+      if (!esAdmin) {
+        throw new ForbiddenException('Solo un admin puede reasignar visitas');
+      }
+      if (input.asignadoUsuarioId !== visita.asignadoUsuarioId) {
+        nuevoAsignadoId = input.asignadoUsuarioId;
+        cambios.asignadoUsuarioId = input.asignadoUsuarioId;
+      }
+    }
 
     const reagenda =
       input.programadaEn !== undefined || input.duracionMinutos !== undefined;
@@ -92,7 +117,10 @@ export class ActualizarVisitaAgendaUseCase {
         throw new BadRequestException(mensajeHorarioLaboral());
       }
 
-      const asignadoId = visita.asignadoUsuarioId;
+      const asignadoId =
+        nuevoAsignadoId !== undefined
+          ? nuevoAsignadoId
+          : visita.asignadoUsuarioId;
       if (asignadoId) {
         const solapa = await this.visitas.existeSolape(
           organizacionId,
@@ -115,6 +143,23 @@ export class ActualizarVisitaAgendaUseCase {
       cambios.programadaEn = programadaEn;
       cambios.programadaFin = programadaFin;
       cambios.duracionMinutos = duracionMinutos;
+    } else if (nuevoAsignadoId) {
+      const solapa = await this.visitas.existeSolape(
+        organizacionId,
+        nuevoAsignadoId,
+        visita.programadaEn,
+        visita.programadaFin,
+        visita.id,
+      );
+      const solapaAct = await this.actividades.existeSolape(
+        organizacionId,
+        nuevoAsignadoId,
+        visita.programadaEn,
+        visita.programadaFin,
+      );
+      if (solapa || solapaAct) {
+        throw new ConflictException(mensajeSolapeVisita());
+      }
     }
 
     if (input.referenciaInmueble !== undefined) {
@@ -156,6 +201,37 @@ export class ActualizarVisitaAgendaUseCase {
       throw new BadRequestException('No hay cambios para aplicar');
     }
 
-    return this.visitas.actualizar(organizacionId, visitaId, cambios);
+    const actualizada = await this.visitas.actualizar(
+      organizacionId,
+      visitaId,
+      cambios,
+    );
+
+    if (
+      nuevoAsignadoId &&
+      nuevoAsignadoId !== ctx.usuarioId
+    ) {
+      const programadaEn = cambios.programadaEn ?? visita.programadaEn;
+      const cuandoIso = programadaEn.toISOString();
+      const leadNombre = actualizada.leadNombre?.trim() || 'Lead';
+      void this.crearNotificacion
+        .execute({
+          organizacionId,
+          tipo: 'AGENDA_ASIGNADA',
+          titulo: 'Nueva visita asignada',
+          mensaje: `${leadNombre} · ${formatearCuandoAgenda(programadaEn)}`,
+          payload: {
+            url: `/agenda?visitaId=${actualizada.id}&cuando=${encodeURIComponent(cuandoIso)}`,
+            cuando: cuandoIso,
+            visitaId: actualizada.id,
+            leadId: actualizada.leadId,
+            origen: 'VISITA',
+          },
+          usuarioIds: [nuevoAsignadoId],
+        })
+        .catch(() => undefined);
+    }
+
+    return actualizada;
   }
 }

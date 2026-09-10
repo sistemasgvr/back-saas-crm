@@ -27,6 +27,7 @@ import { ListarNotificacionesUseCase } from '../application/use-cases/listar-not
 import { ContarNoLeidasUseCase } from '../application/use-cases/contar-no-leidas.use-case';
 import { MarcarLeidaUseCase } from '../application/use-cases/marcar-leida.use-case';
 import { MarcarTodasLeidasUseCase } from '../application/use-cases/marcar-todas-leidas.use-case';
+import { MarcarLeidasWhatsappConversacionUseCase } from '../application/use-cases/marcar-leidas-whatsapp-conversacion.use-case';
 import { RegistrarSuscripcionPushUseCase } from '../application/use-cases/registrar-suscripcion-push.use-case';
 import { EliminarSuscripcionPushUseCase } from '../application/use-cases/eliminar-suscripcion-push.use-case';
 import { ListarNotificacionesQueryDto } from './dto/listar-notificaciones.query.dto';
@@ -48,6 +49,7 @@ export class NotificationsController {
     private readonly contarNoLeidas: ContarNoLeidasUseCase,
     private readonly marcarLeida: MarcarLeidaUseCase,
     private readonly marcarTodasLeidas: MarcarTodasLeidasUseCase,
+    private readonly marcarLeidasWhatsappConversacion: MarcarLeidasWhatsappConversacionUseCase,
     private readonly registrarPush: RegistrarSuscripcionPushUseCase,
     private readonly eliminarPush: EliminarSuscripcionPushUseCase,
     @Inject(PUSH_SENDER) private readonly pushSender: PushSender,
@@ -175,6 +177,46 @@ export class NotificationsController {
       .then((count) => ({ count }));
   }
 
+  @Post('read-all')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Marcar todas las notificaciones como leídas' })
+  @ApiResponse({
+    status: 200,
+    description: 'Cantidad de notificaciones marcadas como leídas.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  async readAll(@CurrentUser() ctx: RequestContext) {
+    const count = await this.marcarTodasLeidas.execute(
+      ctx.organizacionId!,
+      ctx.usuarioId,
+    );
+    return { count };
+  }
+
+  @Post('read-whatsapp/:conversacionId')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Marcar notificaciones WhatsApp de una conversación como leídas',
+    description:
+      'Al abrir un chat, marca como leídas las notificaciones in-app WHATSAPP_MENSAJE de esa conversación.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cantidad de notificaciones marcadas como leídas.',
+  })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  async readWhatsapp(
+    @CurrentUser() ctx: RequestContext,
+    @Param('conversacionId', ParseUUIDPipe) conversacionId: string,
+  ) {
+    const count = await this.marcarLeidasWhatsappConversacion.execute(
+      ctx.organizacionId!,
+      ctx.usuarioId,
+      conversacionId,
+    );
+    return { count };
+  }
+
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Marcar una notificación como leída' })
@@ -190,21 +232,5 @@ export class NotificationsController {
   ) {
     await this.marcarLeida.execute(ctx.organizacionId!, ctx.usuarioId, id);
     return { ok: true };
-  }
-
-  @Post('read-all')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Marcar todas las notificaciones como leídas' })
-  @ApiResponse({
-    status: 200,
-    description: 'Cantidad de notificaciones marcadas como leídas.',
-  })
-  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
-  async readAll(@CurrentUser() ctx: RequestContext) {
-    const count = await this.marcarTodasLeidas.execute(
-      ctx.organizacionId!,
-      ctx.usuarioId,
-    );
-    return { count };
   }
 }

@@ -5,6 +5,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -62,4 +63,11 @@ export class ActualizarVisitaAgendaDto {
   @IsString()
   @MaxLength(2000)
   nota?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reasignar asesor responsable (solo admin)',
+  })
+  @IsOptional()
+  @IsUUID()
+  asignadoUsuarioId?: string;
 }

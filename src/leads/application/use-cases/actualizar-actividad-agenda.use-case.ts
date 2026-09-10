@@ -22,12 +22,24 @@ import {
   tituloDefaultActividad,
   type TipoActividadAgenda,
 } from '../../../shared/domain/agenda-actividades';
+import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
 import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+
+function formatearCuandoAgenda(programadaEn: Date): string {
+  return programadaEn.toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
 
 @Injectable()
 export class ActualizarActividadAgendaUseCase {
@@ -36,6 +48,7 @@ export class ActualizarActividadAgendaUseCase {
     private readonly actividades: LeadActividadesRepository,
     @Inject(LEAD_VISITAS_REPOSITORY)
     private readonly visitas: LeadVisitasRepository,
+    private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
   async execute(
@@ -50,6 +63,7 @@ export class ActualizarActividadAgendaUseCase {
       modalidad?: string;
       estado?: string;
       nota?: string;
+      asignadoUsuarioId?: string;
     },
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ) {
@@ -71,6 +85,19 @@ export class ActualizarActividadAgendaUseCase {
     }
 
     const cambios: Parameters<LeadActividadesRepository['actualizar']>[2] = {};
+    let nuevoAsignadoId: string | null | undefined;
+
+    if (input.asignadoUsuarioId !== undefined) {
+      if (!esAdmin) {
+        throw new ForbiddenException(
+          'Solo un admin puede reasignar actividades',
+        );
+      }
+      if (input.asignadoUsuarioId !== actividad.asignadoUsuarioId) {
+        nuevoAsignadoId = input.asignadoUsuarioId;
+        cambios.asignadoUsuarioId = input.asignadoUsuarioId;
+      }
+    }
 
     if (input.tipo !== undefined) {
       if (!esTipoActividadAgenda(input.tipo)) {
@@ -113,16 +140,20 @@ export class ActualizarActividadAgendaUseCase {
         throw new BadRequestException(mensajeHorarioLaboral());
       }
 
-      if (actividad.asignadoUsuarioId) {
+      const asignadoId =
+        nuevoAsignadoId !== undefined
+          ? nuevoAsignadoId
+          : actividad.asignadoUsuarioId;
+      if (asignadoId) {
         const solapaVisita = await this.visitas.existeSolape(
           organizacionId,
-          actividad.asignadoUsuarioId,
+          asignadoId,
           programadaEn,
           programadaFin,
         );
         const solapaAct = await this.actividades.existeSolape(
           organizacionId,
-          actividad.asignadoUsuarioId,
+          asignadoId,
           programadaEn,
           programadaFin,
           actividad.id,
@@ -135,6 +166,23 @@ export class ActualizarActividadAgendaUseCase {
       cambios.programadaEn = programadaEn;
       cambios.programadaFin = programadaFin;
       cambios.duracionMinutos = duracionMinutos;
+    } else if (nuevoAsignadoId) {
+      const solapaVisita = await this.visitas.existeSolape(
+        organizacionId,
+        nuevoAsignadoId,
+        actividad.programadaEn,
+        actividad.programadaFin,
+      );
+      const solapaAct = await this.actividades.existeSolape(
+        organizacionId,
+        nuevoAsignadoId,
+        actividad.programadaEn,
+        actividad.programadaFin,
+        actividad.id,
+      );
+      if (solapaVisita || solapaAct) {
+        throw new ConflictException(mensajeSolapeVisita());
+      }
     }
 
     if (tipoEfectivo === 'VISITA') {
@@ -172,6 +220,30 @@ export class ActualizarActividadAgendaUseCase {
       actividadId,
       cambios,
     );
+
+    if (nuevoAsignadoId && nuevoAsignadoId !== ctx.usuarioId) {
+      const programadaEn = cambios.programadaEn ?? actividad.programadaEn;
+      const cuandoIso = programadaEn.toISOString();
+      const leadNombre = actualizada.leadNombre?.trim() || 'Lead';
+      const tituloItem = actualizada.titulo?.trim() || 'Actividad';
+      void this.crearNotificacion
+        .execute({
+          organizacionId,
+          tipo: 'AGENDA_ASIGNADA',
+          titulo: 'Nueva actividad asignada',
+          mensaje: `${leadNombre} · ${tituloItem} · ${formatearCuandoAgenda(programadaEn)}`,
+          payload: {
+            url: `/agenda?actividadId=${actualizada.id}&cuando=${encodeURIComponent(cuandoIso)}`,
+            cuando: cuandoIso,
+            actividadId: actualizada.id,
+            leadId: actualizada.leadId,
+            origen: 'ACTIVIDAD',
+          },
+          usuarioIds: [nuevoAsignadoId],
+        })
+        .catch(() => undefined);
+    }
+
     return { origen: 'actividad' as const, ...actualizada };
   }
 }

@@ -20,6 +20,7 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
       where: { id, organizacionId, estado: 1 },
       select: {
         id: true,
+        nombre: true,
         asignadoUsuarioId: true,
         tipoLead: true,
         estadoGestion: true,

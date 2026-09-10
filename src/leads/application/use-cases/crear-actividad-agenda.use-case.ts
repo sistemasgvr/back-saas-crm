@@ -22,6 +22,7 @@ import {
   tituloDefaultActividad,
   type TipoActividadAgenda,
 } from '../../../shared/domain/agenda-actividades';
+import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
@@ -30,6 +31,17 @@ import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+
+function formatearCuandoAgenda(programadaEn: Date): string {
+  return programadaEn.toLocaleString('es-PE', {
+    timeZone: 'America/Lima',
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
 
 @Injectable()
 export class CrearActividadAgendaUseCase {
@@ -40,6 +52,7 @@ export class CrearActividadAgendaUseCase {
     private readonly visitas: LeadVisitasRepository,
     @Inject(LEADS_GESTION_REPOSITORY)
     private readonly leads: LeadsGestionRepository,
+    private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
   async execute(
@@ -146,6 +159,27 @@ export class CrearActividadAgendaUseCase {
       asignadoUsuarioId,
       creadoPorUsuarioId: ctx.usuarioId,
     });
+
+    if (asignadoUsuarioId && asignadoUsuarioId !== ctx.usuarioId) {
+      const cuandoIso = programadaEn.toISOString();
+      const leadNombre = creada.leadNombre?.trim() || 'Lead';
+      void this.crearNotificacion
+        .execute({
+          organizacionId,
+          tipo: 'AGENDA_ASIGNADA',
+          titulo: 'Nueva actividad asignada',
+          mensaje: `${leadNombre} · ${titulo} · ${formatearCuandoAgenda(programadaEn)}`,
+          payload: {
+            url: `/agenda?actividadId=${creada.id}&cuando=${encodeURIComponent(cuandoIso)}`,
+            cuando: cuandoIso,
+            actividadId: creada.id,
+            leadId: creada.leadId,
+            origen: 'ACTIVIDAD',
+          },
+          usuarioIds: [asignadoUsuarioId],
+        })
+        .catch(() => undefined);
+    }
 
     return {
       origen: 'actividad' as const,
