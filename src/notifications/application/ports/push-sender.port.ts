@@ -11,9 +11,13 @@ export interface PushNotificationPayload {
 export interface PushSender {
   habilitado(): boolean;
   publicKey(): string | null;
+  /**
+   * Envía Web Push a las suscripciones activas.
+   * @returns cantidad de suscripciones a las que se intentó enviar (0 si push off o sin subs).
+   */
   enviarAUsuarios(
     usuarioIds: string[],
     data: PushNotificationPayload,
     organizacionId?: string,
-  ): Promise<void>;
+  ): Promise<number>;
 }

@@ -50,8 +50,8 @@ export class WebPushSender implements PushSender, OnModuleInit {
     usuarioIds: string[],
     data: PushNotificationPayload,
     organizacionId?: string,
-  ): Promise<void> {
-    if (!this.ready || usuarioIds.length === 0) return;
+  ): Promise<number> {
+    if (!this.ready || usuarioIds.length === 0) return 0;
 
     const subs = await this.prisma.suscripcionPush.findMany({
       where: {
@@ -60,7 +60,7 @@ export class WebPushSender implements PushSender, OnModuleInit {
         ...(organizacionId ? { organizacionId } : {}),
       },
     });
-    if (subs.length === 0) return;
+    if (subs.length === 0) return 0;
 
     const body = JSON.stringify({
       id: data.id,
@@ -100,5 +100,7 @@ export class WebPushSender implements PushSender, OnModuleInit {
         }
       }),
     );
+
+    return subs.length;
   }
 }
