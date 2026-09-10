@@ -4,6 +4,7 @@ import * as webpush from 'web-push';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
   PushNotificationPayload,
+  PushSendResult,
   PushSender,
 } from '../application/ports/push-sender.port';
 
@@ -49,18 +50,20 @@ export class WebPushSender implements PushSender, OnModuleInit {
   async enviarAUsuarios(
     usuarioIds: string[],
     data: PushNotificationPayload,
-    organizacionId?: string,
-  ): Promise<number> {
-    if (!this.ready || usuarioIds.length === 0) return 0;
+    _organizacionId?: string,
+  ): Promise<PushSendResult> {
+    const vacio: PushSendResult = { attempted: 0, delivered: 0, failed: 0 };
+    if (!this.ready || usuarioIds.length === 0) return vacio;
 
+    // Sin filtrar por organizacionId: el endpoint es por dispositivo/usuario;
+    // si el usuario cambió de org, la fila puede tener otra organizacionId.
     const subs = await this.prisma.suscripcionPush.findMany({
       where: {
         usuarioId: { in: usuarioIds },
         estado: 1,
-        ...(organizacionId ? { organizacionId } : {}),
       },
     });
-    if (subs.length === 0) return 0;
+    if (subs.length === 0) return vacio;
 
     const body = JSON.stringify({
       id: data.id,
@@ -69,6 +72,9 @@ export class WebPushSender implements PushSender, OnModuleInit {
       mensaje: data.mensaje,
       payload: data.payload ?? null,
     });
+
+    let delivered = 0;
+    let failed = 0;
 
     await Promise.all(
       subs.map(async (sub) => {
@@ -81,12 +87,19 @@ export class WebPushSender implements PushSender, OnModuleInit {
             body,
             { TTL: 60 * 60 },
           );
+          delivered += 1;
         } catch (err: unknown) {
+          failed += 1;
           const status =
             err && typeof err === 'object' && 'statusCode' in err
               ? Number((err as { statusCode: number }).statusCode)
               : 0;
-          if (status === 404 || status === 410) {
+          if (
+            status === 404 ||
+            status === 410 ||
+            status === 401 ||
+            status === 403
+          ) {
             await this.prisma.suscripcionPush
               .update({ where: { id: sub.id }, data: { estado: 0 } })
               .catch(() => undefined);
@@ -101,6 +114,6 @@ export class WebPushSender implements PushSender, OnModuleInit {
       }),
     );
 
-    return subs.length;
+    return { attempted: subs.length, delivered, failed };
   }
 }

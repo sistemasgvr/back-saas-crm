@@ -261,10 +261,8 @@ export class MetaWebhooksController {
           resultado.leadId &&
           resultado.organizacionId
         ) {
-          // Auto-asignación: las notificaciones “LEAD_NUEVO” deben llegar solo
-          // al responsable resultante (asignadoUsuarioId) y no a toda la organización.
-          // Si no existe responsable, no se emite notificación.
-          let usuarioIds: string[] = [];
+          // Auto-asignación: LEAD_NUEVO al responsable; si no hay, a toda la org activa.
+          let usuarioIds: string[] | undefined;
           try {
             const asignacion = await this.autoAsignarLead.execute(
               resultado.organizacionId,
@@ -272,13 +270,13 @@ export class MetaWebhooksController {
             );
             usuarioIds = asignacion.asignadoUsuarioId
               ? [asignacion.asignadoUsuarioId]
-              : [];
+              : undefined;
           } catch (error: unknown) {
             this.logger.error(
               'Error auto-asignando lead entrante',
               error instanceof Error ? error.stack : error,
             );
-            usuarioIds = [];
+            usuarioIds = undefined;
           }
 
           void this.crearNotificacion

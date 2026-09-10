@@ -10,7 +10,7 @@ import type { MetaConexionesRepository } from '../../../../meta/connections/appl
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
-import { previewUltimoMensajeWhatsApp } from '../preview-ultimo-mensaje';
+import { previewUltimoMensajeWhatsApp, truncarConEllipsis } from '../preview-ultimo-mensaje';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -134,14 +134,18 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         mediaEsVoz: evento.media?.esVoz,
       }) ?? 'Nuevo mensaje';
 
+    const titulo =
+      conversacion?.lead?.nombre ??
+      conversacion?.nombreContacto ??
+      evento.nombreContacto ??
+      evento.waId;
+
     void this.crearNotificacion
       .execute({
         organizacionId: conexion.organizacionId,
         tipo: 'WHATSAPP_MENSAJE',
-        titulo: 'Nuevo mensaje de WhatsApp',
-        mensaje: conversacion?.lead
-          ? `${conversacion.lead.nombre} te escribió por WhatsApp.`
-          : `Mensaje nuevo de ${conversacion?.nombreContacto ?? evento.waId} — sin lead vinculado.`,
+        titulo,
+        mensaje: truncarConEllipsis(preview, 120),
         payload: {
           whatsappConversacionId: conversacionId,
           /** Preview para pintar la lista de chats al instante en el front. */

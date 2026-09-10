@@ -111,7 +111,11 @@ export class PrismaNotificacionesRepository implements NotificacionesRepository 
     organizacionId: string,
   ): Promise<string[]> {
     const filas = await this.prisma.organizacionUsuario.findMany({
-      where: { organizacionId, estado: 1 },
+      where: {
+        organizacionId,
+        estado: 1,
+        usuario: { estado: 1 },
+      },
       select: { usuarioId: true },
     });
     return filas.map((fila) => fila.usuarioId);

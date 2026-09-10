@@ -8,16 +8,22 @@ export interface PushNotificationPayload {
   payload?: Record<string, unknown> | null;
 }
 
+export interface PushSendResult {
+  attempted: number;
+  delivered: number;
+  failed: number;
+}
+
 export interface PushSender {
   habilitado(): boolean;
   publicKey(): string | null;
   /**
-   * Envía Web Push a las suscripciones activas.
-   * @returns cantidad de suscripciones a las que se intentó enviar (0 si push off o sin subs).
+   * Envía Web Push a las suscripciones activas del usuario (cualquier org).
+   * `organizacionId` se ignora en el filtro de envío (compat API).
    */
   enviarAUsuarios(
     usuarioIds: string[],
     data: PushNotificationPayload,
     organizacionId?: string,
-  ): Promise<number>;
+  ): Promise<PushSendResult>;
 }

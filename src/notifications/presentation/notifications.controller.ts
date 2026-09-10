@@ -112,18 +112,20 @@ export class NotificationsController {
     summary: 'Enviar Web Push de prueba a este usuario',
     description:
       'Diagnóstico aislado: solo Web Push (sin persistir in-app ni Socket.IO). ' +
-      'Si llega al dispositivo, VAPID + SW + permiso + suscripción están OK.',
+      'Si llega al dispositivo, VAPID + SW + permiso + suscripción están OK. ' +
+      'Con la app enfocada el SW no muestra toast del SO (probar en segundo plano).',
   })
   @ApiResponse({
     status: 200,
-    description: 'enabled=false si faltan VAPID; sent=0 si no hay suscripciones activas.',
+    description:
+      'enabled=false si faltan VAPID; attempted/delivered/failed cuentan envíos reales.',
   })
   async testPush(@CurrentUser() ctx: RequestContext) {
     const enabled = this.pushSender.habilitado();
     if (!enabled) {
-      return { enabled: false, sent: 0 };
+      return { enabled: false, attempted: 0, delivered: 0, failed: 0 };
     }
-    const sent = await this.pushSender.enviarAUsuarios(
+    const result = await this.pushSender.enviarAUsuarios(
       [ctx.usuarioId],
       {
         id: `test-${Date.now()}`,
@@ -134,7 +136,7 @@ export class NotificationsController {
       },
       ctx.organizacionId!,
     );
-    return { enabled: true, sent };
+    return { enabled: true, ...result };
   }
 
   @Get()
