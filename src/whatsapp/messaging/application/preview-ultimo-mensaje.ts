@@ -45,7 +45,7 @@ export function previewUltimoMensajeWhatsApp(m: {
     case 'system':
       return 'Mensaje del sistema';
     case 'unsupported':
-      return 'Mensaje no soportado';
+      return 'Meta no envió el contenido';
     default:
       return m.tipo ? 'Nuevo mensaje' : null;
   }

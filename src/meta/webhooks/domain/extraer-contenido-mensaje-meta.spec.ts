@@ -76,7 +76,25 @@ describe('extraerContenidoMensajeMeta', () => {
     ).toEqual({ tipo: 'image', texto: 'Foto del depto' });
   });
 
-  it('marca unsupported con detalle', () => {
+  it('marca unsupported 131060 con mensaje claro', () => {
+    const r = extraerContenidoMensajeMeta({
+      type: 'unsupported',
+      errors: [
+        {
+          code: 131060,
+          title: 'This message is currently unavailable.',
+          message: 'This message is currently unavailable.',
+          error_data: {
+            details: 'This message is currently unavailable.',
+          },
+        },
+      ],
+    });
+    expect(r.tipo).toBe('unsupported');
+    expect(r.texto).toContain('Meta no envió');
+  });
+
+  it('marca unsupported 131051 con detalle', () => {
     const r = extraerContenidoMensajeMeta({
       type: 'unsupported',
       unsupported: { type: 'poll_creation' },
@@ -84,7 +102,10 @@ describe('extraerContenidoMensajeMeta', () => {
         {
           code: 131051,
           title: 'Message type unknown',
-          message: 'Message type is currently not supported.',
+          message: 'Message type unknown',
+          error_data: {
+            details: 'Message type is currently not supported.',
+          },
         },
       ],
     });

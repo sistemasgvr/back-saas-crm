@@ -37,7 +37,12 @@ export interface MensajeMetaParaTexto {
   };
   system?: { body?: string; type?: string };
   unsupported?: { type?: string };
-  errors?: { code?: number; title?: string; message?: string }[];
+  errors?: {
+    code?: number;
+    title?: string;
+    message?: string;
+    error_data?: { details?: string };
+  }[];
   referral?: {
     source_type?: string;
     headline?: string;
@@ -89,11 +94,28 @@ function textoUnsupported(mensaje: MensajeMetaParaTexto): string {
   const sub = mensaje.unsupported?.type?.trim();
   const err = mensaje.errors?.[0] as
     | {
+        code?: number;
         message?: string;
         title?: string;
         error_data?: { details?: string };
       }
     | undefined;
+  const code = err?.code;
+  // 131060 — Meta no entrega el cuerpo (coexistencia / 1.er mensaje CTWA).
+  // https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/unsupported
+  if (
+    code === 131060 ||
+    /currently unavailable/i.test(err?.title ?? '') ||
+    /currently unavailable/i.test(err?.message ?? '') ||
+    /currently unavailable/i.test(err?.error_data?.details ?? '')
+  ) {
+    // Texto corto para BD/preview; la UI del chat usa un aviso dedicado.
+    return 'Meta no envió el contenido de este mensaje';
+  }
+  if (code === 131051) {
+    const tipo = sub ? ` (${sub})` : '';
+    return `Tipo de mensaje no soportado por WhatsApp${tipo}`;
+  }
   const detalle =
     err?.error_data?.details?.trim() ||
     err?.message?.trim() ||
