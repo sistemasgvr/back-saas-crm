@@ -17,8 +17,33 @@ import type {
 import { ultimosDigitos, telefonoAWaId } from './normalizar-telefono';
 import { previewUltimoMensajeWhatsApp } from '../application/preview-ultimo-mensaje';
 import { etiquetaContactoWhatsApp } from '../domain/identidad-contacto-whatsapp';
+import { recuperarTextoDesdeDatosCrudos } from '../../../meta/webhooks/domain/extraer-contenido-mensaje-meta';
 
 const VENTANA_HORAS = 24;
+
+function textoMensajeConRecuperacion(m: {
+  texto: string | null;
+  datosCrudos?: unknown;
+}): string | null {
+  const actual = m.texto?.trim();
+  if (actual) return m.texto;
+  return recuperarTextoDesdeDatosCrudos(m.datosCrudos);
+}
+
+function previewDesdeMensaje(m: {
+  texto: string | null;
+  mediaCaption: string | null;
+  tipo: string;
+  mediaEsVoz: boolean | null;
+  datosCrudos?: unknown;
+}): string | null {
+  return previewUltimoMensajeWhatsApp({
+    texto: textoMensajeConRecuperacion(m),
+    mediaCaption: m.mediaCaption,
+    tipo: m.tipo,
+    mediaEsVoz: m.mediaEsVoz,
+  });
+}
 
 const LEAD_CON_INMUEBLE_SELECT = {
   id: true,
@@ -124,7 +149,12 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
           ventanaExpiraEn: c.ventanaExpiraEn,
           noLeidos: c.noLeidos,
-          ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
+          ultimoMensajeTexto: previewDesdeMensaje(c.mensajes[0] ?? {
+            texto: null,
+            mediaCaption: null,
+            tipo: '',
+            mediaEsVoz: null,
+          }),
           bloqueado: c.bloqueado === 1,
         };
       })
@@ -211,6 +241,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       tipo: string;
       mediaEsVoz: boolean | null;
       fechaMensaje?: Date;
+      datosCrudos?: unknown;
     }[];
   }): ConversacionResumen {
     const etiqueta = etiquetaContactoWhatsApp({
@@ -229,7 +260,14 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
-      ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
+      ultimoMensajeTexto: previewDesdeMensaje(
+        c.mensajes[0] ?? {
+          texto: null,
+          mediaCaption: null,
+          tipo: '',
+          mediaEsVoz: null,
+        },
+      ),
       bloqueado: c.bloqueado === 1,
     };
   }
@@ -260,7 +298,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       wamid: m.wamid,
       direccion: m.direccion,
       tipo: m.tipo,
-      texto: m.texto,
+      texto: textoMensajeConRecuperacion(m),
       plantillaNombre: m.plantillaNombre,
       estadoEntrega: m.estadoEntrega,
       fechaMensaje: m.fechaMensaje,

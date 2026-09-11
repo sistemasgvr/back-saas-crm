@@ -1,3 +1,5 @@
+import { extraerContenidoMensajeMeta } from './extraer-contenido-mensaje-meta';
+
 /** Payload de Meta para el objeto "whatsapp_business_account" — comparte el
  * mismo endpoint/firma que leadgen, se distingue por payload.object
  * (PLAN-GESTION-LEADS-WHATSAPP.md §4.3 / Fase G3). */
@@ -90,6 +92,37 @@ export interface MensajeMetaCrudo {
     type?: string;
     button_reply?: { id?: string; title?: string };
     list_reply?: { id?: string; title?: string; description?: string };
+    /** Respuesta de WhatsApp Flow. */
+    nfm_reply?: {
+      name?: string;
+      body?: string;
+      response_json?: string;
+    };
+  };
+  /**
+   * Quick reply / botón de plantilla (type === 'button', distinto de interactive).
+   * https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples
+   */
+  button?: { text?: string; payload?: string };
+  order?: {
+    catalog_id?: string;
+    text?: string;
+    product_items?: { product_retailer_id?: string; quantity?: number }[];
+  };
+  system?: { body?: string; type?: string };
+  unsupported?: { type?: string };
+  errors?: {
+    code?: number;
+    title?: string;
+    message?: string;
+    error_data?: { details?: string };
+  }[];
+  /** Click-to-WhatsApp / anuncio — puede acompañar text/image/etc. */
+  referral?: {
+    source_type?: string;
+    headline?: string;
+    body?: string;
+    source_url?: string;
   };
   /** Solo type === 'revoke' en ecos (mensaje borrado desde la app Business). */
   revoke?: { original_message_id?: string };
@@ -319,20 +352,9 @@ function clasificarMensajeMeta(
     mensaje.audio ??
     mensaje.document ??
     mensaje.sticker;
-  // Tocar un botón o elegir una opción de lista SÍ es un mensaje de
-  // chat nuevo (a diferencia de reaccionar o editar) — solo que su
-  // "texto" no viene en mensaje.text sino en el título elegido.
-  const textoInteractivo =
-    mensaje.interactive?.type === 'button_reply'
-      ? mensaje.interactive.button_reply?.title
-      : mensaje.interactive?.type === 'list_reply'
-        ? [
-            mensaje.interactive.list_reply?.title,
-            mensaje.interactive.list_reply?.description,
-          ]
-            .filter(Boolean)
-            .join(' — ')
-        : undefined;
+  // Texto/tipo según docs Meta (text, button, interactive, nfm_reply,
+  // captions, unsupported, …) — no solo text.body.
+  const contenido = extraerContenidoMensajeMeta(mensaje);
 
   const evento: EventoMensajeWhatsApp = {
     phoneNumberId,
@@ -342,11 +364,8 @@ function clasificarMensajeMeta(
     nombreContacto: identidad.nombreContacto,
     wamid: mensaje.id,
     timestamp: timestampADate(mensaje.timestamp),
-    tipo:
-      mensaje.type === 'interactive'
-        ? (mensaje.interactive?.type ?? 'interactive')
-        : (mensaje.type ?? 'unknown'),
-    texto: mensaje.text?.body ?? textoInteractivo,
+    tipo: contenido.tipo,
+    texto: contenido.texto ?? undefined,
     respondeAWamid: mensaje.context?.id,
     ubicacion:
       mensaje.location?.latitude !== undefined &&

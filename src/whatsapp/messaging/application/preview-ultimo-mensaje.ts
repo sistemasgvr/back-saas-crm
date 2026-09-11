@@ -33,9 +33,19 @@ export function previewUltimoMensajeWhatsApp(m: {
       return 'Plantilla';
     case 'interactive':
       return 'Mensaje interactivo';
+    case 'button':
     case 'button_reply':
+      return 'Tocó un botón';
     case 'list_reply':
-      return 'Respuesta';
+      return 'Eligió de la lista';
+    case 'nfm_reply':
+      return 'Respondió un formulario';
+    case 'order':
+      return 'Pedido';
+    case 'system':
+      return 'Mensaje del sistema';
+    case 'unsupported':
+      return 'Mensaje no soportado';
     default:
       return m.tipo ? 'Nuevo mensaje' : null;
   }
