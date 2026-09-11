@@ -119,10 +119,26 @@ export class ActualizarGestionLeadUseCase {
 
     const esDueno = lead.asignadoUsuarioId === ctx.usuarioId;
     const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    if (!esDueno && !esAdmin) {
+    const esPoolLibre = lead.asignadoUsuarioId === null;
+    // Pool sin asignar: el asesor que gestiona (p. ej. mueve en kanban) lo
+    // puede operar; se auto-toma de forma race-safe antes de mutar.
+    if (!esDueno && !esAdmin && !esPoolLibre) {
       throw new ForbiddenException(
         'Solo el dueño del lead o un administrador puede gestionar este lead',
       );
+    }
+
+    if (esPoolLibre && !esAdmin) {
+      const tomado = await this.leads.tomar(
+        organizacionId,
+        leadId,
+        ctx.usuarioId,
+      );
+      if (!tomado) {
+        throw new ConflictException(
+          'Otro asesor tomó este lead mientras lo gestionabas',
+        );
+      }
     }
 
     if (input.inmuebleInteresId) {
