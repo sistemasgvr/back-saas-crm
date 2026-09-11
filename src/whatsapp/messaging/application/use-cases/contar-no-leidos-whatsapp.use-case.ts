@@ -6,12 +6,8 @@ import type {
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
-
-/** GET /whatsapp/chats/unread-count — cantidad de conversaciones con algo
- * pendiente entre las que el usuario puede ver (1 por chat, no la suma de
- * sus mensajes), para el badge del ítem "Chats" en el sidebar (mismo
- * criterio de visibilidad que ListarConversacionesUseCase). */
+/** Badge de no leídos del sidebar: misma regla que la lista por defecto
+ * (todos los chats de la org, incluidos libres / sin lead). */
 @Injectable()
 export class ContarNoLeidosWhatsAppUseCase {
   constructor(
@@ -21,11 +17,9 @@ export class ContarNoLeidosWhatsAppUseCase {
 
   execute(
     organizacionId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    _ctx: { usuarioId: string; rol: RolOrganizacion },
   ): Promise<number> {
-    const filtro: FiltroVisibilidadChats = ROLES_ADMIN.includes(ctx.rol)
-      ? { modo: 'todos' }
-      : { modo: 'usuario', usuarioId: ctx.usuarioId };
+    const filtro: FiltroVisibilidadChats = { modo: 'todos' };
     return this.conversaciones.contarNoLeidos(organizacionId, filtro);
   }
 }

@@ -7,8 +7,7 @@ import {
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 
 /**
  * Soft-delete en el CRM. La Cloud API de Meta no expone "borrar para todos"
@@ -36,11 +35,9 @@ export class EliminarMensajeWhatsAppCrmUseCase {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    const esDueno = conversacion.lead?.asignadoUsuarioId === ctx.usuarioId;
-    if (!esAdmin && !esDueno) {
+    if (!puedeEscribirConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException(
-        'Solo el dueño del lead o un administrador puede eliminar mensajes',
+        'Solo el dueño del lead, un administrador o un chat libre pueden eliminar mensajes',
       );
     }
 

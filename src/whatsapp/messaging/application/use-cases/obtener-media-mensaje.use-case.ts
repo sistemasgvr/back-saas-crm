@@ -10,11 +10,10 @@ import type {
   WhatsappConversacionesRepository,
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { puedeVerConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 
 /** Sirve los bytes de un archivo de un mensaje puntual — mismo control de
- * acceso que abrir la conversación (dueño del lead o admin). */
+ * acceso que abrir la conversación (lectura para cualquier miembro de la org). */
 @Injectable()
 export class ObtenerMediaMensajeUseCase {
   constructor(
@@ -36,9 +35,7 @@ export class ObtenerMediaMensajeUseCase {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    const esDueno = conversacion.lead?.asignadoUsuarioId === ctx.usuarioId;
-    if (!esAdmin && !esDueno) {
+    if (!puedeVerConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException('No tienes acceso a esta conversación');
     }
 

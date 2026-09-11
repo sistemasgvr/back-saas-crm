@@ -139,8 +139,10 @@ export interface LeadsGestionRepository {
     leadId: string,
   ): Promise<string | null>;
   /**
-   * Alta manual desde un chat de WhatsApp (idExterno sintético `wa:…`).
-   * Crea el lead + historial NUEVO y lo asigna al usuario creador.
+   * Alta desde un chat de WhatsApp (idExterno sintético `wa:…`).
+   * - Manual: pasar `asignadoUsuarioId` = creador.
+   * - Automático (inbound): pasar `asignadoUsuarioId: null` para que
+   *   AutoAsignarLeadUseCase pueda aplicar el pool.
    */
   crearDesdeWhatsApp(input: {
     organizacionId: string;
@@ -150,7 +152,19 @@ export interface LeadsGestionRepository {
     telefono: string | null;
     tipoLead: string | null;
     datosCrudos: unknown;
-    usuarioId: string;
+    /** Quién crea / historial; null = sistema (webhook). */
+    usuarioId: string | null;
+    /** null = sin asignar (autoasignación posterior). */
+    asignadoUsuarioId: string | null;
     historialId: string;
   }): Promise<{ id: string; creado: boolean }>;
+
+  /**
+   * Busca un lead de la org cuyo teléfono contiene el sufijo de dígitos del
+   * waId/teléfono (misma heurística que findOCrearConversacion).
+   */
+  buscarIdPorTelefonoSufijo(
+    organizacionId: string,
+    telefonoOWaId: string,
+  ): Promise<string | null>;
 }

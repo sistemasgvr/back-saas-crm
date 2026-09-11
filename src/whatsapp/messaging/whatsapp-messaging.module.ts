@@ -24,6 +24,7 @@ import { ProcesarReaccionWhatsAppUseCase } from './application/use-cases/procesa
 import { ProcesarEdicionWhatsAppUseCase } from './application/use-cases/procesar-edicion-whatsapp.use-case';
 import { IniciarConversacionDesdeLeadUseCase } from './application/use-cases/iniciar-conversacion-desde-lead.use-case';
 import { CrearLeadDesdeConversacionWhatsAppUseCase } from './application/use-cases/crear-lead-desde-conversacion-whatsapp.use-case';
+import { AsegurarLeadParaConversacionWhatsAppUseCase } from './application/use-cases/asegurar-lead-para-conversacion-whatsapp.use-case';
 import { VincularLeadConversacionesWhatsAppUseCase } from './application/use-cases/vincular-lead-conversaciones-whatsapp.use-case';
 import { BloquearContactoWhatsAppUseCase } from './application/use-cases/bloquear-contacto-whatsapp.use-case';
 import { EliminarMensajeWhatsAppCrmUseCase } from './application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
@@ -61,6 +62,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarEdicionWhatsAppUseCase,
     IniciarConversacionDesdeLeadUseCase,
     CrearLeadDesdeConversacionWhatsAppUseCase,
+    AsegurarLeadParaConversacionWhatsAppUseCase,
     VincularLeadConversacionesWhatsAppUseCase,
     BloquearContactoWhatsAppUseCase,
     EliminarMensajeWhatsAppCrmUseCase,

@@ -252,6 +252,11 @@ model Lead {
   anuncioId         String?   @map("anuncio_id") @db.Uuid
   formularioId      String?   @map("formulario_id") @db.VarChar(64)
   idExterno         String    @map("id_externo") @db.VarChar(64)
+  /**
+   * Canal de origen: META | WHATSAPP | MANUAL — evita confundir leads de
+   * formularios Meta con los generados desde chat de WhatsApp.
+   */
+  origen            String    @default("MANUAL") @db.VarChar(20)
   nombre            String?   @db.VarChar(200)
   email             String?   @db.VarChar(255)
   telefono          String?   @db.VarChar(40)
@@ -316,6 +321,7 @@ model Lead {
   @@index([asignadoUsuarioId])
   @@index([tipoLead])
   @@index([estadoGestion])
+  @@index([origen])
   @@index([inmuebleInteresId])
   @@index([organizacionId, estadoGestion])
   @@index([organizacionId, tipoLead, estadoGestion])

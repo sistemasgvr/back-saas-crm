@@ -16,8 +16,7 @@ import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaci
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import type { ParametroPlantilla } from '../../../../meta/connections/application/ports/meta-graph-client.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 
 export interface EnviarMensajeInput {
   texto?: string;
@@ -64,11 +63,9 @@ export class EnviarMensajeWhatsAppUseCase {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    const esDueno = conversacion.lead?.asignadoUsuarioId === ctx.usuarioId;
-    if (!esAdmin && !esDueno) {
+    if (!puedeEscribirConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException(
-        'Solo el dueño del lead o un administrador puede escribir en este chat',
+        'Solo el dueño del lead, un administrador o un chat libre pueden escribir aquí',
       );
     }
 

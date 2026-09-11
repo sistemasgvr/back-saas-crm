@@ -58,6 +58,7 @@ export class PrismaLeadsRepository implements LeadsRepository {
         telefono: input.telefono,
         datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
         fechaLead: input.fechaLead,
+        origen: 'META',
         ...(input.tipoLead ? { tipoLead: input.tipoLead } : {}),
       },
     });

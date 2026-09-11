@@ -322,7 +322,8 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     telefono: string | null;
     tipoLead: string | null;
     datosCrudos: unknown;
-    usuarioId: string;
+    usuarioId: string | null;
+    asignadoUsuarioId: string | null;
     historialId: string;
   }): Promise<{ id: string; creado: boolean }> {
     const existente = await this.prisma.lead.findUnique({
@@ -339,6 +340,7 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     }
 
     const ahora = new Date();
+    const asignadoUsuarioId = input.asignadoUsuarioId;
     const lead = await this.prisma.lead.create({
       data: {
         organizacionId: input.organizacionId,
@@ -347,13 +349,14 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
         email: input.email,
         telefono: input.telefono,
         tipoLead: input.tipoLead,
+        origen: 'WHATSAPP',
         datosCrudos: input.datosCrudos as object,
         fechaLead: ahora,
         estadoGestion: 'NUEVO',
         estadoGestionEn: ahora,
         estadoGestionPorUsuarioId: input.usuarioId,
-        asignadoUsuarioId: input.usuarioId,
-        asignadoEn: ahora,
+        asignadoUsuarioId,
+        asignadoEn: asignadoUsuarioId ? ahora : null,
         asignadoPorUsuarioId: null,
         usuarioCreacion: input.usuarioId,
         estadoHistorial: {
@@ -372,5 +375,24 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
       select: { id: true },
     });
     return { id: lead.id, creado: true };
+  }
+
+  async buscarIdPorTelefonoSufijo(
+    organizacionId: string,
+    telefonoOWaId: string,
+  ): Promise<string | null> {
+    const soloDigitos = telefonoOWaId.replace(/\D/g, '');
+    const sufijo = soloDigitos.slice(-9);
+    if (!sufijo) return null;
+    const lead = await this.prisma.lead.findFirst({
+      where: {
+        organizacionId,
+        estado: 1,
+        telefono: { contains: sufijo },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+      select: { id: true },
+    });
+    return lead?.id ?? null;
   }
 }

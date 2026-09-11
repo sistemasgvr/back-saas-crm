@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -13,7 +12,6 @@ import type { RolOrganizacion } from '../../../../auth/domain/request-context.in
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 const TIPOS_LEAD = new Set(['COMPRA', 'VENTA', 'OTRO']);
 
 export interface CrearLeadDesdeChatInput {
@@ -48,12 +46,6 @@ export class CrearLeadDesdeConversacionWhatsAppUseCase {
     }
     if (conversacion.lead) {
       throw new ConflictException('Este chat ya tiene un lead vinculado');
-    }
-
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    if (!esAdmin) {
-      // Chats sin lead solo son visibles para admin; reforzamos el check.
-      throw new ForbiddenException('No tienes permiso para crear el lead');
     }
 
     const nombre =
@@ -91,6 +83,7 @@ export class CrearLeadDesdeConversacionWhatsAppUseCase {
         waId: conversacion.waId,
       },
       usuarioId: ctx.usuarioId,
+      asignadoUsuarioId: ctx.usuarioId,
       historialId: randomUUID(),
     });
 

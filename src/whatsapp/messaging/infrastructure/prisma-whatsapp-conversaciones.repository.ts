@@ -22,15 +22,30 @@ const VENTANA_HORAS = 24;
 const LEAD_CON_INMUEBLE_SELECT = {
   id: true,
   nombre: true,
+  origen: true,
   asignadoUsuarioId: true,
+  asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
   inmuebleInteres: { select: { id: true, codigo: true, titulo: true } },
 } as const;
+
+function nombreUsuario(u: {
+  nombre: string;
+  apellido: string | null;
+}): string {
+  return [u.nombre, u.apellido].filter(Boolean).join(' ');
+}
 
 function mapearLead(
   lead: {
     id: string;
     nombre: string | null;
+    origen: string;
     asignadoUsuarioId: string | null;
+    asignadoUsuario: {
+      id: string;
+      nombre: string;
+      apellido: string | null;
+    } | null;
     inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
   } | null,
   waIdFallback: string,
@@ -39,7 +54,14 @@ function mapearLead(
   return {
     id: lead.id,
     nombre: lead.nombre ?? waIdFallback,
+    origen: lead.origen,
     asignadoUsuarioId: lead.asignadoUsuarioId,
+    asignado: lead.asignadoUsuario
+      ? {
+          id: lead.asignadoUsuario.id,
+          nombre: nombreUsuario(lead.asignadoUsuario),
+        }
+      : null,
     inmuebleInteres: lead.inmuebleInteres
       ? {
           id: lead.inmuebleInteres.id,
@@ -161,7 +183,13 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     lead: {
       id: string;
       nombre: string | null;
+      origen: string;
       asignadoUsuarioId: string | null;
+      asignadoUsuario: {
+        id: string;
+        nombre: string;
+        apellido: string | null;
+      } | null;
       inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
     } | null;
     mensajes: {

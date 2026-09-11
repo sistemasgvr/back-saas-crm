@@ -7,9 +7,9 @@ import {
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
+import { puedeVerConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 import { MarcarLeidoWhatsAppUseCase } from './marcar-leido-whatsapp.use-case';
 
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 const LIMITE_MENSAJES = 200;
 
 /** Trae la conversación + su historial y la marca leída (abrirla = leerla,
@@ -36,9 +36,7 @@ export class ObtenerConversacionUseCase {
       throw new NotFoundException('Conversación no encontrada');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    const esDueno = conversacion.lead?.asignadoUsuarioId === ctx.usuarioId;
-    if (!esAdmin && !esDueno) {
+    if (!puedeVerConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException('No tienes acceso a esta conversación');
     }
 

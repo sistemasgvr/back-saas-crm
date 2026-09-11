@@ -11,6 +11,7 @@ import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/port
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import { previewUltimoMensajeWhatsApp, truncarConEllipsis } from '../preview-ultimo-mensaje';
+import { AsegurarLeadParaConversacionWhatsAppUseCase } from './asegurar-lead-para-conversacion-whatsapp.use-case';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -19,8 +20,9 @@ export interface ResultadoProcesarMensajeWhatsApp {
 }
 
 /** Análogo a ProcesarLeadEntranteUseCase pero para mensajes WA — resuelve la
- * org por phone_number_id, crea/reusa la conversación, guarda el mensaje
- * (idempotente por wamid) y notifica al dueño del lead si hay uno.
+ * org por phone_number_id, crea/reusa la conversación, asegura lead +
+ * autoasignación si hace falta, guarda el mensaje (idempotente por wamid) y
+ * notifica al dueño del lead si hay uno.
  *
  * Si el mensaje trae un archivo, lo descarga de Meta y lo persiste en el
  * mismo paso: el media_id que manda el webhook solo dura 7 días — si
@@ -44,6 +46,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly crearNotificacion: CrearNotificacionUseCase,
+    private readonly asegurarLead: AsegurarLeadParaConversacionWhatsAppUseCase,
   ) {}
 
   async execute(
@@ -63,6 +66,19 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         waId: evento.waId,
         nombreContacto: evento.nombreContacto,
       });
+
+    // Lead primero: así WHATSAPP_MENSAJE ya va al asesor autoasignado.
+    try {
+      await this.asegurarLead.execute(
+        conexion.organizacionId,
+        conversacionId,
+      );
+    } catch (error: unknown) {
+      this.logger.error(
+        `No se pudo asegurar lead para conversación ${conversacionId}`,
+        error instanceof Error ? error.stack : error,
+      );
+    }
 
     const media = evento.media
       ? await this.descargarMediaSiPosible(

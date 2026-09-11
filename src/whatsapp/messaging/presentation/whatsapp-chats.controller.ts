@@ -9,6 +9,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseGuards,
@@ -101,16 +102,25 @@ export class WhatsappChatsController {
   @ApiOperation({
     summary: 'Listar conversaciones',
     description:
-      'Conversaciones de WhatsApp de la organización, acotadas por rol (un VENDEDOR solo ve las de sus leads asignados).',
+      'Conversaciones de WhatsApp de la organización, acotadas por rol. ' +
+      'Admin puede filtrar con `asignado=mios|todos` (default todos). ' +
+      'USUARIO solo ve leads asignados a él.',
   })
   @ApiResponse({ status: 200, description: 'Conversaciones.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
-  findAll(@CurrentUser() ctx: RequestContext) {
-    return this.listarConversaciones.execute(ctx.organizacionId!, {
-      usuarioId: ctx.usuarioId,
-      rol: ctx.rol!,
-    });
+  findAll(
+    @CurrentUser() ctx: RequestContext,
+    @Query('asignado') asignado?: string,
+  ) {
+    return this.listarConversaciones.execute(
+      ctx.organizacionId!,
+      {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+      },
+      { asignado },
+    );
   }
 
   /** Antes de :id — si no, Nest lo confunde con un id de conversación. */

@@ -16,6 +16,10 @@ export interface InmuebleInteresResumen {
 
 export interface LeadEnConversacion extends ReferenciaNombrada {
   asignadoUsuarioId: string | null;
+  /** Asesor dueño del lead (si hay asignación). */
+  asignado: ReferenciaNombrada | null;
+  /** META | WHATSAPP | MANUAL */
+  origen: string;
   inmuebleInteres: InmuebleInteresResumen | null;
 }
 

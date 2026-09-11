@@ -6,10 +6,8 @@ import type {
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
-
-/** Admin ve todos los chats de la org; USUARIO solo los de leads asignados a
- * él (PLAN-GESTION-LEADS-WHATSAPP.md §3 — tabla de visibilidad). */
+/** Todos los roles pueden ver todos los chats (incl. sin lead / sin asignar)
+ * para poder tomarlos; `asignado=mios` acota a los del usuario. */
 @Injectable()
 export class ListarConversacionesUseCase {
   constructor(
@@ -20,10 +18,13 @@ export class ListarConversacionesUseCase {
   execute(
     organizacionId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
+    query?: { asignado?: string },
   ) {
-    const filtro: FiltroVisibilidadChats = ROLES_ADMIN.includes(ctx.rol)
-      ? { modo: 'todos' }
-      : { modo: 'usuario', usuarioId: ctx.usuarioId };
+    const filtro: FiltroVisibilidadChats =
+      query?.asignado === 'mios'
+        ? { modo: 'usuario', usuarioId: ctx.usuarioId }
+        : { modo: 'todos' };
+
     return this.conversaciones.listar(organizacionId, filtro);
   }
 }

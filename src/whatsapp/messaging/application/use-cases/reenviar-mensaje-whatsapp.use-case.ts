@@ -24,14 +24,13 @@ import type {
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { categoriaMediaPorMimeType } from '../limites-media-whatsapp';
+import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 
 /** Tope alineado con el multi-forward de la app WhatsApp (~30). */
 export const MAX_MENSAJES_REENVIAR = 30;
 
 /** Tope de chats destino por reenvío (WhatsApp multi-forward típico: 5). */
 export const MAX_DESTINOS_REENVIAR = 5;
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
 const TIPOS_MEDIA = new Set([
   'image',
@@ -386,11 +385,9 @@ export class ReenviarMensajeWhatsAppUseCase {
     conversacion: { lead: { asignadoUsuarioId: string | null } | null },
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ): void {
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
-    const esDueno = conversacion.lead?.asignadoUsuarioId === ctx.usuarioId;
-    if (!esAdmin && !esDueno) {
+    if (!puedeEscribirConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException(
-        'Solo el dueño del lead o un administrador puede reenviar a este chat',
+        'Solo el dueño del lead, un administrador o un chat libre pueden reenviar a este chat',
       );
     }
   }
