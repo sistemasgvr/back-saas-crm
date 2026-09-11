@@ -12,9 +12,9 @@ import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaci
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import { telefonoAWaId } from '../../infrastructure/normalizar-telefono';
 
-/** CTA "Iniciar chat" desde la ficha del lead — crea (o reusa) la
- * conversación aunque el lead nunca haya escrito por WhatsApp; el primer
- * envío deberá ser una plantilla aprobada (fuera de la ventana 24h, PLAN §3). */
+/** CTA "Iniciar chat" desde la ficha del lead — reusa chat existente (también
+ * sin teléfono: username / BSUID) o crea uno por wa_id si hay teléfono.
+ * El primer envío fuera de ventana 24h debe ser plantilla (PLAN §3). */
 @Injectable()
 export class IniciarConversacionDesdeLeadUseCase {
   constructor(
@@ -31,8 +31,20 @@ export class IniciarConversacionDesdeLeadUseCase {
     if (!lead) {
       throw new NotFoundException('Lead no encontrado');
     }
+
+    // Ya hay chat (p. ej. entró solo con username/BSUID, sin teléfono).
+    const existente = await this.conversaciones.findActivaPorLeadId(
+      organizacionId,
+      leadId,
+    );
+    if (existente) {
+      return { conversacionId: existente.id };
+    }
+
     if (!lead.telefono) {
-      throw new BadRequestException('Este lead no tiene teléfono registrado');
+      throw new BadRequestException(
+        'Este lead no tiene teléfono ni un chat de WhatsApp vinculado. Sin número o BSUID no se puede iniciar la conversación.',
+      );
     }
     const waId = telefonoAWaId(lead.telefono);
     if (!waId) {
