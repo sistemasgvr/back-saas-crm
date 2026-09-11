@@ -99,7 +99,7 @@ export class InmueblesController {
     description:
       'Orden: interés explícito → visitas (realizadas > agendadas) → etapa de ' +
       'pipeline → tip vs operación → recencia. Terminales perdidos/descartados al final. ' +
-      'Lectura permitida a USUARIO (misma gate CRM que el catálogo).',
+      'USUARIO solo ve interesados propios o sin asignar; admin ve todos.',
   })
   @ApiResponse({ status: 200, description: 'Lista ordenada de interesados.' })
   @ApiResponse({ status: 404, description: 'Inmueble no encontrado.' })
@@ -107,7 +107,7 @@ export class InmueblesController {
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.listarInteresados.execute(ctx.organizacionId!, id);
+    return this.listarInteresados.execute(ctx, id);
   }
 
   @Post()

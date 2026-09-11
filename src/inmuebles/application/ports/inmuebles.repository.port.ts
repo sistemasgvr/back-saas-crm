@@ -95,6 +95,7 @@ export interface LeadCandidatoInteres {
   estadoGestion: string;
   tipoLead: string | null;
   estadoGestionEn: Date | null;
+  asignadoUsuarioId: string | null;
   interesExplicito: boolean;
   visitas: {
     estado: string;

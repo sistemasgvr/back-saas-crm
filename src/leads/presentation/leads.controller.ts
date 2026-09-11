@@ -111,6 +111,7 @@ export class LeadsController {
 
   /** Antes de :id — si no, Nest lo confunde con un id de lead. */
   @Get('asignables')
+  @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @ApiOperation({
     summary: 'Miembros a los que se puede asignar un lead',
     description:
@@ -118,6 +119,7 @@ export class LeadsController {
   })
   @ApiResponse({ status: 200, description: 'Miembros asignables.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({ status: 403, description: 'Solo administradores pueden listar asignables.' })
   asignables(@CurrentUser() ctx: RequestContext) {
     return this.leadsLectura.listarMiembrosAsignables(ctx.organizacionId!);
   }

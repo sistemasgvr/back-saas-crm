@@ -130,6 +130,7 @@ export class PrismaInmueblesRepository implements InmueblesRepository {
         estadoGestion: true,
         tipoLead: true,
         estadoGestionEn: true,
+        asignadoUsuarioId: true,
         inmuebleInteresId: true,
         visitas: {
           where: { inmuebleId, organizacionId },
@@ -149,6 +150,7 @@ export class PrismaInmueblesRepository implements InmueblesRepository {
       estadoGestion: l.estadoGestion,
       tipoLead: l.tipoLead,
       estadoGestionEn: l.estadoGestionEn,
+      asignadoUsuarioId: l.asignadoUsuarioId,
       interesExplicito: l.inmuebleInteresId === inmuebleId,
       visitas: l.visitas,
     }));

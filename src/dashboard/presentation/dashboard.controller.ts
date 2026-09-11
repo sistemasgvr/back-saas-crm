@@ -9,6 +9,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
+import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
+import { Roles } from '../../shared/presentation/decorators/roles.decorator';
 import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { ObtenerKpisUseCase } from '../application/use-cases/obtener-kpis.use-case';
@@ -23,7 +25,8 @@ import { FiltroEmbudoQueryDto } from './dto/filtro-embudo.query.dto';
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
+@Roles('PROPIETARIO', 'ADMINISTRADOR')
 @RequireModule('DASHBOARD')
 export class DashboardController {
   constructor(
@@ -44,7 +47,8 @@ export class DashboardController {
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   @ApiResponse({
     status: 403,
-    description: 'La organización no tiene el módulo DASHBOARD activo.',
+    description:
+      'Sin módulo DASHBOARD o rol insuficiente (solo PROPIETARIO/ADMINISTRADOR).',
   })
   getKpis(
     @CurrentUser() ctx: RequestContext,
