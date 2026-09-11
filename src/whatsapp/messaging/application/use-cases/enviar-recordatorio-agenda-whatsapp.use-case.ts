@@ -9,6 +9,7 @@ import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 export interface EnviarRecordatorioAgendaWhatsAppInput {
   organizacionId: string;
@@ -63,6 +64,14 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
       return { ok: false, motivo: 'bloqueado' };
     }
 
+    const para = idParaEnvioWhatsApp(conversacion);
+    if (!para) {
+      this.logger.warn(
+        `Lead ${input.leadId}: conversación ${conversacion.id} sin teléfono ni BSUID — se omite`,
+      );
+      return { ok: false, motivo: 'sin_destinatario' };
+    }
+
     const whatsappConexion = await this.conexionesWa.listarPorOrganizacion(
       input.organizacionId,
     );
@@ -94,7 +103,7 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
         const resultado = await this.graph.enviarMensajeTextoWhatsApp(
           conexionActiva.phoneNumberId,
           accessToken,
-          conversacion.waId,
+          para,
           input.texto,
         );
         await this.conversaciones.registrarMensaje({
@@ -136,7 +145,7 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
       const resultado = await this.graph.enviarMensajePlantillaWhatsApp(
         conexionActiva.phoneNumberId,
         accessToken,
-        conversacion.waId,
+        para,
         plantilla,
         idioma,
       );

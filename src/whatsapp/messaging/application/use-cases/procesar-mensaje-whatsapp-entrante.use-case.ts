@@ -64,6 +64,8 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         organizacionId: conexion.organizacionId,
         whatsappConexionId: conexion.id,
         waId: evento.waId,
+        bsuid: evento.bsuid,
+        username: evento.username,
         nombreContacto: evento.nombreContacto,
       });
 
@@ -154,7 +156,13 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       conversacion?.lead?.nombre ??
       conversacion?.nombreContacto ??
       evento.nombreContacto ??
-      evento.waId;
+      (evento.username
+        ? evento.username.startsWith('@')
+          ? evento.username
+          : `@${evento.username}`
+        : null) ??
+      (evento.waId ? `+${evento.waId}` : null) ??
+      'WhatsApp';
 
     void this.crearNotificacion
       .execute({

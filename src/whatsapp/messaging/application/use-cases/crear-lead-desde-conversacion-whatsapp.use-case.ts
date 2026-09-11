@@ -51,14 +51,16 @@ export class CrearLeadDesdeConversacionWhatsAppUseCase {
     const nombre =
       input.nombre?.trim() ||
       conversacion.nombreContacto?.trim() ||
-      null;
+      (conversacion.username
+        ? conversacion.username.startsWith('@')
+          ? conversacion.username
+          : `@${conversacion.username}`
+        : null);
     const email = input.email?.trim().toLowerCase() || null;
     const telefonoRaw =
       input.telefono?.trim() ||
-      (conversacion.waId ? `+${conversacion.waId}` : null);
-    if (!telefonoRaw) {
-      throw new BadRequestException('Se necesita un teléfono para crear el lead');
-    }
+      (conversacion.waId ? `+${conversacion.waId}` : null) ||
+      null;
 
     let tipoLead: string | null = null;
     if (input.tipoLead != null && input.tipoLead !== '') {
@@ -81,6 +83,8 @@ export class CrearLeadDesdeConversacionWhatsAppUseCase {
         origen: 'whatsapp_chat',
         conversacionId,
         waId: conversacion.waId,
+        bsuid: conversacion.bsuid,
+        username: conversacion.username,
       },
       usuarioId: ctx.usuarioId,
       asignadoUsuarioId: ctx.usuarioId,

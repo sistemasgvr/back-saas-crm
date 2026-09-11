@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -52,6 +53,12 @@ export class BloquearContactoWhatsAppUseCase {
     if (!puedeEscribirConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException(
         'Solo el dueño del lead, un administrador o un chat libre pueden bloquear este contacto',
+      );
+    }
+
+    if (!conversacion.waId) {
+      throw new BadRequestException(
+        'No se puede bloquear este contacto: Meta exige un número de teléfono y este chat solo tiene BSUID/username',
       );
     }
 

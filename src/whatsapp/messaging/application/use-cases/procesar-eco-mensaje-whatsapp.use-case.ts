@@ -47,6 +47,8 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
         organizacionId: conexion.organizacionId,
         whatsappConexionId: conexion.id,
         waId: evento.waId,
+        bsuid: evento.bsuid,
+        username: evento.username,
         nombreContacto: evento.nombreContacto,
       });
 

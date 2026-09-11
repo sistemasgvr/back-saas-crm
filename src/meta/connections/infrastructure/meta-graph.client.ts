@@ -8,6 +8,10 @@ import {
   esRateLimitMeta,
   excepcionDesdeErrorMeta,
 } from '../application/mapear-error-meta-graph';
+import {
+  pareceTelefonoWhatsApp,
+  payloadDestinatarioWhatsApp,
+} from '../../../whatsapp/messaging/domain/identidad-contacto-whatsapp';
 import type {
   AppSuscritaGraph,
   ContactoParaEnviar,
@@ -80,6 +84,13 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
 
   private get graphBaseUrl(): string {
     return `https://graph.facebook.com/${obtenerVersionGraph(this.config)}`;
+  }
+
+  /** `to` (teléfono) o `recipient` (BSUID) según el identificador del contacto. */
+  private destinatario(para: string): { to?: string; recipient?: string } {
+    return payloadDestinatarioWhatsApp(
+      pareceTelefonoWhatsApp(para) ? { waId: para } : { bsuid: para },
+    );
   }
 
   async intercambiarCodigoPorToken(
@@ -829,7 +840,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'text',
         text: { body: texto },
         ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),
@@ -869,7 +880,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'reaction',
         reaction: { message_id: wamidObjetivo, emoji },
       },
@@ -896,7 +907,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'template',
         template: {
           name: nombrePlantilla,
@@ -1047,7 +1058,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: tipo,
         [tipo]: objetoMedia,
         ...(opciones?.respondeAWamid
@@ -1071,7 +1082,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'location',
         location: {
           latitude: ubicacion.latitud,
@@ -1098,7 +1109,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'contacts',
         contacts: contactos.map((c) => ({
           // Meta exige name.formatted_name + first_name — solo pedimos un
@@ -1188,7 +1199,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       {
         messaging_product: 'whatsapp',
         recipient_type: 'individual',
-        to: para,
+        ...this.destinatario(para),
         type: 'interactive',
         interactive: objetoInteractivo,
         ...(respondeAWamid ? { context: { message_id: respondeAWamid } } : {}),

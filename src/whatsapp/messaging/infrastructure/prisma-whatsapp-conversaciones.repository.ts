@@ -16,6 +16,7 @@ import type {
 } from '../application/ports/whatsapp-conversaciones.repository.port';
 import { ultimosDigitos, telefonoAWaId } from './normalizar-telefono';
 import { previewUltimoMensajeWhatsApp } from '../application/preview-ultimo-mensaje';
+import { etiquetaContactoWhatsApp } from '../domain/identidad-contacto-whatsapp';
 
 const VENTANA_HORAS = 24;
 
@@ -48,12 +49,12 @@ function mapearLead(
     } | null;
     inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
   } | null,
-  waIdFallback: string,
+  nombreFallback: string,
 ): LeadEnConversacion | null {
   if (!lead) return null;
   return {
     id: lead.id,
-    nombre: lead.nombre ?? waIdFallback,
+    nombre: lead.nombre ?? nombreFallback,
     origen: lead.origen,
     asignadoUsuarioId: lead.asignadoUsuarioId,
     asignado: lead.asignadoUsuario
@@ -105,18 +106,28 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
 
     return conversaciones
-      .map((c) => ({
-        id: c.id,
-        waId: c.waId,
-        nombreContacto: c.nombreContacto,
-        lead: mapearLead(c.lead, c.waId),
-        // Preferir la fecha del último mensaje real (sanación si ultimoMensajeEn quedó atrasado).
-        ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
-        ventanaExpiraEn: c.ventanaExpiraEn,
-        noLeidos: c.noLeidos,
-        ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
-        bloqueado: c.bloqueado === 1,
-      }))
+      .map((c) => {
+        const etiqueta = etiquetaContactoWhatsApp({
+          nombre: c.nombreContacto,
+          username: c.username,
+          waId: c.waId,
+          bsuid: c.bsuid,
+        });
+        return {
+          id: c.id,
+          waId: c.waId,
+          bsuid: c.bsuid,
+          username: c.username,
+          nombreContacto: c.nombreContacto,
+          lead: mapearLead(c.lead, etiqueta),
+          // Preferir la fecha del último mensaje real (sanación si ultimoMensajeEn quedó atrasado).
+          ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
+          ventanaExpiraEn: c.ventanaExpiraEn,
+          noLeidos: c.noLeidos,
+          ultimoMensajeTexto: previewUltimoMensajeWhatsApp(c.mensajes[0] ?? {}),
+          bloqueado: c.bloqueado === 1,
+        };
+      })
       .sort((a, b) => {
         const ta = a.ultimoMensajeEn?.getTime() ?? 0;
         const tb = b.ultimoMensajeEn?.getTime() ?? 0;
@@ -174,7 +185,9 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
 
   private mapearResumen(c: {
     id: string;
-    waId: string;
+    waId: string | null;
+    bsuid: string | null;
+    username: string | null;
     nombreContacto: string | null;
     ultimoMensajeEn: Date | null;
     ventanaExpiraEn: Date | null;
@@ -200,11 +213,19 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       fechaMensaje?: Date;
     }[];
   }): ConversacionResumen {
+    const etiqueta = etiquetaContactoWhatsApp({
+      nombre: c.nombreContacto,
+      username: c.username,
+      waId: c.waId,
+      bsuid: c.bsuid,
+    });
     return {
       id: c.id,
       waId: c.waId,
+      bsuid: c.bsuid,
+      username: c.username,
       nombreContacto: c.nombreContacto,
-      lead: mapearLead(c.lead, c.waId),
+      lead: mapearLead(c.lead, etiqueta),
       ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
       ventanaExpiraEn: c.ventanaExpiraEn,
       noLeidos: c.noLeidos,
@@ -402,37 +423,93 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async findOCrearConversacion(input: {
     organizacionId: string;
     whatsappConexionId: string;
-    waId: string;
+    waId?: string | null;
+    bsuid?: string | null;
+    username?: string | null;
     nombreContacto?: string;
     leadIdConocido?: string;
   }): Promise<{ id: string; esNueva: boolean }> {
-    const existenteExacto = await this.prisma.whatsappConversacion.findUnique({
-      where: {
-        organizacionId_waId: {
-          organizacionId: input.organizacionId,
-          waId: input.waId,
-        },
-      },
-    });
-    // Ecos de coexistencia a veces traen `to` con '+' u otro formato; el
-    // chat ya existe con el wa_id del webhook entrante. Emparejar por sufijo.
-    const existente =
-      existenteExacto ??
-      (ultimosDigitos(input.waId)
-        ? await this.prisma.whatsappConversacion.findFirst({
-            where: {
+    const waId = input.waId?.replace(/\D/g, '') || null;
+    const bsuid = input.bsuid?.trim() || null;
+    const username = input.username?.trim() || null;
+
+    if (!waId && !bsuid) {
+      throw new Error(
+        'findOCrearConversacion requiere waId o bsuid del contacto WhatsApp',
+      );
+    }
+
+    let existente:
+      | {
+          id: string;
+          leadId: string | null;
+          waId: string | null;
+          bsuid: string | null;
+          username: string | null;
+          nombreContacto: string | null;
+        }
+      | null = null;
+
+    if (waId) {
+      const existenteExacto =
+        await this.prisma.whatsappConversacion.findUnique({
+          where: {
+            organizacionId_waId: {
               organizacionId: input.organizacionId,
-              estado: 1,
-              waId: { endsWith: ultimosDigitos(input.waId) },
+              waId,
             },
-            orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
-          })
-        : null);
+          },
+        });
+      // Ecos de coexistencia a veces traen `to` con '+' u otro formato; el
+      // chat ya existe con el wa_id del webhook entrante. Emparejar por sufijo.
+      existente =
+        existenteExacto ??
+        (ultimosDigitos(waId)
+          ? await this.prisma.whatsappConversacion.findFirst({
+              where: {
+                organizacionId: input.organizacionId,
+                estado: 1,
+                waId: { endsWith: ultimosDigitos(waId) },
+              },
+              orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+            })
+          : null);
+    }
+
+    // Si no había wa_id (o no matcheó) y hay BSUID, buscar por identidad estable.
+    // Cubre el caso: chat creado solo con BSUID y luego Meta manda también teléfono.
+    if (!existente && bsuid) {
+      existente = await this.prisma.whatsappConversacion.findFirst({
+        where: {
+          organizacionId: input.organizacionId,
+          bsuid,
+          estado: 1,
+        },
+        orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+      });
+    }
+
     if (existente) {
+      const data: {
+        leadId?: string;
+        waId?: string;
+        bsuid?: string;
+        username?: string;
+        nombreContacto?: string;
+      } = {};
       if (input.leadIdConocido && !existente.leadId) {
+        data.leadId = input.leadIdConocido;
+      }
+      if (waId && !existente.waId) data.waId = waId;
+      if (bsuid && !existente.bsuid) data.bsuid = bsuid;
+      if (username && !existente.username) data.username = username;
+      if (input.nombreContacto && !existente.nombreContacto) {
+        data.nombreContacto = input.nombreContacto;
+      }
+      if (Object.keys(data).length > 0) {
         await this.prisma.whatsappConversacion.update({
           where: { id: existente.id },
-          data: { leadId: input.leadIdConocido },
+          data,
         });
       }
       return { id: existente.id, esNueva: false };
@@ -442,8 +519,8 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     // directo — evita el riesgo de que la heurística de sufijo empareje con
     // otro lead cuyo teléfono coincida por casualidad.
     let leadId = input.leadIdConocido;
-    if (!leadId) {
-      const sufijo = ultimosDigitos(input.waId);
+    if (!leadId && waId) {
+      const sufijo = ultimosDigitos(waId);
       const leadCandidato = sufijo
         ? await this.prisma.lead.findFirst({
             where: {
@@ -461,7 +538,9 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       data: {
         organizacionId: input.organizacionId,
         whatsappConexionId: input.whatsappConexionId,
-        waId: input.waId,
+        waId,
+        bsuid,
+        username,
         nombreContacto: input.nombreContacto,
         leadId,
       },

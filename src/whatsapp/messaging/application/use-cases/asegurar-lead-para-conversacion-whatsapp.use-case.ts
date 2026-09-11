@@ -4,6 +4,7 @@ import { LEADS_GESTION_REPOSITORY } from '../../../../leads/application/ports/le
 import type { LeadsGestionRepository } from '../../../../leads/application/ports/leads-gestion.repository.port';
 import { AutoAsignarLeadUseCase } from '../../../../leads/application/use-cases/auto-asignar-lead.use-case';
 import { CrearNotificacionUseCase } from '../../../../notifications/application/use-cases/crear-notificacion.use-case';
+import { etiquetaContactoWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 
@@ -16,7 +17,7 @@ export interface ResultadoAsegurarLeadWhatsApp {
 
 /**
  * Garantiza que una conversación WA tenga lead vinculado:
- * match por teléfono → crear lead sin asignar → vincular → AutoAsignar (si pool ON).
+ * match por teléfono (si hay) → crear lead sin asignar → vincular → AutoAsignar (si pool ON).
  * Usado solo desde el inbound de mensajes (sin actor humano).
  *
  * Si el chat ya tiene lead pero sigue sin dueño, reintenta auto-asignación
@@ -54,6 +55,13 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       };
     }
 
+    const etiqueta = etiquetaContactoWhatsApp({
+      nombre: conversacion.nombreContacto,
+      username: conversacion.username,
+      waId: conversacion.waId,
+      bsuid: conversacion.bsuid,
+    });
+
     if (conversacion.lead?.asignadoUsuarioId) {
       return {
         leadId: conversacion.lead.id,
@@ -68,23 +76,34 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
         organizacionId,
         conversacionId,
         conversacion.lead.id,
-        conversacion.nombreContacto,
-        conversacion.waId,
+        etiqueta,
         false,
       );
     }
 
     let creado = false;
-    let leadId = await this.leadsGestion.buscarIdPorTelefonoSufijo(
-      organizacionId,
-      conversacion.waId,
-    );
+    let leadId: string | null = null;
+
+    if (conversacion.waId) {
+      leadId = await this.leadsGestion.buscarIdPorTelefonoSufijo(
+        organizacionId,
+        conversacion.waId,
+      );
+    }
 
     if (!leadId) {
-      const telefono = conversacion.waId.startsWith('+')
-        ? conversacion.waId
-        : `+${conversacion.waId}`;
-      const nombre = conversacion.nombreContacto?.trim() || null;
+      const telefono = conversacion.waId
+        ? conversacion.waId.startsWith('+')
+          ? conversacion.waId
+          : `+${conversacion.waId}`
+        : null;
+      const nombre =
+        conversacion.nombreContacto?.trim() ||
+        (conversacion.username
+          ? conversacion.username.startsWith('@')
+            ? conversacion.username
+            : `@${conversacion.username}`
+          : null);
       const idExterno = `wa:${conversacionId}`;
 
       const alta = await this.leadsGestion.crearDesdeWhatsApp({
@@ -98,6 +117,8 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
           origen: 'whatsapp_chat',
           conversacionId,
           waId: conversacion.waId,
+          bsuid: conversacion.bsuid,
+          username: conversacion.username,
           automatico: true,
         },
         usuarioId: null,
@@ -107,7 +128,7 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       leadId = alta.id;
       creado = alta.creado;
 
-      if (!creado) {
+      if (!creado && conversacion.waId) {
         const porTelefono = await this.leadsGestion.buscarIdPorTelefonoSufijo(
           organizacionId,
           conversacion.waId,
@@ -126,8 +147,7 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       organizacionId,
       conversacionId,
       leadId,
-      conversacion.nombreContacto,
-      conversacion.waId,
+      etiqueta,
       creado,
     );
   }
@@ -136,8 +156,7 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
     organizacionId: string,
     conversacionId: string,
     leadId: string,
-    nombreContacto: string | null | undefined,
-    waId: string,
+    nombreLead: string,
     creado: boolean,
   ): Promise<ResultadoAsegurarLeadWhatsApp> {
     let asignadoUsuarioId: string | null = null;
@@ -157,8 +176,6 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
     }
 
     if (creado || fueAutoAsignado) {
-      const nombreLead =
-        nombreContacto?.trim() || (waId ? `+${waId}` : 'WhatsApp');
       void this.crearNotificacion
         .execute({
           organizacionId,

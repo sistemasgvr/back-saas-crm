@@ -16,6 +16,7 @@ import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaci
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 export interface EnviarUbicacionInput {
   latitud: number;
@@ -88,6 +89,13 @@ export class EnviarUbicacionWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
+    const para = idParaEnvioWhatsApp(conversacion);
+    if (!para) {
+      throw new BadRequestException(
+        'Esta conversación no tiene teléfono ni BSUID para enviar mensajes',
+      );
+    }
+
     let respondeAWamid: string | undefined;
     if (input.respondeAMensajeId) {
       const citado = await this.conversaciones.buscarMensajePorId(
@@ -105,7 +113,7 @@ export class EnviarUbicacionWhatsAppUseCase {
     const resultado = await this.graph.enviarUbicacionWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
-      conversacion.waId,
+      para,
       {
         latitud: input.latitud,
         longitud: input.longitud,

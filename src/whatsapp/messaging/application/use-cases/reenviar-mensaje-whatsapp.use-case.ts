@@ -25,6 +25,7 @@ import type {
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { categoriaMediaPorMimeType } from '../limites-media-whatsapp';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 /** Tope alineado con el multi-forward de la app WhatsApp (~30). */
 export const MAX_MENSAJES_REENVIAR = 30;
@@ -165,6 +166,19 @@ export class ReenviarMensajeWhatsAppUseCase {
         continue;
       }
 
+      const para = idParaEnvioWhatsApp(destino);
+      if (!para) {
+        for (const mensajeId of mensajeIds) {
+          fallidos.push({
+            conversacionDestinoId: destinoId,
+            mensajeId,
+            error:
+              'Esta conversación no tiene teléfono ni BSUID para enviar mensajes',
+          });
+        }
+        continue;
+      }
+
       for (const mensajeId of mensajeIds) {
         try {
           await this.reenviarUno(
@@ -172,7 +186,7 @@ export class ReenviarMensajeWhatsAppUseCase {
             conversacionOrigenId,
             mensajeId,
             destinoId,
-            destino.waId,
+            para,
             phoneNumberId,
             accessToken,
             ctx,

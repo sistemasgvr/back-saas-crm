@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -15,6 +16,7 @@ import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaci
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 /** PATCH .../messages/:mensajeId/reaction — reacciona (o saca la reacción,
  * con emoji vacío) a un mensaje ya enviado, mismo criterio de dueño/admin
@@ -81,10 +83,17 @@ export class EnviarReaccionWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
+    const para = idParaEnvioWhatsApp(conversacion);
+    if (!para) {
+      throw new BadRequestException(
+        'Esta conversación no tiene teléfono ni BSUID para enviar mensajes',
+      );
+    }
+
     await this.graph.enviarReaccionWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
-      conversacion.waId,
+      para,
       mensaje.wamid,
       emoji,
     );

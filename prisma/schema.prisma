@@ -970,10 +970,17 @@ model WhatsappConversacion {
   leadId             String? @map("lead_id") @db.Uuid
 
   /**
-   * Teléfono E.164 sin '+' — mismo formato que usa el payload de Meta. Es la
-   * clave real de una conversación: uno por (org, wa_id), con o sin lead.
+   * Teléfono E.164 sin '+' cuando Meta lo incluye. Con username privacy
+   * puede ser null — la identidad estable pasa a `bsuid`.
    */
-  waId            String    @map("wa_id") @db.VarChar(40)
+  waId            String?   @map("wa_id") @db.VarChar(40)
+  /**
+   * Business-scoped user ID (Meta). Siempre presente en webhooks modernos;
+   * se usa para chatear cuando no hay wa_id (`recipient` en la API).
+   */
+  bsuid           String?   @map("bsuid") @db.VarChar(128)
+  /** Username de WhatsApp del contacto (opcional; cambia con el tiempo). */
+  username        String?   @map("username") @db.VarChar(100)
   nombreContacto  String?   @map("nombre_contacto") @db.VarChar(200)
   ultimoMensajeEn DateTime? @map("ultimo_mensaje_en") @db.Timestamptz
   /**
@@ -1003,6 +1010,7 @@ model WhatsappConversacion {
   @@index([leadId])
   @@index([whatsappConexionId])
   @@index([ultimoMensajeEn])
+  @@index([bsuid])
   @@map("whatsapp_conversaciones")
 }
 

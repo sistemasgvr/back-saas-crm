@@ -9,7 +9,12 @@ export interface WhatsappWebhookPayload {
       field?: string;
       value?: {
         metadata?: { phone_number_id?: string };
-        contacts?: { wa_id?: string; profile?: { name?: string } }[];
+        contacts?: {
+          wa_id?: string;
+          /** Business-scoped user ID (Meta usernames / BSUID). */
+          user_id?: string;
+          profile?: { name?: string; username?: string };
+        }[];
         messages?: MensajeMetaCrudo[];
         /** Coexistencia: mensajes enviados desde la app WhatsApp Business
          * (celular / dispositivo vinculado). El contacto es `to`, no `from`.
@@ -19,6 +24,8 @@ export interface WhatsappWebhookPayload {
           id?: string;
           status?: string;
           timestamp?: string;
+          recipient_id?: string;
+          recipient_user_id?: string;
         }[];
       };
     }[];
@@ -28,6 +35,10 @@ export interface WhatsappWebhookPayload {
 /** Forma común de un mensaje en webhooks `messages` / `smb_message_echoes`. */
 export interface MensajeMetaCrudo {
   from?: string;
+  /** BSUID del contacto (Meta usernames) — presente aunque falte `from`. */
+  from_user_id?: string;
+  to?: string;
+  to_user_id?: string;
   id?: string;
   timestamp?: string;
   type?: string;
@@ -136,7 +147,11 @@ export interface ContactoMensaje {
 
 export interface EventoMensajeWhatsApp {
   phoneNumberId: string;
-  waId: string;
+  /** Teléfono sin '+' — null si Meta omitió wa_id (username privacy). */
+  waId: string | null;
+  /** Business-scoped user ID — identidad estable cuando no hay teléfono. */
+  bsuid: string | null;
+  username?: string | null;
   nombreContacto?: string;
   wamid: string;
   timestamp: Date;
@@ -245,12 +260,17 @@ type AcumuladoresEventos = {
 function clasificarMensajeMeta(
   phoneNumberId: string,
   mensaje: MensajeMetaCrudo,
-  waId: string,
-  nombreContacto: string | undefined,
+  identidad: {
+    waId: string | null;
+    bsuid: string | null;
+    username?: string | null;
+    nombreContacto?: string;
+  },
   destino: 'mensajes' | 'ecos',
   out: AcumuladoresEventos,
 ): void {
   if (!mensaje.id) return;
+  if (!identidad.waId && !identidad.bsuid) return;
 
   if (mensaje.type === 'reaction') {
     if (mensaje.reaction?.message_id) {
@@ -316,8 +336,10 @@ function clasificarMensajeMeta(
 
   const evento: EventoMensajeWhatsApp = {
     phoneNumberId,
-    waId,
-    nombreContacto,
+    waId: identidad.waId,
+    bsuid: identidad.bsuid,
+    username: identidad.username ?? null,
+    nombreContacto: identidad.nombreContacto,
     wamid: mensaje.id,
     timestamp: timestampADate(mensaje.timestamp),
     tipo:
@@ -356,6 +378,45 @@ function clasificarMensajeMeta(
   out[destino].push(evento);
 }
 
+type ContactoWebhookMeta = {
+  wa_id?: string;
+  user_id?: string;
+  profile?: { name?: string; username?: string };
+};
+
+function resolverIdentidadEntrante(
+  mensaje: MensajeMetaCrudo,
+  contacts: ContactoWebhookMeta[],
+): {
+  waId: string | null;
+  bsuid: string | null;
+  username: string | null;
+  nombreContacto?: string;
+} {
+  const bsuid =
+    mensaje.from_user_id?.trim() ||
+    contacts.find((c) => c.user_id)?.user_id?.trim() ||
+    null;
+
+  const waCrudo =
+    mensaje.from?.trim() ||
+    contacts.find((c) => c.wa_id)?.wa_id?.trim() ||
+    null;
+  const waId = waCrudo ? normalizarWaId(waCrudo) || waCrudo : null;
+
+  const perfil =
+    contacts.find((c) =>
+      bsuid ? c.user_id === bsuid : waCrudo ? c.wa_id === waCrudo : false,
+    ) ?? contacts[0];
+
+  return {
+    waId: waId && waId.length > 0 ? waId : null,
+    bsuid,
+    username: perfil?.profile?.username?.trim() || null,
+    nombreContacto: perfil?.profile?.name?.trim() || undefined,
+  };
+}
+
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   mensajes: EventoMensajeWhatsApp[];
   /** Enviados desde la app WhatsApp Business (coexistencia). */
@@ -379,20 +440,16 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
       if (!phoneNumberId) continue;
 
       if (change.field === 'messages') {
-        const contactoPorWaId = new Map(
-          (value?.contacts ?? []).map((c) => [c.wa_id, c.profile?.name]),
-        );
+        const contacts = value?.contacts ?? [];
 
         for (const mensaje of value?.messages ?? []) {
-          if (!mensaje.from) continue;
-          // Entrante: conservar `from` tal cual lo manda Meta (wa_id estable
-          // de la conversación). No normalizar acá — un cambio de formato
-          // crearía un chat duplicado.
+          // Meta usernames: puede venir solo from_user_id (sin `from`/wa_id).
+          const identidad = resolverIdentidadEntrante(mensaje, contacts);
+          if (!identidad.waId && !identidad.bsuid) continue;
           clasificarMensajeMeta(
             phoneNumberId,
             mensaje,
-            mensaje.from,
-            contactoPorWaId.get(mensaje.from),
+            identidad,
             'mensajes',
             out,
           );
@@ -412,12 +469,18 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
 
       if (change.field === 'smb_message_echoes') {
         for (const eco of value?.message_echoes ?? []) {
-          if (!eco.to) continue;
+          const waId = eco.to ? normalizarWaId(eco.to) : null;
+          const bsuid = eco.to_user_id?.trim() || null;
+          if (!waId && !bsuid) continue;
           clasificarMensajeMeta(
             phoneNumberId,
             eco,
-            normalizarWaId(eco.to),
-            undefined,
+            {
+              waId: waId || null,
+              bsuid,
+              username: null,
+              nombreContacto: undefined,
+            },
             'ecos',
             out,
           );

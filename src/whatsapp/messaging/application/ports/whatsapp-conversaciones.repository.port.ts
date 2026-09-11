@@ -25,7 +25,11 @@ export interface LeadEnConversacion extends ReferenciaNombrada {
 
 export interface ConversacionResumen {
   id: string;
-  waId: string;
+  /** Teléfono E.164 sin '+' — null si Meta omitió wa_id (username privacy). */
+  waId: string | null;
+  /** Business-scoped user ID — identidad estable cuando no hay teléfono. */
+  bsuid: string | null;
+  username: string | null;
   nombreContacto: string | null;
   lead: LeadEnConversacion | null;
   ultimoMensajeEn: Date | null;
@@ -252,15 +256,17 @@ export interface WhatsappConversacionesRepository {
     leadId: string,
   ): Promise<boolean>;
 
-  /** Crea la conversación si no existe (por wa_id). Si `leadIdConocido` viene
-   * dado (CTA "Iniciar chat" desde una ficha de lead puntual), se vincula
-   * directo a ese lead; si no, intenta emparejar por teléfono (heurística,
-   * puede fallar). Devuelve si ya existía (para no re-vincular lead en cada
-   * mensaje si el usuario la desvinculó a mano después). */
+  /** Crea la conversación si no existe (por wa_id o bsuid). Si `leadIdConocido`
+   * viene dado (CTA "Iniciar chat" desde una ficha de lead puntual), se vincula
+   * directo a ese lead; si no y hay waId, intenta emparejar por teléfono
+   * (heurística, puede fallar). Devuelve si ya existía (para no re-vincular
+   * lead en cada mensaje si el usuario la desvinculó a mano después). */
   findOCrearConversacion(input: {
     organizacionId: string;
     whatsappConexionId: string;
-    waId: string;
+    waId?: string | null;
+    bsuid?: string | null;
+    username?: string | null;
     nombreContacto?: string;
     leadIdConocido?: string;
   }): Promise<{ id: string; esNueva: boolean }>;

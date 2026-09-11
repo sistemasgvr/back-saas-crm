@@ -19,6 +19,7 @@ import {
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 const MAX_BOTONES = 3;
 const MAX_FILAS_TOTAL = 10;
@@ -93,6 +94,13 @@ export class EnviarInteractivoWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
+    const para = idParaEnvioWhatsApp(conversacion);
+    if (!para) {
+      throw new BadRequestException(
+        'Esta conversación no tiene teléfono ni BSUID para enviar mensajes',
+      );
+    }
+
     let respondeAWamid: string | undefined;
     if (input.respondeAMensajeId) {
       const citado = await this.conversaciones.buscarMensajePorId(
@@ -121,7 +129,7 @@ export class EnviarInteractivoWhatsAppUseCase {
     const resultado = await this.graph.enviarInteractivoWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
-      conversacion.waId,
+      para,
       interactivo,
       respondeAWamid,
     );

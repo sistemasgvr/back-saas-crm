@@ -17,6 +17,7 @@ import type { WhatsappConversacionesRepository } from '../ports/whatsapp-convers
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import type { ParametroPlantilla } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 export interface EnviarMensajeInput {
   texto?: string;
@@ -89,6 +90,13 @@ export class EnviarMensajeWhatsAppUseCase {
     }
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
+    const para = idParaEnvioWhatsApp(conversacion);
+    if (!para) {
+      throw new BadRequestException(
+        'Esta conversación no tiene teléfono ni BSUID para enviar mensajes',
+      );
+    }
+
     const dentroDeVentana =
       conversacion.ventanaExpiraEn !== null &&
       conversacion.ventanaExpiraEn.getTime() > Date.now();
@@ -118,7 +126,7 @@ export class EnviarMensajeWhatsAppUseCase {
       resultado = await this.graph.enviarMensajeTextoWhatsApp(
         conexionActiva.phoneNumberId,
         accessToken,
-        conversacion.waId,
+        para,
         input.texto,
         respondeAWamid,
       );
@@ -132,7 +140,7 @@ export class EnviarMensajeWhatsAppUseCase {
       resultado = await this.graph.enviarMensajePlantillaWhatsApp(
         conexionActiva.phoneNumberId,
         accessToken,
-        conversacion.waId,
+        para,
         input.plantillaNombre,
         input.plantillaIdioma,
         input.parametros,
