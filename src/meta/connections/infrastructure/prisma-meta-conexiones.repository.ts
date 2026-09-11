@@ -33,6 +33,12 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     });
   }
 
+  findPorMetaUserId(metaUserId: string) {
+    return this.prisma.metaConexion.findFirst({
+      where: { metaUserId, estado: 1 },
+    });
+  }
+
   async guardarCredencialesApp(input: GuardarCredencialesInput) {
     const existente = await this.findActivaPorOrganizacion(
       input.organizacionId,

@@ -521,9 +521,13 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     // Lista de chats ordena/muestra por ultimoMensajeEn. Varios envíos
     // salientes del CRM olvidaban llamar actualizarTrasSaliente — al
     // actualizar aquí el preview y la hora quedan alineados con el mensaje.
+    // Responder = ya se leyó el chat (mismo criterio que WhatsApp).
     await this.prisma.whatsappConversacion.update({
       where: { id: input.whatsappConversacionId },
-      data: { ultimoMensajeEn: input.fechaMensaje },
+      data: {
+        ultimoMensajeEn: input.fechaMensaje,
+        ...(input.direccion === 'saliente' ? { noLeidos: 0 } : {}),
+      },
     });
 
     return { id: mensaje.id, creado: true };
@@ -572,7 +576,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   ): Promise<void> {
     await this.prisma.whatsappConversacion.update({
       where: { id: conversacionId },
-      data: { ultimoMensajeEn: fechaMensaje },
+      data: { ultimoMensajeEn: fechaMensaje, noLeidos: 0 },
     });
   }
 

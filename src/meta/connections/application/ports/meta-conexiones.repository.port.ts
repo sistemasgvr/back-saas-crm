@@ -26,6 +26,7 @@ export interface MetaConexionesRepository {
   findActivaPorPageId(pageId: string): Promise<MetaConexion | null>;
   findActivaPorWebhookVerifyToken(token: string): Promise<MetaConexion | null>;
   listActivasConAppSecret(): Promise<MetaConexion[]>;
+  findPorMetaUserId(metaUserId: string): Promise<MetaConexion | null>;
   /** Crea la fila si no existe, o reemplaza App ID/Secret si ya existía (rotación de credenciales). */
   guardarCredencialesApp(
     input: GuardarCredencialesInput,

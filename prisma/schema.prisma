@@ -113,11 +113,12 @@ model Organizacion {
   metaCuentasPublicitarias MetaCuentaPublicitaria[]
   metaFormularios          MetaFormulario[]
   metaInsightsDiarios      MetaInsightDiario[]
+  metaSolicitudesEliminacion MetaSolicitudEliminacionDatos[]
   campanas                 Campana[]
   leads                    Lead[]
   inmuebles                Inmueble[]
   leadAutoAsignacionConfig LeadAutoAsignacionConfig?
-  leadAutoAsignacionQueue  LeadAutoAsignacionQueue[]
+  leadAutoAsignacionQueue   LeadAutoAsignacionQueue[]
   notificaciones           Notificacion[]
   notificacionesUsuario    NotificacionUsuario[]
   suscripcionesPush        SuscripcionPush[]
@@ -587,6 +588,7 @@ model MetaConexion {
   paginas              MetaPagina[]
   cuentasPublicitarias MetaCuentaPublicitaria[]
   whatsappConexiones   WhatsappConexion[]
+  solicitudesEliminacion MetaSolicitudEliminacionDatos[]
 
   // page_id único entre conexiones activas: índice parcial en migración
   // 20260817223000_meta_conexiones_page_id_unique (Prisma DSL no soporta partial unique).
@@ -597,7 +599,34 @@ model MetaConexion {
   @@index([pageId])
   @@index([adAccountId])
   @@index([estado])
+  @@index([metaUserId])
   @@map("meta_conexiones")
+}
+
+/**
+ * Solicitudes de eliminación/deautorización enviadas por Meta
+ * (Data Deletion Callback / Deauthorize Callback) — App Review.
+ */
+model MetaSolicitudEliminacionDatos {
+  id               String    @id @default(uuid()) @db.Uuid
+  confirmationCode String    @unique @map("confirmation_code") @db.VarChar(64)
+  metaUserId       String    @map("meta_user_id") @db.VarChar(64)
+  organizacionId   String?   @map("organizacion_id") @db.Uuid
+  metaConexionId   String?   @map("meta_conexion_id") @db.Uuid
+  /** DATA_DELETION | DEAUTHORIZE */
+  tipo             String    @default("DATA_DELETION") @db.VarChar(32)
+  /** PENDIENTE | PROCESADA | NO_ENCONTRADA */
+  estado           String    @default("PENDIENTE") @db.VarChar(32)
+  detalle          String?
+  fechaCreacion    DateTime  @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaProcesada   DateTime? @map("fecha_procesada") @db.Timestamptz
+
+  organizacion Organizacion? @relation(fields: [organizacionId], references: [id])
+  metaConexion MetaConexion? @relation(fields: [metaConexionId], references: [id])
+
+  @@index([metaUserId])
+  @@index([estado])
+  @@map("meta_solicitudes_eliminacion_datos")
 }
 
 model MetaPagina {
