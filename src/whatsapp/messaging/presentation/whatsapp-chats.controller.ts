@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -65,6 +66,8 @@ import {
 import { BloquearContactoWhatsAppUseCase } from '../application/use-cases/bloquear-contacto-whatsapp.use-case';
 import { EliminarMensajeWhatsAppCrmUseCase } from '../application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
 import { ReenviarMensajeWhatsAppUseCase } from '../application/use-cases/reenviar-mensaje-whatsapp.use-case';
+import { RenombrarConversacionWhatsAppUseCase } from '../application/use-cases/renombrar-conversacion-whatsapp.use-case';
+import { RenombrarConversacionDto } from './dto/renombrar-conversacion.dto';
 
 // El límite real por tipo lo valida validarArchivoWhatsApp() en el use-case
 // (5MB imagen / 16MB audio-video / 100MB documento) — este es solo el tope
@@ -96,6 +99,7 @@ export class WhatsappChatsController {
     private readonly bloquearContacto: BloquearContactoWhatsAppUseCase,
     private readonly eliminarMensajeCrm: EliminarMensajeWhatsAppCrmUseCase,
     private readonly reenviarMensaje: ReenviarMensajeWhatsAppUseCase,
+    private readonly renombrarConversacion: RenombrarConversacionWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -517,6 +521,30 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  @Patch(':id/nombre')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Renombrar contacto del chat',
+    description:
+      'Actualiza nombreContacto del chat y, si hay lead vinculado, también lead.nombre.',
+  })
+  @ApiResponse({ status: 204, description: 'Nombre actualizado.' })
+  @ApiResponse({ status: 400, description: 'Nombre vacío o demasiado largo.' })
+  @ApiResponse({ status: 403, description: 'Sin permiso de escritura en el chat.' })
+  @ApiResponse({ status: 404, description: 'Conversación no encontrada.' })
+  renombrar(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RenombrarConversacionDto,
+  ) {
+    return this.renombrarConversacion.execute(
+      ctx.organizacionId!,
+      id,
+      dto.nombre,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+    );
   }
 
   @Delete(':id/block')

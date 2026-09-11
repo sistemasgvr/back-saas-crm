@@ -286,7 +286,14 @@ export interface WhatsappConversacionesRepository {
   actualizarTrasEntrante(
     conversacionId: string,
     fechaMensaje: Date,
-    nombreContacto?: string,
+  ): Promise<void>;
+
+  /** Renombra el chat (nombreContacto) y, si tiene lead vinculado, también
+   * lead.nombre — misma transacción para que ficha y header queden al día. */
+  renombrar(
+    organizacionId: string,
+    conversacionId: string,
+    nombre: string,
   ): Promise<void>;
 
   /** Mensaje saliente (CRM o eco desde la app Business) — actualiza orden

@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsIn,
   IsObject,
@@ -7,12 +8,26 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  MinLength,
   ValidateIf,
 } from 'class-validator';
 import { TIPOS_LEAD_INMOBILIARIA } from '../../../shared/domain/tipos-lead-inmobiliaria';
 import { TODOS_LOS_MOTIVOS } from '../../../shared/domain/pipeline-inmobiliaria';
 
 export class ActualizarGestionLeadDto {
+  @ApiPropertyOptional({
+    maxLength: 200,
+    description: 'Nombre visible del lead en el CRM (y en chats WhatsApp vinculados).',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  nombre?: string;
+
   @ApiPropertyOptional({
     enum: TIPOS_LEAD_INMOBILIARIA,
     description:

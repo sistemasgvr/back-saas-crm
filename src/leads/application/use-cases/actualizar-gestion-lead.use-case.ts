@@ -65,6 +65,8 @@ export interface ActualizarGestionInput {
   metadata?: Record<string, unknown> | null;
   /** null = quitar vínculo con el catálogo. */
   inmuebleInteresId?: string | null;
+  /** Nombre visible del lead (también sincroniza chats WhatsApp vinculados). */
+  nombre?: string;
 }
 
 function motivosValidosParaEstado(
@@ -137,6 +139,19 @@ export class ActualizarGestionLeadUseCase {
       if (!tomado) {
         throw new ConflictException(
           'Otro asesor tomó este lead mientras lo gestionabas',
+        );
+      }
+    }
+
+    let nombreTrim: string | undefined;
+    if (input.nombre !== undefined) {
+      nombreTrim = input.nombre.trim();
+      if (nombreTrim.length < 1) {
+        throw new BadRequestException('El nombre no puede estar vacío');
+      }
+      if (nombreTrim.length > 200) {
+        throw new BadRequestException(
+          'El nombre no puede superar los 200 caracteres',
         );
       }
     }
@@ -407,6 +422,7 @@ export class ActualizarGestionLeadUseCase {
         motivoCierre: input.motivoCierre,
         notaCierre: input.notaCierre,
         inmuebleInteresId: input.inmuebleInteresId,
+        nombre: nombreTrim,
       },
       ctx.usuarioId,
       huboCambioDeEstado

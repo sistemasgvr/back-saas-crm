@@ -633,19 +633,48 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async actualizarTrasEntrante(
     conversacionId: string,
     fechaMensaje: Date,
-    nombreContacto?: string,
   ): Promise<void> {
     const ventanaExpiraEn = new Date(
       fechaMensaje.getTime() + VENTANA_HORAS * 60 * 60 * 1000,
     );
+    // No pisar nombreContacto con el profile name de Meta — el CRM es la
+    // fuente de verdad una vez que el chat existe (findOCrearConversacion
+    // solo rellena si estaba vacío).
     await this.prisma.whatsappConversacion.update({
       where: { id: conversacionId },
       data: {
         ultimoMensajeEn: fechaMensaje,
         ventanaExpiraEn,
         noLeidos: { increment: 1 },
-        ...(nombreContacto ? { nombreContacto } : {}),
       },
+    });
+  }
+
+  async renombrar(
+    organizacionId: string,
+    conversacionId: string,
+    nombre: string,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const conversacion = await tx.whatsappConversacion.findFirst({
+        where: { id: conversacionId, organizacionId },
+        select: { leadId: true },
+      });
+      if (!conversacion) return;
+      await tx.whatsappConversacion.update({
+        where: { id: conversacionId },
+        data: { nombreContacto: nombre },
+      });
+      if (conversacion.leadId) {
+        await tx.lead.updateMany({
+          where: {
+            id: conversacion.leadId,
+            organizacionId,
+            estado: 1,
+          },
+          data: { nombre },
+        });
+      }
     });
   }
 

@@ -117,9 +117,17 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           ...(cambios.inmuebleInteresId !== undefined
             ? { inmuebleInteresId: cambios.inmuebleInteresId }
             : {}),
+          ...(cambios.nombre !== undefined ? { nombre: cambios.nombre } : {}),
           usuarioEdicion,
         },
       });
+
+      if (cambios.nombre !== undefined) {
+        await tx.whatsappConversacion.updateMany({
+          where: { leadId: id, organizacionId },
+          data: { nombreContacto: cambios.nombre },
+        });
+      }
 
       if (!historial) return;
 

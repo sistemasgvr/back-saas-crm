@@ -136,7 +136,6 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     await this.conversaciones.actualizarTrasEntrante(
       conversacionId,
       evento.timestamp,
-      evento.nombreContacto,
     );
 
     const conversacion = await this.conversaciones.findPorId(

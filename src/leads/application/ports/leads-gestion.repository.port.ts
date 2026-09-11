@@ -15,6 +15,8 @@ export interface CambiosGestionLead {
   notaCierre?: string | null;
   /** null = quitar vínculo con el catálogo. */
   inmuebleInteresId?: string | null;
+  /** Nombre visible del lead (también sincroniza chats WhatsApp vinculados). */
+  nombre?: string;
 }
 
 export interface RegistrarHistorialInput {
