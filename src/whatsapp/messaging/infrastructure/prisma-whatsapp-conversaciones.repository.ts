@@ -512,6 +512,20 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           data,
         });
       }
+      // Lead vacío + chat con nombre de perfil → copiar (no pisa CRM).
+      const nombreRelleno =
+        (data.nombreContacto ?? existente.nombreContacto)?.trim() || null;
+      if (existente.leadId && nombreRelleno) {
+        await this.prisma.lead.updateMany({
+          where: {
+            id: existente.leadId,
+            organizacionId: input.organizacionId,
+            estado: 1,
+            OR: [{ nombre: null }, { nombre: '' }],
+          },
+          data: { nombre: nombreRelleno },
+        });
+      }
       return { id: existente.id, esNueva: false };
     }
 
@@ -545,6 +559,18 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         leadId,
       },
     });
+    const nombreRelleno = input.nombreContacto?.trim() || null;
+    if (leadId && nombreRelleno) {
+      await this.prisma.lead.updateMany({
+        where: {
+          id: leadId,
+          organizacionId: input.organizacionId,
+          estado: 1,
+          OR: [{ nombre: null }, { nombre: '' }],
+        },
+        data: { nombre: nombreRelleno },
+      });
+    }
     return { id: conversacion.id, esNueva: true };
   }
 

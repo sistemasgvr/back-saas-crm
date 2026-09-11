@@ -62,7 +62,22 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       bsuid: conversacion.bsuid,
     });
 
+    const nombreParaLead =
+      conversacion.nombreContacto?.trim() ||
+      (conversacion.username
+        ? conversacion.username.startsWith('@')
+          ? conversacion.username
+          : `@${conversacion.username}`
+        : null);
+
     if (conversacion.lead?.asignadoUsuarioId) {
+      if (nombreParaLead) {
+        await this.leadsGestion.completarNombreSiVacio(
+          organizacionId,
+          conversacion.lead.id,
+          nombreParaLead,
+        );
+      }
       return {
         leadId: conversacion.lead.id,
         creado: false,
@@ -72,6 +87,13 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
     }
 
     if (conversacion.lead && !conversacion.lead.asignadoUsuarioId) {
+      if (nombreParaLead) {
+        await this.leadsGestion.completarNombreSiVacio(
+          organizacionId,
+          conversacion.lead.id,
+          nombreParaLead,
+        );
+      }
       return this.intentarAutoAsignarExistente(
         organizacionId,
         conversacionId,
@@ -97,19 +119,12 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
           ? conversacion.waId
           : `+${conversacion.waId}`
         : null;
-      const nombre =
-        conversacion.nombreContacto?.trim() ||
-        (conversacion.username
-          ? conversacion.username.startsWith('@')
-            ? conversacion.username
-            : `@${conversacion.username}`
-          : null);
       const idExterno = `wa:${conversacionId}`;
 
       const alta = await this.leadsGestion.crearDesdeWhatsApp({
         organizacionId,
         idExterno,
-        nombre,
+        nombre: nombreParaLead,
         email: null,
         telefono,
         tipoLead: null,
@@ -135,6 +150,14 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
         );
         if (porTelefono) leadId = porTelefono;
       }
+    }
+
+    if (nombreParaLead) {
+      await this.leadsGestion.completarNombreSiVacio(
+        organizacionId,
+        leadId,
+        nombreParaLead,
+      );
     }
 
     await this.conversaciones.asignarLeadSiLibre(

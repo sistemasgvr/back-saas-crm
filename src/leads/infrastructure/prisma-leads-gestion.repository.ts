@@ -403,4 +403,23 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     });
     return lead?.id ?? null;
   }
+
+  async completarNombreSiVacio(
+    organizacionId: string,
+    leadId: string,
+    nombre: string,
+  ): Promise<boolean> {
+    const limpio = nombre.trim();
+    if (!limpio) return false;
+    const result = await this.prisma.lead.updateMany({
+      where: {
+        id: leadId,
+        organizacionId,
+        estado: 1,
+        OR: [{ nombre: null }, { nombre: '' }],
+      },
+      data: { nombre: limpio },
+    });
+    return result.count > 0;
+  }
 }

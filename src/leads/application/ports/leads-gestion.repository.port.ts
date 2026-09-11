@@ -169,4 +169,14 @@ export interface LeadsGestionRepository {
     organizacionId: string,
     telefonoOWaId: string,
   ): Promise<string | null>;
+
+  /**
+   * Si el lead no tiene nombre, lo rellena desde el chat WA (no pisa un
+   * nombre ya guardado en el CRM).
+   */
+  completarNombreSiVacio(
+    organizacionId: string,
+    leadId: string,
+    nombre: string,
+  ): Promise<boolean>;
 }
