@@ -121,7 +121,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       },
       include: {
         lead: { select: LEAD_CON_INMUEBLE_SELECT },
-        mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
+        mensajes: {
+          orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
+          take: 1,
+        },
       },
       // Postgres pone los NULL primero en un ORDER BY ... DESC por defecto —
       // sin "nulls: 'last'" las conversaciones sin ningún mensaje todavía
@@ -190,7 +193,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       where: { id, organizacionId, estado: 1 },
       include: {
         lead: { select: LEAD_CON_INMUEBLE_SELECT },
-        mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
+        mensajes: {
+          orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
+          take: 1,
+        },
       },
     });
     if (!c) return null;
@@ -205,7 +211,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       where: { organizacionId, leadId, estado: 1 },
       include: {
         lead: { select: LEAD_CON_INMUEBLE_SELECT },
-        mensajes: { orderBy: { fechaMensaje: 'desc' }, take: 1 },
+        mensajes: {
+          orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
+          take: 1,
+        },
       },
       orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
     });
@@ -276,9 +285,12 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     whatsappConversacionId: string,
     limite: number,
   ): Promise<MensajeRow[]> {
-    const mensajes = await this.prisma.whatsappMensaje.findMany({
+    // Meta a veces marca varios mensajes con el mismo segundo (ecos /
+    // envíos en lote). Desempatar por fechaCreacion = orden de llegada real.
+    // Pedimos los más recientes y los devolvemos ascendente para el chat.
+    const recientes = await this.prisma.whatsappMensaje.findMany({
       where: { whatsappConversacionId },
-      orderBy: { fechaMensaje: 'asc' },
+      orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
       take: limite,
       include: {
         respondeA: {
@@ -293,6 +305,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         },
       },
     });
+    const mensajes = recientes.slice().reverse();
     return mensajes.map((m) => ({
       id: m.id,
       wamid: m.wamid,
@@ -411,7 +424,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   ): Promise<string | null> {
     const mensaje = await this.prisma.whatsappMensaje.findFirst({
       where: { whatsappConversacionId, direccion: 'entrante' },
-      orderBy: { fechaMensaje: 'desc' },
+      orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
       select: { wamid: true },
     });
     return mensaje?.wamid ?? null;
@@ -625,6 +638,13 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
     if (existente) return { id: existente.id, creado: false };
 
+    // Si Meta (o un lote local) repite el mismo segundo, desplazar +1ms para
+    // que el orden cronológico coincida con el de llegada/envío.
+    const fechaMensaje = await this.fechaMensajeSinColision(
+      input.whatsappConversacionId,
+      input.fechaMensaje,
+    );
+
     const mensaje = await this.prisma.whatsappMensaje.create({
       data: {
         organizacionId: input.organizacionId,
@@ -636,7 +656,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         plantillaNombre: input.plantillaNombre,
         estadoEntrega: input.estadoEntrega,
         datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
-        fechaMensaje: input.fechaMensaje,
+        fechaMensaje,
         usuarioCreacion: input.usuarioCreacion,
         mediaId: input.mediaId,
         mediaMimeType: input.mediaMimeType,
@@ -668,12 +688,32 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     await this.prisma.whatsappConversacion.update({
       where: { id: input.whatsappConversacionId },
       data: {
-        ultimoMensajeEn: input.fechaMensaje,
+        ultimoMensajeEn: fechaMensaje,
         ...(input.direccion === 'saliente' ? { noLeidos: 0 } : {}),
       },
     });
 
     return { id: mensaje.id, creado: true };
+  }
+
+  /** Evita empates de segundo (Meta / lotes): el nuevo mensaje queda justo después. */
+  private async fechaMensajeSinColision(
+    whatsappConversacionId: string,
+    fecha: Date,
+  ): Promise<Date> {
+    const segundoInicio = new Date(Math.floor(fecha.getTime() / 1000) * 1000);
+    const segundoFin = new Date(segundoInicio.getTime() + 1000);
+    const ultimoEnSegundo = await this.prisma.whatsappMensaje.findFirst({
+      where: {
+        whatsappConversacionId,
+        fechaMensaje: { gte: segundoInicio, lt: segundoFin },
+      },
+      orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
+      select: { fechaMensaje: true },
+    });
+    if (!ultimoEnSegundo) return fecha;
+    if (ultimoEnSegundo.fechaMensaje.getTime() < fecha.getTime()) return fecha;
+    return new Date(ultimoEnSegundo.fechaMensaje.getTime() + 1);
   }
 
   async obtenerMedia(
