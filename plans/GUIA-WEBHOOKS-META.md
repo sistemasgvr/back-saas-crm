@@ -88,10 +88,13 @@ Hazlo **después** de tener WABA + número en Business Manager y el módulo What
 1. Misma pantalla Webhooks → producto **WhatsApp Business Account**.
 2. Misma **Callback URL** y el **mismo verify token** (un solo endpoint sirve para Page y WABA).
 3. **Verificar y guardar**.
-4. Suscribir campos relevantes, como mínimo:
+4. Suscribir campos relevantes, como mínimo (coexistencia):
    - **`messages`** (mensajes entrantes / estados)
-   - **`smb_message_echoes`** (coexistencia: lo que mandan desde la app WhatsApp Business en el celular)
-   - Si aparecen: estados de entrega (`message_status` / similares según la UI actual de Meta)
+   - **`smb_message_echoes`** (lo que mandan desde la app WhatsApp Business en el celular)
+   - **`history`** (sync de historial de chat al onboardear coexistencia)
+   - **`smb_app_state_sync`** (sync de contactos de la app Business)
+
+   Nota: `POST /{wabaId}/subscribed_apps` desde el CRM solo vincula la app al WABA; **los fields se suscriben en este Dashboard**.
 
 ### Checklist WhatsApp
 
@@ -99,8 +102,10 @@ Hazlo **después** de tener WABA + número en Business Manager y el módulo What
 - [ ] Misma Callback URL + verify token
 - [ ] Verificar y guardar OK
 - [ ] Campo **`messages`** suscrito
-- [ ] Campo **`smb_message_echoes`** suscrito (si usan coexistencia / app móvil)
-- [ ] En CRM: `/settings/whatsapp` con número vinculado
+- [ ] Campo **`smb_message_echoes`** suscrito
+- [ ] Campo **`history`** suscrito
+- [ ] Campo **`smb_app_state_sync`** suscrito
+- [ ] En CRM: `/settings/whatsapp` con número vinculado (+ Re-suscribir / Verificar webhook)
 
 ---
 
@@ -120,7 +125,9 @@ Aunque Meta tenga la URL bien, el CRM enruta por página / WABA:
 
 1. Módulo `WHATSAPP` habilitado en la org.
 2. `/settings/whatsapp` → vincular número.
-3. Lead con teléfono → iniciar chat / plantilla → respuesta del cliente en `/chats`.
+3. **Re-suscribir webhook** / **Verificar** en la conexión (confirma app suscrita al WABA).
+4. En Meta Dashboard: fields `messages`, `smb_message_echoes`, `history`, `smb_app_state_sync`.
+5. Lead con teléfono → iniciar chat / plantilla → respuesta del cliente en `/chats`.
 
 ---
 
@@ -142,7 +149,7 @@ Aunque Meta tenga la URL bien, el CRM enruta por página / WABA:
 2. En Meta: **Page** → Verificar y guardar → suscribir **`leadgen`**.
 3. En CRM: conectar Meta + vincular página + Verificar en Meta.
 4. Lead de prueba → `/leads`.
-5. Más adelante: **WhatsApp Business Account** → `messages` → vincular número → `/chats`.
+5. Más adelante: **WhatsApp Business Account** → `messages`, `smb_message_echoes`, `history`, `smb_app_state_sync` → vincular número → `/chats`.
 
 ---
 

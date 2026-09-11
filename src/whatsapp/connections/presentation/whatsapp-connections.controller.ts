@@ -28,6 +28,8 @@ import { ListarNumerosVinculadosUseCase } from '../application/use-cases/listar-
 import { ListarNumerosDisponiblesUseCase } from '../application/use-cases/listar-numeros-disponibles.use-case';
 import { VincularNumeroUseCase } from '../application/use-cases/vincular-numero.use-case';
 import { DesvincularNumeroUseCase } from '../application/use-cases/desvincular-numero.use-case';
+import { ResuscribirWebhookWhatsappUseCase } from '../application/use-cases/resuscribir-webhook-whatsapp.use-case';
+import { VerificarSaludWebhookWhatsappUseCase } from '../application/use-cases/verificar-salud-webhook-whatsapp.use-case';
 import { VincularNumeroDto } from './dto/vincular-numero.dto';
 
 @ApiTags('WhatsApp Connections')
@@ -42,6 +44,8 @@ export class WhatsappConnectionsController {
     private readonly listarDisponibles: ListarNumerosDisponiblesUseCase,
     private readonly vincular: VincularNumeroUseCase,
     private readonly desvincular: DesvincularNumeroUseCase,
+    private readonly resuscribirWebhook: ResuscribirWebhookWhatsappUseCase,
+    private readonly verificarSalud: VerificarSaludWebhookWhatsappUseCase,
   ) {}
 
   @Get()
@@ -87,6 +91,60 @@ export class WhatsappConnectionsController {
       dto.phoneNumberId,
       dto.numeroDisplay,
       dto.nombreVerificado,
+      ctx.usuarioId,
+    );
+  }
+
+  @Post(':id/resync-webhook')
+  @ApiOperation({
+    summary: 'Resuscribir el webhook del WABA',
+    description:
+      'Vuelve a suscribir la app al WABA vía Graph y reporta campos visibles en subscribed_apps.',
+  })
+  @ApiResponse({ status: 200, description: 'Webhook resuscrito.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo WHATSAPP no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La conexión no existe o no pertenece a la organización.',
+  })
+  resyncWebhook(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.resuscribirWebhook.execute(
+      ctx.organizacionId!,
+      id,
+      ctx.usuarioId,
+    );
+  }
+
+  @Post(':id/verificar-webhook')
+  @ApiOperation({
+    summary: 'Verificar salud del webhook WhatsApp',
+    description:
+      'Consulta subscribed_apps del WABA y, si Graph expone campos, valida los de coexistencia.',
+  })
+  @ApiResponse({ status: 200, description: 'Resultado del chequeo de salud.' })
+  @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Rol insuficiente o módulo WHATSAPP no activo.',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'La conexión no existe o no pertenece a la organización.',
+  })
+  verificarWebhook(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.verificarSalud.execute(
+      ctx.organizacionId!,
+      id,
       ctx.usuarioId,
     );
   }

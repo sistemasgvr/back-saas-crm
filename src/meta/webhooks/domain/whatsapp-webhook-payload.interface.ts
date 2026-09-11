@@ -1,4 +1,7 @@
+import { Logger } from '@nestjs/common';
 import { extraerContenidoMensajeMeta } from './extraer-contenido-mensaje-meta';
+
+const logger = new Logger('WhatsappWebhookPayload');
 
 /** Payload de Meta para el objeto "whatsapp_business_account" — comparte el
  * mismo endpoint/firma que leadgen, se distingue por payload.object
@@ -10,7 +13,7 @@ export interface WhatsappWebhookPayload {
     changes?: {
       field?: string;
       value?: {
-        metadata?: { phone_number_id?: string };
+        metadata?: { phone_number_id?: string; display_phone_number?: string };
         contacts?: {
           wa_id?: string;
           /** Business-scoped user ID (Meta usernames / BSUID). */
@@ -29,6 +32,32 @@ export interface WhatsappWebhookPayload {
           recipient_id?: string;
           recipient_user_id?: string;
         }[];
+        /**
+         * Coexistencia: sync de historial (hasta ~180 días).
+         * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/history
+         */
+        history?: Array<{
+          metadata?: {
+            phase?: number;
+            chunk_order?: number;
+            progress?: number;
+          };
+          errors?: {
+            code?: number;
+            title?: string;
+            message?: string;
+            error_data?: { details?: string };
+          }[];
+          threads?: Array<{
+            id?: string;
+            context?: {
+              wa_id?: string;
+              user_id?: string;
+              username?: string;
+            };
+            messages?: MensajeMetaCrudo[];
+          }>;
+        }>;
       };
     }[];
   }[];
@@ -436,6 +465,125 @@ function resolverIdentidadEntrante(
   };
 }
 
+type ThreadHistorialMeta = {
+  id?: string;
+  context?: { wa_id?: string; user_id?: string; username?: string };
+};
+
+/**
+ * Historial de coexistencia: `to`/`to_user_id` marca eco explícito.
+ * Sin `to`, Meta suele omitirlo en mensajes del negocio — se compara `from`
+ * con el contacto del thread (id / context) para no clasificar ecos como
+ * entrantes.
+ */
+function resolverHistorialThread(
+  mensaje: MensajeMetaCrudo,
+  thread: ThreadHistorialMeta,
+): {
+  destino: 'mensajes' | 'ecos';
+  identidad: {
+    waId: string | null;
+    bsuid: string | null;
+    username: string | null;
+    nombreContacto?: string;
+  };
+} | null {
+  const username = thread.context?.username?.trim() || null;
+  const contactoWaCrudo =
+    thread.context?.wa_id?.trim() || thread.id?.trim() || null;
+  const contactoWa = contactoWaCrudo
+    ? normalizarWaId(contactoWaCrudo) || contactoWaCrudo
+    : null;
+  const contactoBsuid = thread.context?.user_id?.trim() || null;
+
+  if (mensaje.to || mensaje.to_user_id) {
+    const waId = mensaje.to
+      ? normalizarWaId(mensaje.to) || mensaje.to
+      : contactoWa;
+    const bsuid = mensaje.to_user_id?.trim() || contactoBsuid;
+    if (!waId && !bsuid) return null;
+    return {
+      destino: 'ecos',
+      identidad: { waId: waId || null, bsuid, username },
+    };
+  }
+
+  const fromWa = mensaje.from
+    ? normalizarWaId(mensaje.from) || mensaje.from
+    : null;
+  const fromBsuid = mensaje.from_user_id?.trim() || null;
+
+  const fromEsContacto =
+    (fromWa && contactoWa && fromWa === contactoWa) ||
+    (fromBsuid && contactoBsuid && fromBsuid === contactoBsuid);
+
+  if (fromEsContacto) {
+    return {
+      destino: 'mensajes',
+      identidad: {
+        waId: fromWa || contactoWa,
+        bsuid: fromBsuid || contactoBsuid,
+        username,
+      },
+    };
+  }
+
+  // `from` es el negocio (o no matchea el thread) → eco; identidad = contacto.
+  if (contactoWa || contactoBsuid) {
+    if (fromWa || fromBsuid) {
+      return {
+        destino: 'ecos',
+        identidad: {
+          waId: contactoWa,
+          bsuid: contactoBsuid,
+          username,
+        },
+      };
+    }
+  }
+
+  // Fallback: entrante con from o thread.context.
+  const waId = fromWa || contactoWa;
+  const bsuid = fromBsuid || contactoBsuid;
+  if (!waId && !bsuid) return null;
+  return {
+    destino: 'mensajes',
+    identidad: { waId, bsuid, username },
+  };
+}
+
+/** Placeholder de media en sync histórico — sin asset id hasta un webhook posterior. */
+function normalizarMensajeHistorial(
+  mensaje: MensajeMetaCrudo,
+): MensajeMetaCrudo {
+  if (mensaje.type !== 'media_placeholder') return mensaje;
+  return {
+    ...mensaje,
+    type: 'unsupported',
+    text: { body: 'Media histórico no disponible' },
+    unsupported: { type: 'media_placeholder' },
+  };
+}
+
+function procesarMensajesCampo(
+  phoneNumberId: string,
+  messages: MensajeMetaCrudo[],
+  contacts: ContactoWebhookMeta[],
+  out: AcumuladoresEventos,
+): void {
+  for (const mensaje of messages) {
+    const identidad = resolverIdentidadEntrante(mensaje, contacts);
+    if (!identidad.waId && !identidad.bsuid) continue;
+    clasificarMensajeMeta(
+      phoneNumberId,
+      normalizarMensajeHistorial(mensaje),
+      identidad,
+      'mensajes',
+      out,
+    );
+  }
+}
+
 export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   mensajes: EventoMensajeWhatsApp[];
   /** Enviados desde la app WhatsApp Business (coexistencia). */
@@ -454,25 +602,20 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      const field = change.field;
       const value = change.value;
       const phoneNumberId = value?.metadata?.phone_number_id;
-      if (!phoneNumberId) continue;
 
-      if (change.field === 'messages') {
+      if (field === 'messages') {
+        if (!phoneNumberId) continue;
         const contacts = value?.contacts ?? [];
 
-        for (const mensaje of value?.messages ?? []) {
-          // Meta usernames: puede venir solo from_user_id (sin `from`/wa_id).
-          const identidad = resolverIdentidadEntrante(mensaje, contacts);
-          if (!identidad.waId && !identidad.bsuid) continue;
-          clasificarMensajeMeta(
-            phoneNumberId,
-            mensaje,
-            identidad,
-            'mensajes',
-            out,
-          );
-        }
+        procesarMensajesCampo(
+          phoneNumberId,
+          value?.messages ?? [],
+          contacts,
+          out,
+        );
 
         for (const status of value?.statuses ?? []) {
           if (!status.id || !status.status) continue;
@@ -486,14 +629,15 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
         continue;
       }
 
-      if (change.field === 'smb_message_echoes') {
+      if (field === 'smb_message_echoes') {
+        if (!phoneNumberId) continue;
         for (const eco of value?.message_echoes ?? []) {
           const waId = eco.to ? normalizarWaId(eco.to) : null;
           const bsuid = eco.to_user_id?.trim() || null;
           if (!waId && !bsuid) continue;
           clasificarMensajeMeta(
             phoneNumberId,
-            eco,
+            normalizarMensajeHistorial(eco),
             {
               waId: waId || null,
               bsuid,
@@ -504,6 +648,60 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
             out,
           );
         }
+        continue;
+      }
+
+      if (field === 'history') {
+        if (!phoneNumberId) continue;
+
+        // Follow-up de media histórico puede llegar como `messages` bajo field=history.
+        if (value?.messages?.length) {
+          procesarMensajesCampo(
+            phoneNumberId,
+            value.messages,
+            value.contacts ?? [],
+            out,
+          );
+        }
+
+        for (const chunk of value?.history ?? []) {
+          if (chunk.errors?.length) {
+            logger.log(
+              `Ignorando chunk history con errores: ${chunk.errors
+                .map((e) => e.code ?? e.title ?? 'desconocido')
+                .join(', ')}`,
+            );
+            continue;
+          }
+
+          for (const thread of chunk.threads ?? []) {
+            for (const mensaje of thread.messages ?? []) {
+              const resuelto = resolverHistorialThread(mensaje, thread);
+              if (!resuelto) continue;
+              clasificarMensajeMeta(
+                phoneNumberId,
+                normalizarMensajeHistorial(mensaje),
+                resuelto.identidad,
+                resuelto.destino,
+                out,
+              );
+            }
+          }
+        }
+        continue;
+      }
+
+      if (field === 'smb_app_state_sync') {
+        logger.log(
+          'Ignorando campo webhook WhatsApp smb_app_state_sync (sync de contactos; no procesamos mensajes)',
+        );
+        continue;
+      }
+
+      if (field) {
+        logger.warn(
+          `Campo webhook WhatsApp desconocido ignorado: ${field}`,
+        );
       }
     }
   }
