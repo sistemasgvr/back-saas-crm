@@ -732,13 +732,26 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     wabaId: string,
     accessToken: string,
   ): Promise<AppSuscritaGraph[]> {
+    // Respuesta real de Graph (docs Meta):
+    // { data: [{ whatsapp_business_api_data: { id, name, link } }] }
+    // No suele incluir subscribed_fields (esos viven en App Dashboard).
     const data = await this.get<
-      GraphListResponse<{ id: string; subscribed_fields?: string[] }>
+      GraphListResponse<{
+        id?: string;
+        subscribed_fields?: string[];
+        whatsapp_business_api_data?: {
+          id?: string;
+          name?: string;
+          link?: string;
+        };
+      }>
     >(`/${wabaId}/subscribed_apps`, { access_token: accessToken });
-    return data.data.map((app) => ({
-      id: app.id,
-      camposSuscritos: app.subscribed_fields ?? [],
-    }));
+    return (data.data ?? [])
+      .map((app) => ({
+        id: app.whatsapp_business_api_data?.id ?? app.id ?? '',
+        camposSuscritos: app.subscribed_fields ?? [],
+      }))
+      .filter((app) => app.id.length > 0);
   }
 
   async listarPlantillasWhatsApp(

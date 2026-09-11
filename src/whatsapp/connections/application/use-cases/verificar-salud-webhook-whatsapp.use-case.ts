@@ -69,7 +69,7 @@ export class VerificarSaludWebhookWhatsappUseCase {
       if (!suscrito) {
         error =
           'La app no está suscrita al WABA en Meta — usa "Re-suscribir webhook"';
-        camposFaltantes = [...CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA];
+        // No inventamos campos faltantes: Graph WABA no lista fields aquí.
       } else if (camposSuscritos.length > 0) {
         camposFaltantes = CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA.filter(
           (c) => !camposSuscritos.includes(c),
@@ -78,12 +78,13 @@ export class VerificarSaludWebhookWhatsappUseCase {
           error = `Faltan campos de webhook en Meta: ${camposFaltantes.join(', ')}`;
         }
       }
+      // Si la app está suscrita y Graph no expone subscribed_fields (caso normal),
+      // el check de fields se hace en Meta App Dashboard, no vía este endpoint.
     } catch (graphError) {
       error =
         graphError instanceof Error
           ? graphError.message
           : 'Error desconocido al verificar en Meta';
-      camposFaltantes = [...CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA];
     }
 
     await this.whatsappConexiones.marcarWebhookCheck(

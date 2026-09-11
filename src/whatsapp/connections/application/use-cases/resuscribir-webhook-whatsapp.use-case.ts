@@ -70,8 +70,8 @@ export class ResuscribirWebhookWhatsappUseCase {
       camposSuscritos = [];
     }
 
-    // Si Graph no expone subscribed_fields, no inventamos faltantes
-    // (la suscripción de fields vive en Meta App Dashboard).
+    // Graph WABA casi nunca expone subscribed_fields; si vienen vacíos,
+    // no inventamos faltantes (los fields se configuran en App Dashboard).
     const camposFaltantes =
       camposSuscritos.length > 0
         ? CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA.filter(
