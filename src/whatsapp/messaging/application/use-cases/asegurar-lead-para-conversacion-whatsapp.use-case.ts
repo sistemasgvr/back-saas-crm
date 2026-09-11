@@ -18,6 +18,9 @@ export interface ResultadoAsegurarLeadWhatsApp {
  * Garantiza que una conversación WA tenga lead vinculado:
  * match por teléfono → crear lead sin asignar → vincular → AutoAsignar (si pool ON).
  * Usado solo desde el inbound de mensajes (sin actor humano).
+ *
+ * Si el chat ya tiene lead pero sigue sin dueño, reintenta auto-asignación
+ * (antes se hacía early-return y el lead quedaba libre para siempre).
  */
 @Injectable()
 export class AsegurarLeadParaConversacionWhatsAppUseCase {
@@ -51,13 +54,24 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       };
     }
 
-    if (conversacion.lead) {
+    if (conversacion.lead?.asignadoUsuarioId) {
       return {
         leadId: conversacion.lead.id,
         creado: false,
         fueAutoAsignado: false,
         asignadoUsuarioId: conversacion.lead.asignadoUsuarioId,
       };
+    }
+
+    if (conversacion.lead && !conversacion.lead.asignadoUsuarioId) {
+      return this.intentarAutoAsignarExistente(
+        organizacionId,
+        conversacionId,
+        conversacion.lead.id,
+        conversacion.nombreContacto,
+        conversacion.waId,
+        false,
+      );
     }
 
     let creado = false;
@@ -93,7 +107,6 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       leadId = alta.id;
       creado = alta.creado;
 
-      // Race: otro request creó el mismo idExterno o ya había match — ok.
       if (!creado) {
         const porTelefono = await this.leadsGestion.buscarIdPorTelefonoSufijo(
           organizacionId,
@@ -109,6 +122,24 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       leadId,
     );
 
+    return this.intentarAutoAsignarExistente(
+      organizacionId,
+      conversacionId,
+      leadId,
+      conversacion.nombreContacto,
+      conversacion.waId,
+      creado,
+    );
+  }
+
+  private async intentarAutoAsignarExistente(
+    organizacionId: string,
+    conversacionId: string,
+    leadId: string,
+    nombreContacto: string | null | undefined,
+    waId: string,
+    creado: boolean,
+  ): Promise<ResultadoAsegurarLeadWhatsApp> {
     let asignadoUsuarioId: string | null = null;
     let fueAutoAsignado = false;
     try {
@@ -127,8 +158,7 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
 
     if (creado || fueAutoAsignado) {
       const nombreLead =
-        conversacion.nombreContacto?.trim() ||
-        (conversacion.waId ? `+${conversacion.waId}` : 'WhatsApp');
+        nombreContacto?.trim() || (waId ? `+${waId}` : 'WhatsApp');
       void this.crearNotificacion
         .execute({
           organizacionId,

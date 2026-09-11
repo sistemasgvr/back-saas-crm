@@ -35,11 +35,18 @@ export interface LeadAutoAsignacionRepository {
   }): Promise<{ asignadoUsuarioId: string | null; fechaLeadEfectiva: Date } | null>;
 
   /**
-   * Drena la cola del tenant en orden por fechaLead. Asigna “NUEVO”/sin responsable
-   * al usuario que toca por cursor y elimina items ya asignados manualmente.
-   *
-   * Importante: la lógica intenta preservar round-robin sólo cuando el lead
-   * se asigna efectivamente (si otro lo tomó antes, no se avanza cursor).
+   * Asigna de inmediato un lead concreto (si sigue libre y el pool está ON).
+   * Avanza el cursor round-robin y lo saca de la cola.
+   * @returns usuario destino o null si no se asignó.
+   */
+  asignarLeadPendiente(
+    organizacionId: string,
+    leadId: string,
+  ): Promise<string | null>;
+
+  /**
+   * Drena la cola del tenant en orden por fechaLead. Asigna leads libres al
+   * usuario que toca por cursor. Items inválidos se descartan sin abortar.
    */
   procesarCola(organizacionId: string): Promise<void>;
 }
@@ -47,4 +54,3 @@ export interface LeadAutoAsignacionRepository {
 export const LEAD_AUTO_ASIGNACION_REPOSITORY = Symbol(
   'LEAD_AUTO_ASIGNACION_REPOSITORY',
 );
-
