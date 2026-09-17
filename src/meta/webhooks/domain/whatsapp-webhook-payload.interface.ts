@@ -227,6 +227,8 @@ export interface EventoMensajeWhatsApp {
   ubicacion?: UbicacionMensaje;
   /** Solo presente cuando tipo === 'contacts'. */
   contactos?: ContactoMensaje[];
+  /** Sync de coexistencia (`field=history`) — no debe abrir ventana 24h ni notificar. */
+  esHistorial?: boolean;
   raw: unknown;
 }
 
@@ -330,6 +332,7 @@ function clasificarMensajeMeta(
   },
   destino: 'mensajes' | 'ecos',
   out: AcumuladoresEventos,
+  opciones?: { esHistorial?: boolean },
 ): void {
   if (!mensaje.id) return;
   if (!identidad.waId && !identidad.bsuid) return;
@@ -420,6 +423,7 @@ function clasificarMensajeMeta(
             esVoz: mensaje.audio?.voice,
           }
         : undefined,
+    esHistorial: opciones?.esHistorial === true,
     raw: mensaje,
   };
 
@@ -570,6 +574,7 @@ function procesarMensajesCampo(
   messages: MensajeMetaCrudo[],
   contacts: ContactoWebhookMeta[],
   out: AcumuladoresEventos,
+  opciones?: { esHistorial?: boolean },
 ): void {
   for (const mensaje of messages) {
     const identidad = resolverIdentidadEntrante(mensaje, contacts);
@@ -580,6 +585,7 @@ function procesarMensajesCampo(
       identidad,
       'mensajes',
       out,
+      opciones,
     );
   }
 }
@@ -661,6 +667,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
             value.messages,
             value.contacts ?? [],
             out,
+            { esHistorial: true },
           );
         }
 
@@ -684,6 +691,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
                 resuelto.identidad,
                 resuelto.destino,
                 out,
+                { esHistorial: true },
               );
             }
           }

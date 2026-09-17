@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
   ContactoMensajeRow,
@@ -599,17 +599,45 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       leadId = leadCandidato?.id;
     }
 
-    const conversacion = await this.prisma.whatsappConversacion.create({
-      data: {
-        organizacionId: input.organizacionId,
-        whatsappConexionId: input.whatsappConexionId,
-        waId,
-        bsuid,
-        username,
-        nombreContacto: input.nombreContacto,
-        leadId,
-      },
-    });
+    let conversacion;
+    let esNueva = true;
+    try {
+      conversacion = await this.prisma.whatsappConversacion.create({
+        data: {
+          organizacionId: input.organizacionId,
+          whatsappConexionId: input.whatsappConexionId,
+          waId,
+          bsuid,
+          username,
+          nombreContacto: input.nombreContacto,
+          leadId,
+        },
+      });
+    } catch (error: unknown) {
+      // Carrera concurrente en @@unique([organizacionId, waId]): reusa la fila.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002' &&
+        waId
+      ) {
+        const recien = await this.prisma.whatsappConversacion.findUnique({
+          where: {
+            organizacionId_waId: {
+              organizacionId: input.organizacionId,
+              waId,
+            },
+          },
+        });
+        if (recien) {
+          conversacion = recien;
+          esNueva = false;
+        } else {
+          throw error;
+        }
+      } else {
+        throw error;
+      }
+    }
     const nombreRelleno = input.nombreContacto?.trim() || null;
     if (leadId && nombreRelleno) {
       await this.prisma.lead.updateMany({
@@ -622,7 +650,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         data: { nombre: nombreRelleno },
       });
     }
-    return { id: conversacion.id, esNueva: true };
+    return { id: conversacion.id, esNueva };
   }
 
   async registrarMensaje(
@@ -737,21 +765,36 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async actualizarTrasEntrante(
     conversacionId: string,
     fechaMensaje: Date,
+    opciones?: { incrementarNoLeidos?: boolean; extenderVentana?: boolean },
   ): Promise<void> {
-    const ventanaExpiraEn = new Date(
-      fechaMensaje.getTime() + VENTANA_HORAS * 60 * 60 * 1000,
-    );
-    // No pisar nombreContacto con el profile name de Meta — el CRM es la
-    // fuente de verdad una vez que el chat existe (findOCrearConversacion
-    // solo rellena si estaba vacío).
-    await this.prisma.whatsappConversacion.update({
-      where: { id: conversacionId },
-      data: {
-        ultimoMensajeEn: fechaMensaje,
-        ventanaExpiraEn,
-        noLeidos: { increment: 1 },
-      },
-    });
+    const incrementarNoLeidos = opciones?.incrementarNoLeidos !== false;
+    const extenderVentana = opciones?.extenderVentana !== false;
+    const ventanaExpiraEn = extenderVentana
+      ? new Date(fechaMensaje.getTime() + VENTANA_HORAS * 60 * 60 * 1000)
+      : null;
+
+    // Solo avanza orden/ventana si el mensaje es más nuevo que el último
+    // (history/out-of-order no debe cerrar ni abrir la ventana 24h).
+    await this.prisma.$executeRaw`
+      UPDATE whatsapp_conversaciones
+      SET
+        ultimo_mensaje_en = CASE
+          WHEN ultimo_mensaje_en IS NULL OR ultimo_mensaje_en < ${fechaMensaje}
+          THEN ${fechaMensaje}
+          ELSE ultimo_mensaje_en
+        END,
+        ventana_expira_en = CASE
+          WHEN ${extenderVentana} = false THEN ventana_expira_en
+          WHEN ventana_expira_en IS NULL OR ventana_expira_en < ${ventanaExpiraEn}
+          THEN ${ventanaExpiraEn}
+          ELSE ventana_expira_en
+        END,
+        no_leidos = CASE
+          WHEN ${incrementarNoLeidos} THEN no_leidos + 1
+          ELSE no_leidos
+        END
+      WHERE id = ${conversacionId}::uuid
+    `;
   }
 
   async renombrar(
@@ -785,11 +828,23 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async actualizarTrasSaliente(
     conversacionId: string,
     fechaMensaje: Date,
+    opciones?: { limpiarNoLeidos?: boolean },
   ): Promise<void> {
-    await this.prisma.whatsappConversacion.update({
-      where: { id: conversacionId },
-      data: { ultimoMensajeEn: fechaMensaje, noLeidos: 0 },
-    });
+    const limpiarNoLeidos = opciones?.limpiarNoLeidos !== false;
+    await this.prisma.$executeRaw`
+      UPDATE whatsapp_conversaciones
+      SET
+        ultimo_mensaje_en = CASE
+          WHEN ultimo_mensaje_en IS NULL OR ultimo_mensaje_en < ${fechaMensaje}
+          THEN ${fechaMensaje}
+          ELSE ultimo_mensaje_en
+        END,
+        no_leidos = CASE
+          WHEN ${limpiarNoLeidos} THEN 0
+          ELSE no_leidos
+        END
+      WHERE id = ${conversacionId}::uuid
+    `;
   }
 
   async actualizarEstadoMensaje(

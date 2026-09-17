@@ -13,6 +13,7 @@ import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import type { RawBodyRequest } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { ProcesarLeadEntranteUseCase } from '../../leads/application/use-cases/procesar-lead-entrante.use-case';
 import { PageSinConexionError } from '../../leads/application/errors/page-sin-conexion.error';
 import { extraerEventosLeadgen } from '../domain/leadgen-webhook-payload.interface';
@@ -27,6 +28,19 @@ import { ProcesarEcoMensajeWhatsAppUseCase } from '../../../whatsapp/messaging/a
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
 import { ProcesarEdicionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-edicion-whatsapp.use-case';
+
+function esErrorReintentable(error: unknown): boolean {
+  if (error instanceof PageSinConexionError) return false;
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    // Unique / not found / constraint: no tiene sentido reintentar el mismo payload.
+    if (['P2002', 'P2025', 'P2003'].includes(error.code)) return false;
+    return true;
+  }
+  if (error instanceof Prisma.PrismaClientInitializationError) return true;
+  if (error instanceof Prisma.PrismaClientRustPanicError) return true;
+  // Fallos transitorios (Graph, red, DB) — Meta reintenta con backoff.
+  return error instanceof Error;
+}
 
 // Público — sin JWT (PLAN.md §7, §8.2). Se protege con el ?token= de la URL,
 // hub.verify_token (GET) y la firma HMAC del body (POST).
@@ -112,10 +126,8 @@ export class MetaWebhooksController {
       'Endpoint público que Meta invoca en tiempo real con los eventos suscritos. Un mismo endpoint recibe ' +
       'dos tipos de payload, distinguidos por `object`: `"page"` con leads nuevos (leadgen) y ' +
       '`"whatsapp_business_account"` con mensajes/estados de WhatsApp entrantes. Verifica el `?token=` propio ' +
-      'y la firma HMAC `X-Hub-Signature-256` del body crudo, y procesa el evento (ingesta idempotente) antes ' +
-      'de responder 200 — en un runtime serverless, código lanzado después de responder no tiene garantía de ' +
-      'terminar. Meta no reintenta por errores posteriores al ACK, así que un fallo puntual se resuelve vía ' +
-      'backfill manual, no reintento automático.',
+      'y la firma HMAC `X-Hub-Signature-256` del body crudo. Fallos reintentables responden 5xx para que ' +
+      'Meta reintente; errores terminales (page sin conexión, etc.) ACK 200.',
   })
   @ApiQuery({
     name: 'token',
@@ -123,11 +135,15 @@ export class MetaWebhooksController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Evento procesado.',
+    description: 'Evento procesado (o rechazado de forma terminal).',
   })
   @ApiResponse({
     status: 403,
     description: 'Token de URL incorrecto o firma HMAC inválida.',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Fallo reintentable — Meta debe reintentar el webhook.',
   })
   async receive(
     @Query('token') token: string,
@@ -154,37 +170,30 @@ export class MetaWebhooksController {
       return;
     }
 
-    // Se espera a que termine el procesamiento ANTES de responder — en un
-    // runtime serverless (Vercel) el código async lanzado después de mandar
-    // la respuesta no tiene garantía de terminar: la función puede
-    // congelarse/matarse apenas el response sale, cortando el trabajo a
-    // mitad de camino. Así estuvieron perdiéndose leads en silencio: nunca
-    // tiraban error (no hay nada que loguear si el proceso se congela antes
-    // de llegar al catch), simplemente no terminaban de guardarse. Meta
-    // tolera unos segundos de latencia en el ACK — perder eventos por
-    // ahorrarse ese margen no vale la pena. El procesamiento interno ya es
-    // idempotente y loguea sus propios errores, así que esto nunca tira.
-    //
-    // Mismo endpoint/firma para "page" (leadgen) y "whatsapp_business_account"
-    // (Fase G3) — Meta permite apuntar ambas suscripciones a la misma URL;
-    // se distingue por payload.object (PLAN-GESTION-LEADS-WHATSAPP.md §4.3).
+    let huboFalloReintentable = false;
+
     if (payload.object === 'whatsapp_business_account') {
-      await this.procesarEventosWhatsApp(
+      huboFalloReintentable = await this.procesarEventosWhatsApp(
         payload as unknown as WhatsappWebhookPayload,
       );
     } else {
       const eventos = extraerEventosLeadgen(payload);
-      await this.procesarEventosLeadgen(eventos);
+      huboFalloReintentable = await this.procesarEventosLeadgen(eventos);
     }
 
+    if (huboFalloReintentable) {
+      res.status(503).send('Retry');
+      return;
+    }
     res.status(200).send('OK');
   }
 
   private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
-  ): Promise<void> {
+  ): Promise<boolean> {
     const { mensajes, ecos, estados, reacciones, ediciones } =
       extraerEventosWhatsApp(payload);
+    let huboFalloReintentable = false;
 
     for (const evento of mensajes) {
       try {
@@ -194,6 +203,7 @@ export class MetaWebhooksController {
           `Error procesando mensaje WhatsApp ${evento.wamid} (phone_number_id ${evento.phoneNumberId})`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
 
@@ -205,6 +215,7 @@ export class MetaWebhooksController {
           `Error procesando eco WhatsApp ${evento.wamid} (phone_number_id ${evento.phoneNumberId})`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
 
@@ -216,6 +227,7 @@ export class MetaWebhooksController {
           `Error procesando estado WhatsApp ${evento.wamid}`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
 
@@ -227,6 +239,7 @@ export class MetaWebhooksController {
           `Error procesando reacción WhatsApp sobre ${evento.wamidObjetivo}`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
 
@@ -238,15 +251,19 @@ export class MetaWebhooksController {
           `Error procesando edición WhatsApp sobre ${evento.wamidOriginal}`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
+
+    return huboFalloReintentable;
   }
 
   private async procesarEventosLeadgen(
     eventos: ReturnType<typeof extraerEventosLeadgen>,
-  ): Promise<void> {
+  ): Promise<boolean> {
     let procesados = 0;
     let rechazadosPageId = 0;
+    let huboFalloReintentable = false;
 
     for (const evento of eventos) {
       try {
@@ -261,7 +278,6 @@ export class MetaWebhooksController {
           resultado.leadId &&
           resultado.organizacionId
         ) {
-          // Auto-asignación: LEAD_NUEVO al responsable; si no hay, a toda la org activa.
           let usuarioIds: string[] | undefined;
           try {
             const asignacion = await this.autoAsignarLead.execute(
@@ -285,7 +301,10 @@ export class MetaWebhooksController {
               tipo: 'LEAD_NUEVO',
               titulo: 'Nuevo lead',
               mensaje: 'Llegó un nuevo lead desde Meta.',
-              payload: { leadId: resultado.leadId, url: `/leads/${resultado.leadId}` },
+              payload: {
+                leadId: resultado.leadId,
+                url: `/leads/${resultado.leadId}`,
+              },
               usuarioIds,
             })
             .catch((error: unknown) =>
@@ -303,11 +322,11 @@ export class MetaWebhooksController {
           );
           continue;
         }
-        // Ya ACK 200: no hay retry vía 5xx. Log + idempotencia/backfill.
         this.logger.error(
           `Error procesando leadgen ${evento.leadgenId} (page ${evento.pageId})`,
           error instanceof Error ? error.stack : error,
         );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
       }
     }
 
@@ -320,5 +339,7 @@ export class MetaWebhooksController {
         `Webhook leadgen: ${rechazadosPageId} evento(s) rechazados — ningún page_id tiene conexión activa`,
       );
     }
+
+    return huboFalloReintentable;
   }
 }

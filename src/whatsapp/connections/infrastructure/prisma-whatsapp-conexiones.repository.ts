@@ -67,6 +67,14 @@ export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRep
     return fila ? toRow(fila) : null;
   }
 
+  async findPorWabaId(wabaId: string): Promise<WhatsappConexionRow | null> {
+    const fila = await this.prisma.whatsappConexion.findFirst({
+      where: { wabaId, estado: 1 },
+      orderBy: { fechaCreacion: 'asc' },
+    });
+    return fila ? toRow(fila) : null;
+  }
+
   async vincular(input: VincularNumeroInput): Promise<WhatsappConexionRow> {
     const existente = await this.prisma.whatsappConexion.findFirst({
       where: {

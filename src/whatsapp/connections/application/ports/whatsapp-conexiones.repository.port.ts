@@ -41,6 +41,8 @@ export interface WhatsappConexionesRepository {
   findPorPhoneNumberId(
     phoneNumberId: string,
   ): Promise<WhatsappConexionRow | null>;
+  /** Misma resolución sin sesión: entry.id del webhook WhatsApp es el WABA. */
+  findPorWabaId(wabaId: string): Promise<WhatsappConexionRow | null>;
   /** Crea o reactiva (si estaba soft-deleted) — evita duplicar la vinculación. */
   vincular(input: VincularNumeroInput): Promise<WhatsappConexionRow>;
   desvincular(

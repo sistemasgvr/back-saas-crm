@@ -335,6 +335,17 @@ export class ActualizarGestionLeadUseCase {
     }
 
     if (crearVisita) {
+      if (crearVisita.inmuebleId) {
+        const inmuebleVisita = await this.inmuebles.obtenerPorId(
+          organizacionId,
+          crearVisita.inmuebleId,
+        );
+        if (!inmuebleVisita) {
+          throw new BadRequestException(
+            'El inmueble de la visita no existe en esta organización',
+          );
+        }
+      }
       if (esVisitaEnPasado(crearVisita.programadaEn)) {
         throw new BadRequestException(mensajeVisitaPasado());
       }
@@ -440,7 +451,13 @@ export class ActualizarGestionLeadUseCase {
             crearVisita: crearVisita ?? undefined,
             cerrarVisita: cerrarVisita ?? undefined,
             crearCalificacion: crearCalificacion ?? undefined,
-            cancelarVisitasProgramadas: reinicioPorCambioTipo || undefined,
+            cancelarVisitasProgramadas:
+              reinicioPorCambioTipo ||
+              !!crearVisita ||
+              (huboCambioDeEstado &&
+                lead.estadoGestion === 'VISITA_AGENDADA' &&
+                estadoGestionFinal !== 'VISITA_AGENDADA') ||
+              undefined,
           }
         : undefined,
     );

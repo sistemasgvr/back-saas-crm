@@ -286,6 +286,7 @@ export interface WhatsappConversacionesRepository {
   actualizarTrasEntrante(
     conversacionId: string,
     fechaMensaje: Date,
+    opciones?: { incrementarNoLeidos?: boolean; extenderVentana?: boolean },
   ): Promise<void>;
 
   /** Renombra el chat (nombreContacto) y, si tiene lead vinculado, también
@@ -297,10 +298,12 @@ export interface WhatsappConversacionesRepository {
   ): Promise<void>;
 
   /** Mensaje saliente (CRM o eco desde la app Business) — actualiza orden
-   * del chat sin incrementar noLeidos ni extender la ventana de 24h. */
+   * del chat sin incrementar noLeidos ni extender la ventana de 24h.
+   * Solo avanza `ultimoMensajeEn` si `fechaMensaje` es más reciente. */
   actualizarTrasSaliente(
     conversacionId: string,
     fechaMensaje: Date,
+    opciones?: { limpiarNoLeidos?: boolean },
   ): Promise<void>;
 
   actualizarEstadoMensaje(

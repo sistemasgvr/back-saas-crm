@@ -146,6 +146,53 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
         },
       });
 
+      if (historial.cerrarVisita) {
+        const visitasAbiertas = await tx.leadVisita.findMany({
+          where: {
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            estado: 'PROGRAMADA',
+          },
+          orderBy: { programadaEn: 'desc' },
+        });
+        if (visitasAbiertas.length > 0) {
+          const resultado = historial.cerrarVisita.resultado;
+          const estado =
+            resultado === 'ASISTIO'
+              ? 'REALIZADA'
+              : resultado === 'NO_SHOW'
+                ? 'NO_SHOW'
+                : 'CANCELADA';
+          // Cierra todas las PROGRAMADA abiertas (no solo la última).
+          await tx.leadVisita.updateMany({
+            where: {
+              id: { in: visitasAbiertas.map((v) => v.id) },
+            },
+            data: {
+              estado,
+              resultado,
+              feedback: historial.cerrarVisita.feedback,
+              historialCierraId: historial.id,
+            },
+          });
+        }
+      }
+
+      if (historial.cancelarVisitasProgramadas) {
+        await tx.leadVisita.updateMany({
+          where: {
+            organizacionId: historial.organizacionId,
+            leadId: historial.leadId,
+            estado: 'PROGRAMADA',
+          },
+          data: {
+            estado: 'CANCELADA',
+            resultado: 'CANCELADA',
+          },
+        });
+      }
+
+      // Crear visita DESPUÉS de cancelar abiertas, para no cancelar la nueva.
       if (historial.crearVisita) {
         const v = historial.crearVisita;
         await tx.leadVisita.create({
@@ -184,49 +231,6 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
             nota: c.nota,
             historialId: historial.id,
             usuarioId: c.usuarioId,
-          },
-        });
-      }
-
-      if (historial.cerrarVisita) {
-        const visitaAbierta = await tx.leadVisita.findFirst({
-          where: {
-            organizacionId: historial.organizacionId,
-            leadId: historial.leadId,
-            estado: 'PROGRAMADA',
-          },
-          orderBy: { programadaEn: 'desc' },
-        });
-        if (visitaAbierta) {
-          const resultado = historial.cerrarVisita.resultado;
-          const estado =
-            resultado === 'ASISTIO'
-              ? 'REALIZADA'
-              : resultado === 'NO_SHOW'
-                ? 'NO_SHOW'
-                : 'CANCELADA';
-          await tx.leadVisita.update({
-            where: { id: visitaAbierta.id },
-            data: {
-              estado,
-              resultado,
-              feedback: historial.cerrarVisita.feedback,
-              historialCierraId: historial.id,
-            },
-          });
-        }
-      }
-
-      if (historial.cancelarVisitasProgramadas) {
-        await tx.leadVisita.updateMany({
-          where: {
-            organizacionId: historial.organizacionId,
-            leadId: historial.leadId,
-            estado: 'PROGRAMADA',
-          },
-          data: {
-            estado: 'CANCELADA',
-            resultado: 'CANCELADA',
           },
         });
       }

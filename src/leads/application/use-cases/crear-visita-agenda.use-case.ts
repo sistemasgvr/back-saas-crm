@@ -24,6 +24,8 @@ import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repositor
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
+import { INMUEBLES_REPOSITORY } from '../../../inmuebles/application/ports/inmuebles.repository.port';
+import type { InmueblesRepository } from '../../../inmuebles/application/ports/inmuebles.repository.port';
 
 const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
 
@@ -47,6 +49,8 @@ export class CrearVisitaAgendaUseCase {
     private readonly actividades: LeadActividadesRepository,
     @Inject(LEADS_GESTION_REPOSITORY)
     private readonly leads: LeadsGestionRepository,
+    @Inject(INMUEBLES_REPOSITORY)
+    private readonly inmuebles: InmueblesRepository,
     private readonly crearNotificacion: CrearNotificacionUseCase,
   ) {}
 
@@ -99,6 +103,18 @@ export class CrearVisitaAgendaUseCase {
     const referenciaInmueble = input.referenciaInmueble.trim();
     if (!referenciaInmueble) {
       throw new BadRequestException('Indica el inmueble o proyecto');
+    }
+
+    if (input.inmuebleId) {
+      const inmueble = await this.inmuebles.obtenerPorId(
+        organizacionId,
+        input.inmuebleId,
+      );
+      if (!inmueble) {
+        throw new BadRequestException(
+          'El inmueble de la visita no existe en esta organización',
+        );
+      }
     }
 
     if (esVisitaEnPasado(programadaEn)) {

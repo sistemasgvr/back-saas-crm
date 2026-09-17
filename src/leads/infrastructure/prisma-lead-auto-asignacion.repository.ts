@@ -142,67 +142,77 @@ export class PrismaLeadAutoAsignacionRepository
         return null;
       }
 
-      const indiceActual =
+      let indiceActual =
         ((Number(cfg.siguienteIndice) % N) + N) % N;
-      const usuarioDestinoId = usuarioIds[indiceActual];
-      if (!usuarioDestinoId) {
-        this.logger.warn(
-          `Auto-asignación org=${organizacionId}: índice ${indiceActual} sin usuario`,
-        );
-        return null;
-      }
 
-      const usuarioOk = await tx.usuario.findFirst({
-        where: { id: usuarioDestinoId, estado: 1 },
-        select: { id: true },
-      });
-      if (!usuarioOk) {
-        this.logger.warn(
-          `Auto-asignación org=${organizacionId}: usuario destino ${usuarioDestinoId} inactivo/ausente`,
-        );
-        // Avanzar cursor para no quedar atascados en el mismo destino.
+      for (let intento = 0; intento < N; intento += 1) {
+        const usuarioDestinoId = usuarioIds[indiceActual];
+        if (!usuarioDestinoId) {
+          indiceActual = (indiceActual + 1) % N;
+          continue;
+        }
+
+        const miembroOk = await tx.organizacionUsuario.findFirst({
+          where: {
+            organizacionId,
+            usuarioId: usuarioDestinoId,
+            estado: 1,
+            usuario: { estado: 1 },
+          },
+          select: { id: true },
+        });
+        if (!miembroOk) {
+          this.logger.warn(
+            `Auto-asignación org=${organizacionId}: usuario ${usuarioDestinoId} sin membresía activa — se salta`,
+          );
+          indiceActual = (indiceActual + 1) % N;
+          continue;
+        }
+
+        const siguienteIndice = (indiceActual + 1) % N;
         await tx.leadAutoAsignacionConfig.update({
           where: { organizacionId },
-          data: { siguienteIndice: (indiceActual + 1) % N },
+          data: { siguienteIndice },
         });
-        return null;
+
+        const result = await tx.lead.updateMany({
+          where: {
+            id: leadId,
+            organizacionId,
+            estado: 1,
+            asignadoUsuarioId: null,
+          },
+          data: {
+            asignadoUsuarioId: usuarioDestinoId,
+            asignadoEn: new Date(),
+            asignadoPorUsuarioId: null,
+            usuarioEdicion: usuarioDestinoId,
+          },
+        });
+
+        await tx.leadAutoAsignacionQueue.deleteMany({
+          where: { organizacionId, leadId },
+        });
+
+        if (result.count !== 1) {
+          await tx.leadAutoAsignacionConfig.update({
+            where: { organizacionId },
+            data: { siguienteIndice: indiceActual },
+          });
+          return null;
+        }
+
+        return usuarioDestinoId;
       }
 
-      const siguienteIndice = (indiceActual + 1) % N;
+      this.logger.warn(
+        `Auto-asignación org=${organizacionId}: ningún miembro activo en el pool para lead=${leadId}`,
+      );
       await tx.leadAutoAsignacionConfig.update({
         where: { organizacionId },
-        data: { siguienteIndice },
+        data: { siguienteIndice: indiceActual },
       });
-
-      const result = await tx.lead.updateMany({
-        where: {
-          id: leadId,
-          organizacionId,
-          estado: 1,
-          asignadoUsuarioId: null,
-        },
-        data: {
-          asignadoUsuarioId: usuarioDestinoId,
-          asignadoEn: new Date(),
-          asignadoPorUsuarioId: null,
-          usuarioEdicion: usuarioDestinoId,
-        },
-      });
-
-      await tx.leadAutoAsignacionQueue.deleteMany({
-        where: { organizacionId, leadId },
-      });
-
-      if (result.count !== 1) {
-        // Alguien lo tomó en paralelo: revertir cursor.
-        await tx.leadAutoAsignacionConfig.update({
-          where: { organizacionId },
-          data: { siguienteIndice: indiceActual },
-        });
-        return null;
-      }
-
-      return usuarioDestinoId;
+      return null;
     });
   }
 
@@ -246,8 +256,13 @@ export class PrismaLeadAutoAsignacionRepository
           continue;
         }
 
-        const usuarioOk = await tx.usuario.findFirst({
-          where: { id: usuarioDestinoId, estado: 1 },
+        const usuarioOk = await tx.organizacionUsuario.findFirst({
+          where: {
+            organizacionId,
+            usuarioId: usuarioDestinoId,
+            estado: 1,
+            usuario: { estado: 1 },
+          },
           select: { id: true },
         });
         if (!usuarioOk) {

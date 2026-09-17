@@ -39,6 +39,9 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
       evento.phoneNumberId,
     );
     if (!conexion) {
+      this.logger.warn(
+        `Webhook eco WhatsApp ignorado: phone_number_id ${evento.phoneNumberId} sin conexión activa`,
+      );
       return { procesado: false };
     }
 
@@ -95,6 +98,7 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
       await this.conversaciones.actualizarTrasSaliente(
         conversacionId,
         evento.timestamp,
+        { limpiarNoLeidos: evento.esHistorial !== true },
       );
     }
 

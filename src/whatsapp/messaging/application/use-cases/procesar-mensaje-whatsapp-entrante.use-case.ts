@@ -56,6 +56,9 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       evento.phoneNumberId,
     );
     if (!conexion) {
+      this.logger.warn(
+        `Webhook WhatsApp entrante ignorado: phone_number_id ${evento.phoneNumberId} sin conexión activa`,
+      );
       return { procesado: false };
     }
 
@@ -70,16 +73,19 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       });
 
     // Lead primero: así WHATSAPP_MENSAJE ya va al asesor autoasignado.
-    try {
-      await this.asegurarLead.execute(
-        conexion.organizacionId,
-        conversacionId,
-      );
-    } catch (error: unknown) {
-      this.logger.error(
-        `No se pudo asegurar lead para conversación ${conversacionId}`,
-        error instanceof Error ? error.stack : error,
-      );
+    // History sync no crea/asegura leads ni notifica (solo rellena el hilo).
+    if (evento.esHistorial !== true) {
+      try {
+        await this.asegurarLead.execute(
+          conexion.organizacionId,
+          conversacionId,
+        );
+      } catch (error: unknown) {
+        this.logger.error(
+          `No se pudo asegurar lead para conversación ${conversacionId}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
     }
 
     const media = evento.media
@@ -133,10 +139,23 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       };
     }
 
+    const esHistorial = evento.esHistorial === true;
     await this.conversaciones.actualizarTrasEntrante(
       conversacionId,
       evento.timestamp,
+      {
+        incrementarNoLeidos: !esHistorial,
+        extenderVentana: !esHistorial,
+      },
     );
+
+    if (esHistorial) {
+      return {
+        procesado: true,
+        organizacionId: conexion.organizacionId,
+        conversacionId,
+      };
+    }
 
     const conversacion = await this.conversaciones.findPorId(
       conexion.organizacionId,
