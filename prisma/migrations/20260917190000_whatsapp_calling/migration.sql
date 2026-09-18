@@ -1,12 +1,5 @@
 -- WhatsApp Cloud API Calling: roles de línea + historial de llamadas
-
-ALTER TABLE "whatsapp_conexiones"
-  ADD COLUMN IF NOT EXISTS "rol_linea" VARCHAR(20) NOT NULL DEFAULT 'MENSAJES',
-  ADD COLUMN IF NOT EXISTS "calling_habilitado" SMALLINT NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS "calling_ultimo_error" TEXT;
-
-CREATE INDEX IF NOT EXISTS "whatsapp_conexiones_organizacion_id_rol_linea_idx"
-  ON "whatsapp_conexiones"("organizacion_id", "rol_linea");
+-- Idempotente: seguro ante reintentos y locks parciales.
 
 CREATE TABLE IF NOT EXISTS "whatsapp_llamadas" (
   "id" UUID NOT NULL,
@@ -50,27 +43,58 @@ CREATE INDEX IF NOT EXISTS "whatsapp_llamadas_lead_id_idx"
 CREATE INDEX IF NOT EXISTS "whatsapp_llamadas_asignado_usuario_id_inicio_en_idx"
   ON "whatsapp_llamadas"("asignado_usuario_id", "inicio_en");
 
-ALTER TABLE "whatsapp_llamadas"
-  ADD CONSTRAINT "whatsapp_llamadas_organizacion_id_fkey"
-  FOREIGN KEY ("organizacion_id") REFERENCES "organizaciones"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'whatsapp_llamadas_organizacion_id_fkey'
+  ) THEN
+    ALTER TABLE "whatsapp_llamadas"
+      ADD CONSTRAINT "whatsapp_llamadas_organizacion_id_fkey"
+      FOREIGN KEY ("organizacion_id") REFERENCES "organizaciones"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
 
-ALTER TABLE "whatsapp_llamadas"
-  ADD CONSTRAINT "whatsapp_llamadas_whatsapp_conexion_id_fkey"
-  FOREIGN KEY ("whatsapp_conexion_id") REFERENCES "whatsapp_conexiones"("id")
-  ON DELETE RESTRICT ON UPDATE CASCADE;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'whatsapp_llamadas_whatsapp_conexion_id_fkey'
+  ) THEN
+    ALTER TABLE "whatsapp_llamadas"
+      ADD CONSTRAINT "whatsapp_llamadas_whatsapp_conexion_id_fkey"
+      FOREIGN KEY ("whatsapp_conexion_id") REFERENCES "whatsapp_conexiones"("id")
+      ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
 
-ALTER TABLE "whatsapp_llamadas"
-  ADD CONSTRAINT "whatsapp_llamadas_conversacion_id_fkey"
-  FOREIGN KEY ("conversacion_id") REFERENCES "whatsapp_conversaciones"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'whatsapp_llamadas_conversacion_id_fkey'
+  ) THEN
+    ALTER TABLE "whatsapp_llamadas"
+      ADD CONSTRAINT "whatsapp_llamadas_conversacion_id_fkey"
+      FOREIGN KEY ("conversacion_id") REFERENCES "whatsapp_conversaciones"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
-ALTER TABLE "whatsapp_llamadas"
-  ADD CONSTRAINT "whatsapp_llamadas_lead_id_fkey"
-  FOREIGN KEY ("lead_id") REFERENCES "leads"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'whatsapp_llamadas_lead_id_fkey'
+  ) THEN
+    ALTER TABLE "whatsapp_llamadas"
+      ADD CONSTRAINT "whatsapp_llamadas_lead_id_fkey"
+      FOREIGN KEY ("lead_id") REFERENCES "leads"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
 
-ALTER TABLE "whatsapp_llamadas"
-  ADD CONSTRAINT "whatsapp_llamadas_asignado_usuario_id_fkey"
-  FOREIGN KEY ("asignado_usuario_id") REFERENCES "usuarios"("id")
-  ON DELETE SET NULL ON UPDATE CASCADE;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'whatsapp_llamadas_asignado_usuario_id_fkey'
+  ) THEN
+    ALTER TABLE "whatsapp_llamadas"
+      ADD CONSTRAINT "whatsapp_llamadas_asignado_usuario_id_fkey"
+      FOREIGN KEY ("asignado_usuario_id") REFERENCES "usuarios"("id")
+      ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+ALTER TABLE "whatsapp_conexiones"
+  ADD COLUMN IF NOT EXISTS "rol_linea" VARCHAR(20) NOT NULL DEFAULT 'MENSAJES',
+  ADD COLUMN IF NOT EXISTS "calling_habilitado" SMALLINT NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS "calling_ultimo_error" TEXT;
+
+CREATE INDEX IF NOT EXISTS "whatsapp_conexiones_organizacion_id_rol_linea_idx"
+  ON "whatsapp_conexiones"("organizacion_id", "rol_linea");
