@@ -10,6 +10,7 @@ import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/port
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import type { ResultadoProcesarMensajeWhatsApp } from './procesar-mensaje-whatsapp-entrante.use-case';
+import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
 
 /** Coexistencia (`smb_message_echoes`): el negocio respondió desde la app
  * WhatsApp Business (celular o dispositivo vinculado). Se persiste como
@@ -30,6 +31,7 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
     private readonly conexionesMeta: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
+    private readonly guardarMedia: GuardarMediaWhatsAppService,
   ) {}
 
   async execute(
@@ -62,6 +64,23 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
         )
       : undefined;
 
+    let mediaObjetoId: string | undefined;
+    if (media) {
+      try {
+        const objeto = await this.guardarMedia.asegurar(
+          conexion.organizacionId,
+          media.buffer,
+          media.mimeType ?? evento.media?.mimeType ?? 'application/octet-stream',
+        );
+        mediaObjetoId = objeto.id;
+      } catch (error: unknown) {
+        this.logger.error(
+          `No se pudo guardar media MinIO (eco) para wamid ${evento.wamid}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
     const respondeAMensajeId = evento.respondeAWamid
       ? ((await this.conversaciones.buscarIdPorWamid(
           conexion.organizacionId,
@@ -85,7 +104,7 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
       mediaCaption: evento.media?.caption,
       mediaEsVoz: evento.media?.esVoz,
       mediaTamanoBytes: media?.buffer.length,
-      mediaBytes: media?.buffer,
+      mediaObjetoId,
       respondeAMensajeId,
       ubicacionLatitud: evento.ubicacion?.latitud,
       ubicacionLongitud: evento.ubicacion?.longitud,

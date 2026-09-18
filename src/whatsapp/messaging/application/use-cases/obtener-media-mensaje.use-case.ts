@@ -1,24 +1,32 @@
+import type { Readable } from 'stream';
 import {
   ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { OBJECT_STORAGE } from '../../../../shared/application/ports/object-storage.port';
+import type { ObjectStorage } from '../../../../shared/application/ports/object-storage.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
-import type {
-  MediaMensaje,
-  WhatsappConversacionesRepository,
-} from '../ports/whatsapp-conversaciones.repository.port';
+import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { puedeVerConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 
-/** Sirve los bytes de un archivo de un mensaje puntual — mismo control de
- * acceso que abrir la conversación (lectura para cualquier miembro de la org). */
+export interface MediaMensajeStream {
+  stream: Readable;
+  mimeType: string;
+  nombreArchivo: string | null;
+  tamanoBytes: number | null;
+}
+
+/** Sirve el archivo de un mensaje desde MinIO — mismo control de acceso que
+ * abrir la conversación (lectura para cualquier miembro de la org). */
 @Injectable()
 export class ObtenerMediaMensajeUseCase {
   constructor(
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
   ) {}
 
   async execute(
@@ -26,7 +34,7 @@ export class ObtenerMediaMensajeUseCase {
     conversacionId: string,
     mensajeId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
-  ): Promise<MediaMensaje> {
+  ): Promise<MediaMensajeStream> {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,
       conversacionId,
@@ -48,6 +56,13 @@ export class ObtenerMediaMensajeUseCase {
         'El mensaje no existe o no tiene un archivo asociado',
       );
     }
-    return media;
+
+    const stream = await this.storage.getStream(media.objectKey);
+    return {
+      stream,
+      mimeType: media.mimeType,
+      nombreArchivo: media.nombreArchivo,
+      tamanoBytes: media.tamanoBytes,
+    };
   }
 }

@@ -20,9 +20,14 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "media:migrar-minio": "ts-node -r tsconfig-paths/register prisma/scripts/migrar-media-minio.ts",
+    "media:estimar-unica": "ts-node -r tsconfig-paths/register prisma/scripts/estimar-media-unica.ts",
+    "media:exportar-local": "ts-node -r tsconfig-paths/register prisma/scripts/exportar-media-local.ts",
+    "media:vincular-export": "ts-node -r tsconfig-paths/register prisma/scripts/vincular-media-exportada.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1135.0",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.0",
@@ -39,6 +44,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "cookie-parser": "^1.4.7",
+    "dotenv": "^18.0.0",
     "form-data": "^4.0.6",
     "joi": "^18.2.3",
     "passport": "^0.7.0",

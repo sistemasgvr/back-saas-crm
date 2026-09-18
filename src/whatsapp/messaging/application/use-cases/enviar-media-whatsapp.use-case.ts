@@ -18,6 +18,7 @@ import type { RolOrganizacion } from '../../../../auth/domain/request-context.in
 import { validarArchivoWhatsApp } from '../limites-media-whatsapp';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
+import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
 
 export interface EnviarMediaInput {
   buffer: Buffer;
@@ -33,9 +34,7 @@ export interface EnviarMediaInput {
 /** Envía un archivo (imagen/video/audio/documento/sticker) a un chat —
  * mismo flujo que texto: solo funciona DENTRO de la ventana de 24h, Meta no
  * admite archivos libres fuera de ella (solo plantillas). Sube el archivo a
- * Meta, lo manda, y guarda una copia propia en WhatsappMensajeMedia — el
- * media_id de Meta para lo que subimos nosotros dura 30 días, no sirve como
- * referencia permanente para mostrarlo después en el historial del chat. */
+ * Meta, lo manda, y guarda una copia deduplicada en MinIO (SHA-256 por org). */
 @Injectable()
 export class EnviarMediaWhatsAppUseCase {
   constructor(
@@ -47,6 +46,7 @@ export class EnviarMediaWhatsAppUseCase {
     private readonly conexiones: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
+    private readonly guardarMedia: GuardarMediaWhatsAppService,
   ) {}
 
   async execute(
@@ -149,6 +149,12 @@ export class EnviarMediaWhatsAppUseCase {
       },
     );
 
+    const mediaObjeto = await this.guardarMedia.asegurar(
+      organizacionId,
+      input.buffer,
+      input.mimeType,
+    );
+
     await this.conversaciones.registrarMensaje({
       organizacionId,
       whatsappConversacionId: conversacionId,
@@ -169,7 +175,7 @@ export class EnviarMediaWhatsAppUseCase {
       mediaCaption: input.caption,
       mediaEsVoz: esVoz || undefined,
       mediaTamanoBytes: input.buffer.length,
-      mediaBytes: input.buffer,
+      mediaObjetoId: mediaObjeto.id,
       fechaMensaje: new Date(),
       usuarioCreacion: ctx.usuarioId,
       respondeAMensajeId: input.respondeAMensajeId,

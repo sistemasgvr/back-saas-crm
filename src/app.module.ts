@@ -7,6 +7,7 @@ import {
   envValidationSchema,
 } from './shared/infrastructure/env.validation';
 import { PrismaModule } from './shared/infrastructure/prisma.module';
+import { ObjectStorageModule } from './shared/infrastructure/object-storage.module';
 import { RequestLoggerMiddleware } from './shared/presentation/middleware/request-logger.middleware';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -31,6 +32,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
       validationOptions: envValidationOptions,
     }),
     PrismaModule,
+    ObjectStorageModule,
     AuthModule,
     OrganizationsModule,
     ModulesModule,

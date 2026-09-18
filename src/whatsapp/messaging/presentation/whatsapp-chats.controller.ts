@@ -27,6 +27,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
+import { pipeline } from 'stream/promises';
 import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
@@ -667,8 +668,9 @@ export class WhatsappChatsController {
   @ApiOperation({
     summary: 'Descargar el archivo de un mensaje',
     description:
-      'Sirve los bytes guardados del archivo (entrante o saliente). Entrante: descargado de Meta apenas llegó el ' +
-      'webhook, porque la referencia de Meta solo dura 7 días. Saliente: guardado al momento de enviarlo.',
+      'Streamea el archivo desde MinIO (entrante o saliente). Entrante: descargado de Meta apenas llegó el ' +
+      'webhook, porque la referencia de Meta solo dura 7 días. Saliente: guardado al momento de enviarlo. ' +
+      'Objetos deduplicados por organización + SHA-256.',
   })
   @ApiResponse({
     status: 200,
@@ -698,7 +700,10 @@ export class WhatsappChatsController {
         ? `inline; filename="${encodeURIComponent(media.nombreArchivo)}"`
         : 'inline',
       'Cache-Control': 'private, max-age=86400',
+      ...(media.tamanoBytes != null
+        ? { 'Content-Length': String(media.tamanoBytes) }
+        : {}),
     });
-    res.send(media.bytes);
+    await pipeline(media.stream, res);
   }
 }

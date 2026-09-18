@@ -14,6 +14,8 @@ import type {
   TipoMediaWhatsApp,
 } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
+import { OBJECT_STORAGE } from '../../../../shared/application/ports/object-storage.port';
+import type { ObjectStorage } from '../../../../shared/application/ports/object-storage.port';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
@@ -68,6 +70,7 @@ export class ReenviarMensajeWhatsAppUseCase {
     private readonly conexiones: MetaConexionesRepository,
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
   ) {}
 
   async execute(
@@ -257,7 +260,11 @@ export class ReenviarMensajeWhatsAppUseCase {
     }
 
     if (TIPOS_MEDIA.has(mensaje.tipo)) {
-      if (!mensaje.mediaBytes || !mensaje.mediaMimeType) {
+      if (
+        !mensaje.mediaObjetoId ||
+        !mensaje.mediaObjectKey ||
+        !mensaje.mediaMimeType
+      ) {
         throw new BadRequestException(
           'Este archivo ya no está disponible para reenviar',
         );
@@ -268,10 +275,11 @@ export class ReenviarMensajeWhatsAppUseCase {
       if (!categoria || !TIPOS_MEDIA.has(categoria)) {
         throw new BadRequestException('Tipo de archivo no reenviable');
       }
+      const mediaBytes = await this.storage.getBuffer(mensaje.mediaObjectKey);
       const subido = await this.graph.subirMediaWhatsApp(
         phoneNumberId,
         accessToken,
-        mensaje.mediaBytes,
+        mediaBytes,
         mensaje.mediaMimeType,
         mensaje.mediaNombreArchivo ?? undefined,
       );
@@ -300,8 +308,8 @@ export class ReenviarMensajeWhatsAppUseCase {
         mediaNombreArchivo: mensaje.mediaNombreArchivo ?? undefined,
         mediaCaption: mensaje.mediaCaption ?? undefined,
         mediaEsVoz: mensaje.mediaEsVoz ?? undefined,
-        mediaTamanoBytes: mensaje.mediaBytes.length,
-        mediaBytes: mensaje.mediaBytes,
+        mediaTamanoBytes: mediaBytes.length,
+        mediaObjetoId: mensaje.mediaObjetoId,
         fechaMensaje: new Date(),
         usuarioCreacion: ctx.usuarioId,
       });

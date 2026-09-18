@@ -7,7 +7,7 @@ import type {
   FiltroVisibilidadChats,
   InteractivoMensajeRow,
   LeadEnConversacion,
-  MediaMensaje,
+  MediaMensajeMeta,
   MensajeParaReenviar,
   MensajeResuelto,
   MensajeRow,
@@ -703,11 +703,18 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         interactivo: input.interactivo
           ? (input.interactivo as unknown as Prisma.InputJsonValue)
           : undefined,
-        ...(input.mediaBytes
-          ? { media: { create: { bytes: input.mediaBytes } } }
+        ...(input.mediaObjetoId
+          ? { media: { create: { mediaObjetoId: input.mediaObjetoId } } }
           : {}),
       },
     });
+
+    if (input.mediaObjetoId) {
+      await this.prisma.whatsappMediaObjeto.update({
+        where: { id: input.mediaObjetoId },
+        data: { usos: { increment: 1 } },
+      });
+    }
 
     // Lista de chats ordena/muestra por ultimoMensajeEn. Varios envíos
     // salientes del CRM olvidaban llamar actualizarTrasSaliente — al
@@ -747,18 +754,23 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async obtenerMedia(
     organizacionId: string,
     mensajeId: string,
-  ): Promise<MediaMensaje | null> {
+  ): Promise<MediaMensajeMeta | null> {
     const mensaje = await this.prisma.whatsappMensaje.findFirst({
       where: { id: mensajeId, organizacionId },
-      include: { media: true },
+      include: {
+        media: { include: { mediaObjeto: true } },
+      },
     });
-    if (!mensaje?.media) return null;
+    if (!mensaje?.media?.mediaObjeto) return null;
     return {
-      // Prisma mapea Bytes a Uint8Array, no a Buffer — Buffer.from() sobre un
-      // Uint8Array no copia los bytes, solo envuelve el mismo buffer.
-      bytes: Buffer.from(mensaje.media.bytes),
-      mimeType: mensaje.mediaMimeType ?? 'application/octet-stream',
+      objectKey: mensaje.media.mediaObjeto.objectKey,
+      mimeType:
+        mensaje.mediaMimeType ??
+        mensaje.media.mediaObjeto.mimeType ??
+        'application/octet-stream',
       nombreArchivo: mensaje.mediaNombreArchivo,
+      tamanoBytes:
+        mensaje.mediaTamanoBytes ?? mensaje.media.mediaObjeto.tamanoBytes,
     };
   }
 
@@ -909,7 +921,9 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   ): Promise<MensajeParaReenviar | null> {
     const mensaje = await this.prisma.whatsappMensaje.findFirst({
       where: { id: mensajeId, organizacionId },
-      include: { media: true },
+      include: {
+        media: { include: { mediaObjeto: true } },
+      },
     });
     if (!mensaje) return null;
     return {
@@ -921,7 +935,8 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       mediaNombreArchivo: mensaje.mediaNombreArchivo,
       mediaCaption: mensaje.mediaCaption,
       mediaEsVoz: mensaje.mediaEsVoz,
-      mediaBytes: mensaje.media ? Buffer.from(mensaje.media.bytes) : null,
+      mediaObjetoId: mensaje.media?.mediaObjetoId ?? null,
+      mediaObjectKey: mensaje.media?.mediaObjeto?.objectKey ?? null,
       ubicacionLatitud: mensaje.ubicacionLatitud,
       ubicacionLongitud: mensaje.ubicacionLongitud,
       ubicacionNombre: mensaje.ubicacionNombre,

@@ -12,6 +12,7 @@ import type { MetaGraphClient } from '../../../../meta/connections/application/p
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import { previewUltimoMensajeWhatsApp, truncarConEllipsis } from '../preview-ultimo-mensaje';
 import { AsegurarLeadParaConversacionWhatsAppUseCase } from './asegurar-lead-para-conversacion-whatsapp.use-case';
+import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -47,6 +48,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly asegurarLead: AsegurarLeadParaConversacionWhatsAppUseCase,
+    private readonly guardarMedia: GuardarMediaWhatsAppService,
   ) {}
 
   async execute(
@@ -95,6 +97,23 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         )
       : undefined;
 
+    let mediaObjetoId: string | undefined;
+    if (media) {
+      try {
+        const objeto = await this.guardarMedia.asegurar(
+          conexion.organizacionId,
+          media.buffer,
+          media.mimeType ?? evento.media?.mimeType ?? 'application/octet-stream',
+        );
+        mediaObjetoId = objeto.id;
+      } catch (error: unknown) {
+        this.logger.error(
+          `No se pudo guardar media MinIO para wamid ${evento.wamid}`,
+          error instanceof Error ? error.stack : error,
+        );
+      }
+    }
+
     // El webhook solo trae el wamid del mensaje citado — hace falta el id
     // propio para guardar la relación (self-relation por id, no por wamid).
     // Si no se encuentra (mensaje muy viejo, o cita un mensaje que no es
@@ -121,7 +140,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       mediaCaption: evento.media?.caption,
       mediaEsVoz: evento.media?.esVoz,
       mediaTamanoBytes: media?.buffer.length,
-      mediaBytes: media?.buffer,
+      mediaObjetoId,
       respondeAMensajeId,
       ubicacionLatitud: evento.ubicacion?.latitud,
       ubicacionLongitud: evento.ubicacion?.longitud,

@@ -138,7 +138,7 @@ export interface MensajeResuelto {
   whatsappConversacionId: string;
 }
 
-/** Lo necesario para reenviar un mensaje a otro chat (contenido + bytes). */
+/** Lo necesario para reenviar un mensaje a otro chat (contenido + ref media). */
 export interface MensajeParaReenviar {
   id: string;
   whatsappConversacionId: string;
@@ -148,7 +148,10 @@ export interface MensajeParaReenviar {
   mediaNombreArchivo: string | null;
   mediaCaption: string | null;
   mediaEsVoz: boolean | null;
-  mediaBytes: Buffer | null;
+  /** Objeto deduplicado en MinIO — null si el mensaje no tiene media migrado. */
+  mediaObjetoId: string | null;
+  /** Key en el bucket; para bajar bytes al re-subir a Meta. */
+  mediaObjectKey: string | null;
   ubicacionLatitud: number | null;
   ubicacionLongitud: number | null;
   ubicacionNombre: string | null;
@@ -156,6 +159,14 @@ export interface MensajeParaReenviar {
   contactos: ContactoMensajeRow | ContactoMensajeRow[] | null;
 }
 
+export interface MediaMensajeMeta {
+  objectKey: string;
+  mimeType: string;
+  nombreArchivo: string | null;
+  tamanoBytes: number | null;
+}
+
+/** @deprecated Preferir MediaMensajeMeta + stream desde MinIO. */
 export interface MediaMensaje {
   bytes: Buffer;
   mimeType: string;
@@ -185,11 +196,9 @@ export interface RegistrarMensajeInput {
   mediaCaption?: string;
   mediaEsVoz?: boolean;
   mediaTamanoBytes?: number;
-  /** Si viene, se persiste en la tabla aparte WhatsappMensajeMedia en la
-   * misma escritura — entrante: ya descargado de Meta al llegar el webhook
-   * (el media_id de Meta solo dura 7 días). Saliente: los bytes que el
-   * usuario subió, antes de mandarlos a Meta. */
-  mediaBytes?: Buffer;
+  /** Id del objeto deduplicado en MinIO (WhatsappMediaObjeto).
+   * Se crea el vínculo en WhatsappMensajeMedia e incrementa `usos`. */
+  mediaObjetoId?: string;
   /** Id PROPIO (no wamid) del mensaje que este responde/cita — ya resuelto
    * por el use-case antes de llamar acá. */
   respondeAMensajeId?: string;
@@ -276,12 +285,11 @@ export interface WhatsappConversacionesRepository {
     input: RegistrarMensajeInput,
   ): Promise<{ id: string; creado: boolean }>;
 
-  /** Bytes de un mensaje con archivo — null si el mensaje no existe, no
-   * pertenece a la organización, o no tiene media asociado. */
+  /** Metadatos + objectKey del archivo — null si no existe o no tiene media en MinIO. */
   obtenerMedia(
     organizacionId: string,
     mensajeId: string,
-  ): Promise<MediaMensaje | null>;
+  ): Promise<MediaMensajeMeta | null>;
 
   actualizarTrasEntrante(
     conversacionId: string,

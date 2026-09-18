@@ -103,6 +103,12 @@ export const envValidationSchema = Joi.object({
   /** Plantilla Meta APPROVED para recordatorios de agenda fuera de ventana 24h. */
   WHATSAPP_AGENDA_REMINDER_TEMPLATE: Joi.string().allow('').optional(),
   WHATSAPP_AGENDA_REMINDER_TEMPLATE_LANG: Joi.string().allow('').optional(),
+
+  /** MinIO (S3-compatible) — media de WhatsApp y futuros adjuntos. */
+  MINIO_SERVER_URL: Joi.string().uri().required(),
+  MINIO_ROOT_USER: Joi.string().min(1).required(),
+  MINIO_ROOT_PASSWORD: Joi.string().min(1).required(),
+  MINIO_BUCKET: Joi.string().min(1).default('crm-gvr'),
 });
 
 export const envValidationOptions = {

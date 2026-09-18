@@ -31,6 +31,7 @@ import { EliminarMensajeWhatsAppCrmUseCase } from './application/use-cases/elimi
 import { ReenviarMensajeWhatsAppUseCase } from './application/use-cases/reenviar-mensaje-whatsapp.use-case';
 import { RenombrarConversacionWhatsAppUseCase } from './application/use-cases/renombrar-conversacion-whatsapp.use-case';
 import { EnviarRecordatorioAgendaWhatsAppUseCase } from './application/use-cases/enviar-recordatorio-agenda-whatsapp.use-case';
+import { GuardarMediaWhatsAppService } from './application/guardar-media-whatsapp.service';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
 import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-whatsapp-conversaciones.repository';
 
@@ -70,6 +71,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ReenviarMensajeWhatsAppUseCase,
     RenombrarConversacionWhatsAppUseCase,
     EnviarRecordatorioAgendaWhatsAppUseCase,
+    GuardarMediaWhatsAppService,
     {
       provide: WHATSAPP_CONVERSACIONES_REPOSITORY,
       useClass: PrismaWhatsappConversacionesRepository,

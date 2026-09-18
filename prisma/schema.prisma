@@ -126,6 +126,7 @@ model Organizacion {
   whatsappConexiones       WhatsappConexion[]
   whatsappConversaciones   WhatsappConversacion[]
   whatsappLlamadas         WhatsappLlamada[]
+  whatsappMediaObjetos     WhatsappMediaObjeto[]
 
   @@index([estado])
   @@index([rubro])
@@ -1145,21 +1146,44 @@ model WhatsappMensaje {
 }
 
 /**
- * Bytes del archivo, en una tabla aparte — así listar/leer mensajes (lo que
- * pasa todo el tiempo) nunca arrastra binarios, y solo se leen al pedir la
- * descarga puntual de un archivo (WhatsappChatsController GET .../media).
- * v1 guarda en Postgres (Bytes) para no depender de un bucket externo que
- * hoy no existe en el proyecto — si el volumen de archivos crece mucho,
- * el paso natural es migrar a un object storage (S3/R2) manteniendo esta
- * misma tabla como índice.
+ * Objeto de media deduplicado por organización + SHA-256.
+ * El binario vive en MinIO (`object_key`); esta fila es el índice.
+ * Varios mensajes pueden apuntar al mismo objeto (mismo PDF a muchos leads).
+ */
+model WhatsappMediaObjeto {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizacionId String   @map("organizacion_id") @db.Uuid
+  sha256         String   @db.Char(64)
+  objectKey      String   @map("object_key") @db.VarChar(512)
+  tamanoBytes    Int      @map("tamano_bytes")
+  mimeType       String   @map("mime_type") @db.VarChar(127)
+  usos           Int      @default(0)
+  fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  organizacion  Organizacion           @relation(fields: [organizacionId], references: [id])
+  mensajesMedia WhatsappMensajeMedia[]
+
+  @@unique([organizacionId, sha256])
+  @@index([organizacionId])
+  @@map("whatsapp_media_objetos")
+}
+
+/**
+ * Vínculo mensaje → objeto en MinIO.
+ * `bytes` es nullable solo durante la migración desde Postgres BYTEA;
+ * tras el backfill se elimina la columna (migración 2).
  */
 model WhatsappMensajeMedia {
   whatsappMensajeId String   @id @map("whatsapp_mensaje_id") @db.Uuid
-  bytes             Bytes    @map("bytes")
+  mediaObjetoId     String?  @map("media_objeto_id") @db.Uuid
+  /** @deprecated Legacy BYTEA — null tras migrar a MinIO; se droppea en migración 2. */
+  bytes             Bytes?   @map("bytes")
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
-  whatsappMensaje WhatsappMensaje @relation(fields: [whatsappMensajeId], references: [id])
+  whatsappMensaje WhatsappMensaje     @relation(fields: [whatsappMensajeId], references: [id])
+  mediaObjeto     WhatsappMediaObjeto? @relation(fields: [mediaObjetoId], references: [id])
 
+  @@index([mediaObjetoId])
   @@map("whatsapp_mensajes_media")
 }
 
