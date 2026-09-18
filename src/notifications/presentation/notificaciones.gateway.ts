@@ -47,4 +47,12 @@ export class NotificacionesGateway implements OnGatewayConnection, WsEmitter {
       this.server.to(`user:${usuarioId}`).emit(evento, data);
     }
   }
+
+  emitirAOrganizacion(
+    organizacionId: string,
+    evento: string,
+    data: unknown,
+  ): void {
+    this.server.to(`org:${organizacionId}`).emit(evento, data);
+  }
 }

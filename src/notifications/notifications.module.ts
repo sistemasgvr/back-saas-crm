@@ -48,6 +48,6 @@ import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar
     { provide: WS_EMITTER, useExisting: NotificacionesGateway },
     { provide: PUSH_SENDER, useExisting: WebPushSender },
   ],
-  exports: [CrearNotificacionUseCase],
+  exports: [CrearNotificacionUseCase, WS_EMITTER],
 })
 export class NotificationsModule {}

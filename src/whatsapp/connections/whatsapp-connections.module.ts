@@ -7,6 +7,7 @@ import { VincularNumeroUseCase } from './application/use-cases/vincular-numero.u
 import { DesvincularNumeroUseCase } from './application/use-cases/desvincular-numero.use-case';
 import { ResuscribirWebhookWhatsappUseCase } from './application/use-cases/resuscribir-webhook-whatsapp.use-case';
 import { VerificarSaludWebhookWhatsappUseCase } from './application/use-cases/verificar-salud-webhook-whatsapp.use-case';
+import { ActualizarRolLineaUseCase } from './application/use-cases/actualizar-rol-linea.use-case';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from './application/ports/whatsapp-conexiones.repository.port';
 import { PrismaWhatsappConexionesRepository } from './infrastructure/prisma-whatsapp-conexiones.repository';
 
@@ -20,6 +21,7 @@ import { PrismaWhatsappConexionesRepository } from './infrastructure/prisma-what
     DesvincularNumeroUseCase,
     ResuscribirWebhookWhatsappUseCase,
     VerificarSaludWebhookWhatsappUseCase,
+    ActualizarRolLineaUseCase,
     {
       provide: WHATSAPP_CONEXIONES_REPOSITORY,
       useClass: PrismaWhatsappConexionesRepository,

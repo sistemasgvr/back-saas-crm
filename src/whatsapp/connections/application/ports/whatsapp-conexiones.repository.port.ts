@@ -11,6 +11,10 @@ export interface WhatsappConexionRow {
   numeroDisplay: string | null;
   nombreVerificado: string | null;
   estadoNumero: string | null;
+  /** MENSAJES | LLAMADAS | AMBOS */
+  rolLinea: string;
+  callingHabilitado: boolean;
+  callingUltimoError: string | null;
   webhookSuscrito: boolean;
   webhookSuscritoEn: Date | null;
   webhookUltimoCheckEn: Date | null;
@@ -54,6 +58,17 @@ export interface WhatsappConexionesRepository {
   marcarWebhookCheck(
     id: string,
     suscrito: boolean,
+    error: string | null,
+  ): Promise<void>;
+  actualizarRolLinea(
+    organizacionId: string,
+    id: string,
+    rolLinea: string,
+    usuarioEdicion: string,
+  ): Promise<WhatsappConexionRow | null>;
+  actualizarCallingHabilitado(
+    id: string,
+    habilitado: boolean,
     error: string | null,
   ): Promise<void>;
 }

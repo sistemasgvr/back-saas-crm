@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -30,7 +31,9 @@ import { VincularNumeroUseCase } from '../application/use-cases/vincular-numero.
 import { DesvincularNumeroUseCase } from '../application/use-cases/desvincular-numero.use-case';
 import { ResuscribirWebhookWhatsappUseCase } from '../application/use-cases/resuscribir-webhook-whatsapp.use-case';
 import { VerificarSaludWebhookWhatsappUseCase } from '../application/use-cases/verificar-salud-webhook-whatsapp.use-case';
+import { ActualizarRolLineaUseCase } from '../application/use-cases/actualizar-rol-linea.use-case';
 import { VincularNumeroDto } from './dto/vincular-numero.dto';
+import { ActualizarRolLineaDto } from './dto/actualizar-rol-linea.dto';
 
 @ApiTags('WhatsApp Connections')
 @ApiBearerAuth('JWT-auth')
@@ -46,6 +49,7 @@ export class WhatsappConnectionsController {
     private readonly desvincular: DesvincularNumeroUseCase,
     private readonly resuscribirWebhook: ResuscribirWebhookWhatsappUseCase,
     private readonly verificarSalud: VerificarSaludWebhookWhatsappUseCase,
+    private readonly actualizarRolLinea: ActualizarRolLineaUseCase,
   ) {}
 
   @Get()
@@ -91,6 +95,25 @@ export class WhatsappConnectionsController {
       dto.phoneNumberId,
       dto.numeroDisplay,
       dto.nombreVerificado,
+      ctx.usuarioId,
+    );
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Actualizar rol de línea (MENSAJES | LLAMADAS | AMBOS)',
+  })
+  @ApiResponse({ status: 200, description: 'Conexión actualizada.' })
+  @ApiResponse({ status: 404, description: 'Conexión no encontrada.' })
+  patchRolLinea(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ActualizarRolLineaDto,
+  ) {
+    return this.actualizarRolLinea.execute(
+      ctx.organizacionId!,
+      id,
+      dto.rolLinea,
       ctx.usuarioId,
     );
   }

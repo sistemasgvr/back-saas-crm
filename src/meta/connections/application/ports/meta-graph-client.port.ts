@@ -229,6 +229,42 @@ export interface DebugTokenGraph {
   expiresAt?: Date;
 }
 
+/** SDP de señalización WebRTC para WhatsApp Cloud API Calling. */
+export interface MetaCallSdp {
+  sdp_type: 'offer' | 'answer';
+  sdp: string;
+}
+
+export interface MetaCallActionResult {
+  success: boolean;
+}
+
+export interface MetaCallSettingsGraph {
+  status?: string;
+  call_icon_visibility?: string;
+  call_hours?: unknown;
+  callback_permission_status?: string;
+}
+
+export interface MetaCallPermissionGraph {
+  permission?: { status?: string; expiration_time?: number };
+}
+
+export interface AccionLlamadaWhatsAppInput {
+  action: 'pre_accept' | 'accept' | 'reject' | 'terminate' | 'connect';
+  callId?: string;
+  /** Destinatario para BIC (action=connect). */
+  to?: string;
+  session?: { sdp_type: string; sdp: string };
+}
+
+export interface SolicitarPermisoLlamadaInput {
+  to: string;
+  mensaje?: string;
+  plantillaNombre?: string;
+  plantillaIdioma?: string;
+}
+
 export interface MetaInsightGraph {
   fecha: string;
   spend: number;
@@ -511,4 +547,35 @@ export interface MetaGraphClient {
     accessToken: string,
     telefonos: string[],
   ): Promise<void>;
+
+  // --- WhatsApp Cloud API Calling ---
+  /** GET /{phone-number-id}/call_settings */
+  obtenerSettingsLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+  ): Promise<MetaCallSettingsGraph>;
+  /** POST /{phone-number-id}/call_settings */
+  actualizarSettingsLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    body: Record<string, unknown>,
+  ): Promise<void>;
+  /** POST /{phone-number-id}/calls — pre_accept | accept | reject | terminate | connect */
+  accionLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    input: AccionLlamadaWhatsAppInput,
+  ): Promise<MetaCallActionResult & { calls?: { id: string }[] }>;
+  /** GET /{phone-number-id}/call_permissions?user_wa_id= */
+  obtenerPermisosLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    userWaId: string,
+  ): Promise<MetaCallPermissionGraph>;
+  /** Solicitud de permiso vía interactive call_permission_request o plantilla. */
+  solicitarPermisoLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    input: SolicitarPermisoLlamadaInput,
+  ): Promise<MetaCallActionResult>;
 }

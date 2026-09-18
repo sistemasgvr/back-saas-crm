@@ -32,6 +32,8 @@ export interface WhatsappWebhookPayload {
           recipient_id?: string;
           recipient_user_id?: string;
         }[];
+        /** Cloud API Calling — array de llamadas en el webhook `field=calls`. */
+        calls?: LlamadaMetaCruda[];
         /**
          * Coexistencia: sync de historial (hasta ~180 días).
          * https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/history
@@ -61,6 +63,19 @@ export interface WhatsappWebhookPayload {
       };
     }[];
   }[];
+}
+
+/** Forma cruda de una llamada en el webhook `field=calls` de Meta. */
+export interface LlamadaMetaCruda {
+  id?: string;
+  from?: string;
+  to?: string;
+  event?: string;
+  direction?: 'USER_INITIATED' | 'BUSINESS_INITIATED' | string;
+  status?: string;
+  timestamp?: string;
+  session?: { sdp_type?: string; sdp?: string };
+  connection?: { webrtc?: unknown };
 }
 
 /** Forma común de un mensaje en webhooks `messages` / `smb_message_echoes`. */
@@ -261,6 +276,20 @@ export interface EventoEstadoWhatsApp {
   timestamp: Date;
 }
 
+/** Evento normalizado de WhatsApp Cloud API Calling. */
+export interface EventoLlamadaWhatsApp {
+  phoneNumberId: string;
+  callId: string;
+  /** Teléfono del contacto (from en UIC, to en BIC). */
+  waId: string | null;
+  event: string;
+  direction?: string;
+  status?: string;
+  timestamp: Date;
+  session?: { sdp_type?: string; sdp?: string };
+  raw: unknown;
+}
+
 function timestampADate(timestamp?: string): Date {
   return timestamp ? new Date(Number(timestamp) * 1000) : new Date();
 }
@@ -317,6 +346,7 @@ type AcumuladoresEventos = {
   estados: EventoEstadoWhatsApp[];
   reacciones: EventoReaccionWhatsApp[];
   ediciones: EventoEdicionWhatsApp[];
+  llamadas: EventoLlamadaWhatsApp[];
 };
 
 /** Clasifica un mensaje Meta crudo (entrante o eco) en el acumulador correcto.
@@ -597,6 +627,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
   estados: EventoEstadoWhatsApp[];
   reacciones: EventoReaccionWhatsApp[];
   ediciones: EventoEdicionWhatsApp[];
+  llamadas: EventoLlamadaWhatsApp[];
 } {
   const out: AcumuladoresEventos = {
     mensajes: [],
@@ -604,6 +635,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
     estados: [],
     reacciones: [],
     ediciones: [],
+    llamadas: [],
   };
 
   for (const entry of payload.entry ?? []) {
@@ -699,9 +731,42 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
         continue;
       }
 
+      if (field === 'calls') {
+        if (!phoneNumberId) continue;
+        for (const call of value?.calls ?? []) {
+          if (!call.id || !call.event) continue;
+          const direction = call.direction;
+          const waCrudo =
+            direction === 'BUSINESS_INITIATED'
+              ? call.to
+              : call.from ?? call.to;
+          out.llamadas.push({
+            phoneNumberId,
+            callId: call.id,
+            waId: waCrudo ? normalizarWaId(waCrudo) || waCrudo : null,
+            event: call.event,
+            direction,
+            status: call.status,
+            timestamp: timestampADate(call.timestamp),
+            session: call.session
+              ? { sdp_type: call.session.sdp_type, sdp: call.session.sdp }
+              : undefined,
+            raw: call,
+          });
+        }
+        continue;
+      }
+
       if (field === 'smb_app_state_sync') {
         logger.log(
           'Ignorando campo webhook WhatsApp smb_app_state_sync (sync de contactos; no procesamos mensajes)',
+        );
+        continue;
+      }
+
+      if (field === 'account_settings_update') {
+        logger.log(
+          'Ignorando campo webhook WhatsApp account_settings_update (settings Calling; se consultan vía Graph)',
         );
         continue;
       }

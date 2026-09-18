@@ -6,6 +6,7 @@ import { PrismaModule } from '../../shared/infrastructure/prisma.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
 import { WhatsappMessagingModule } from '../../whatsapp/messaging/whatsapp-messaging.module';
 import { WhatsappConnectionsModule } from '../../whatsapp/connections/whatsapp-connections.module';
+import { WhatsappCallsModule } from '../../whatsapp/calls/whatsapp-calls.module';
 import { VerificarWebhookMetaUseCase } from './application/use-cases/verificar-webhook-meta.use-case';
 import { MetaWebhooksController } from './presentation/meta-webhooks.controller';
 import { LeadsModule } from '../../leads/leads.module';
@@ -20,6 +21,7 @@ import { LeadsModule } from '../../leads/leads.module';
     NotificationsModule,
     WhatsappMessagingModule,
     WhatsappConnectionsModule,
+    WhatsappCallsModule,
   ],
   controllers: [MetaWebhooksController],
   providers: [VerificarWebhookMetaUseCase],

@@ -9,5 +9,19 @@ export const CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA = [
   'smb_app_state_sync',
 ] as const;
 
+/** Campos extra para línea Cloud API-only con Calling. */
+export const CAMPOS_WEBHOOK_WHATSAPP_CALLING = [
+  'calls',
+  'account_settings_update',
+] as const;
+
+export const CAMPOS_WEBHOOK_WHATSAPP_TODOS = [
+  ...CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA,
+  ...CAMPOS_WEBHOOK_WHATSAPP_CALLING,
+] as const;
+
 export type CampoWebhookWhatsappCoexistencia =
   (typeof CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA)[number];
+
+export type CampoWebhookWhatsappCalling =
+  (typeof CAMPOS_WEBHOOK_WHATSAPP_CALLING)[number];

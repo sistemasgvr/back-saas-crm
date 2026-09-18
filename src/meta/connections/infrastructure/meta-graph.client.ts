@@ -20,7 +20,11 @@ import type {
   FiltroInsights,
   FiltroLeadsDeForm,
   ListadoGraph,
+  AccionLlamadaWhatsAppInput,
   MetaAnuncioGraph,
+  MetaCallActionResult,
+  MetaCallPermissionGraph,
+  MetaCallSettingsGraph,
   MetaCampanaGraph,
   MetaConjuntoAnuncioGraph,
   MetaCuentaPublicitariaDetalleGraph,
@@ -39,6 +43,7 @@ import type {
   MetaUsuario,
   PaginaLeadsDeForm,
   ParametroPlantilla,
+  SolicitarPermisoLlamadaInput,
   TipoMediaWhatsApp,
   TokenIntercambiado,
   UbicacionParaEnviar,
@@ -1250,6 +1255,99 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
       },
       accessToken,
     );
+  }
+
+  async obtenerSettingsLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+  ): Promise<MetaCallSettingsGraph> {
+    return this.get<MetaCallSettingsGraph>(`/${phoneNumberId}/call_settings`, {
+      access_token: accessToken,
+    });
+  }
+
+  async actualizarSettingsLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    body: Record<string, unknown>,
+  ): Promise<void> {
+    await this.postJson(`/${phoneNumberId}/call_settings`, body, accessToken);
+  }
+
+  async accionLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    input: AccionLlamadaWhatsAppInput,
+  ): Promise<MetaCallActionResult & { calls?: { id: string }[] }> {
+    const body: Record<string, unknown> = {
+      messaging_product: 'whatsapp',
+      action: input.action,
+    };
+    if (input.callId) body.call_id = input.callId;
+    if (input.to) body.to = input.to;
+    if (input.session) {
+      body.session = {
+        sdp_type: input.session.sdp_type,
+        sdp: input.session.sdp,
+      };
+    }
+    return this.postJson(`/${phoneNumberId}/calls`, body, accessToken);
+  }
+
+  async obtenerPermisosLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    userWaId: string,
+  ): Promise<MetaCallPermissionGraph> {
+    return this.get<MetaCallPermissionGraph>(
+      `/${phoneNumberId}/call_permissions`,
+      {
+        access_token: accessToken,
+        user_wa_id: userWaId,
+      },
+    );
+  }
+
+  async solicitarPermisoLlamadaWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+    input: SolicitarPermisoLlamadaInput,
+  ): Promise<MetaCallActionResult> {
+    if (input.plantillaNombre) {
+      await this.postJson(
+        `/${phoneNumberId}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          ...this.destinatario(input.to),
+          type: 'template',
+          template: {
+            name: input.plantillaNombre,
+            language: { code: input.plantillaIdioma ?? 'es' },
+          },
+        },
+        accessToken,
+      );
+      return { success: true };
+    }
+
+    const mensaje =
+      input.mensaje?.trim() ||
+      '¿Nos das permiso para llamarte por WhatsApp?';
+    await this.postJson(
+      `/${phoneNumberId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        ...this.destinatario(input.to),
+        type: 'interactive',
+        interactive: {
+          type: 'call_permission_request',
+          action: { name: 'call_permission_request' },
+          body: { text: mensaje },
+        },
+      },
+      accessToken,
+    );
+    return { success: true };
   }
 
   /**

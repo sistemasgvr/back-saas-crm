@@ -47,6 +47,7 @@ model Usuario {
 
   leadAutoAsignacionConfigsPrimero LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionPrimero")
   leadAutoAsignacionConfigsSegundo LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionSegundo")
+  whatsappLlamadasAsignadas       WhatsappLlamada[]          @relation("WhatsappLlamadaAsignado")
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -124,6 +125,7 @@ model Organizacion {
   suscripcionesPush        SuscripcionPush[]
   whatsappConexiones       WhatsappConexion[]
   whatsappConversaciones   WhatsappConversacion[]
+  whatsappLlamadas         WhatsappLlamada[]
 
   @@index([estado])
   @@index([rubro])
@@ -304,6 +306,7 @@ model Lead {
   asignadoPorUsuario     Usuario?               @relation("LeadAsignadoPor", fields: [asignadoPorUsuarioId], references: [id])
   inmuebleInteres        Inmueble?              @relation("LeadInmuebleInteres", fields: [inmuebleInteresId], references: [id])
   whatsappConversaciones WhatsappConversacion[]
+  whatsappLlamadas       WhatsappLlamada[]
   estadoHistorial        LeadEstadoHistorial[]
   visitas                LeadVisita[]
   actividades            LeadActividad[]
@@ -937,6 +940,15 @@ model WhatsappConexion {
   nombreVerificado String? @map("nombre_verificado") @db.VarChar(255)
   estadoNumero     String? @map("estado_numero") @db.VarChar(40)
 
+  /**
+   * MENSAJES = coexistencia / chats; LLAMADAS = Cloud API-only Calling;
+   * AMBOS = Cloud-only con messaging+calling (sin coexistencia).
+   */
+  rolLinea           String @default("MENSAJES") @map("rol_linea") @db.VarChar(20)
+  /** 1 = Calling ENABLED en Meta settings (solo válido si no es coexistencia). */
+  callingHabilitado Int    @default(0) @map("calling_habilitado") @db.SmallInt
+  callingUltimoError String? @map("calling_ultimo_error")
+
   webhookSuscrito      Int       @default(0) @map("webhook_suscrito") @db.SmallInt
   webhookSuscritoEn    DateTime? @map("webhook_suscrito_en") @db.Timestamptz
   webhookUltimoCheckEn DateTime? @map("webhook_ultimo_check_en") @db.Timestamptz
@@ -951,10 +963,12 @@ model WhatsappConexion {
   organizacion   Organizacion           @relation(fields: [organizacionId], references: [id])
   metaConexion   MetaConexion           @relation(fields: [metaConexionId], references: [id])
   conversaciones WhatsappConversacion[]
+  llamadas       WhatsappLlamada[]
 
   // phone_number_id único entre conexiones activas: índice parcial en migración
   // (Prisma DSL no soporta partial unique) — permite re-vincular tras desvincular.
   @@index([organizacionId, phoneNumberId])
+  @@index([organizacionId, rolLinea])
   @@index([estado])
   @@map("whatsapp_conexiones")
 }
@@ -1005,6 +1019,7 @@ model WhatsappConversacion {
   whatsappConexion WhatsappConexion  @relation(fields: [whatsappConexionId], references: [id])
   lead             Lead?             @relation(fields: [leadId], references: [id])
   mensajes         WhatsappMensaje[]
+  llamadas         WhatsappLlamada[]
 
   @@unique([organizacionId, waId])
   @@index([leadId])
@@ -1146,4 +1161,60 @@ model WhatsappMensajeMedia {
   whatsappMensaje WhatsappMensaje @relation(fields: [whatsappMensajeId], references: [id])
 
   @@map("whatsapp_mensajes_media")
+}
+
+/**
+ * Historial de llamadas WhatsApp Cloud API Calling (UIC/BIC).
+ * Señalización vía Graph + webhook `calls`; media WebRTC en el browser.
+ */
+model WhatsappLlamada {
+  id                   String  @id @default(uuid()) @db.Uuid
+  organizacionId       String  @map("organizacion_id") @db.Uuid
+  whatsappConexionId   String  @map("whatsapp_conexion_id") @db.Uuid
+  conversacionId       String? @map("conversacion_id") @db.Uuid
+  leadId               String? @map("lead_id") @db.Uuid
+  asignadoUsuarioId    String? @map("asignado_usuario_id") @db.Uuid
+
+  /** call_id de Meta — idempotencia ante reintentos de webhook. */
+  callId    String  @map("call_id") @db.VarChar(128)
+  waId      String? @map("wa_id") @db.VarChar(40)
+  /** ENTRANTE | SALIENTE */
+  direccion String  @db.VarChar(12)
+  /**
+   * RINGING | PRE_ACCEPTED | ACTIVE | ENDED | REJECTED | MISSED | FAILED
+   */
+  estado    String  @db.VarChar(20)
+  /**
+   * CONTESTADA | NO_CONTESTADA | RECHAZADA | OCUPADO | FALLIDA | null si en curso
+   */
+  resultado String? @db.VarChar(20)
+
+  inicioEn     DateTime  @map("inicio_en") @db.Timestamptz
+  contestadaEn DateTime? @map("contestada_en") @db.Timestamptz
+  finEn        DateTime? @map("fin_en") @db.Timestamptz
+  duracionSeg  Int?      @map("duracion_seg")
+
+  notaPostLlamada String? @map("nota_post_llamada")
+  /** seguimiento | visita | consulta | otro */
+  motivo          String? @db.VarChar(40)
+  errorCodigo     String? @map("error_codigo") @db.VarChar(40)
+  errorMensaje    String? @map("error_mensaje")
+
+  datosCrudos Json? @map("datos_crudos")
+
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion     Organizacion          @relation(fields: [organizacionId], references: [id])
+  whatsappConexion WhatsappConexion      @relation(fields: [whatsappConexionId], references: [id])
+  conversacion     WhatsappConversacion? @relation(fields: [conversacionId], references: [id])
+  lead             Lead?                 @relation(fields: [leadId], references: [id])
+  asignadoUsuario  Usuario?              @relation("WhatsappLlamadaAsignado", fields: [asignadoUsuarioId], references: [id])
+
+  @@unique([organizacionId, callId])
+  @@index([organizacionId, inicioEn(sort: Desc)])
+  @@index([conversacionId])
+  @@index([leadId])
+  @@index([asignadoUsuarioId, inicioEn])
+  @@map("whatsapp_llamadas")
 }

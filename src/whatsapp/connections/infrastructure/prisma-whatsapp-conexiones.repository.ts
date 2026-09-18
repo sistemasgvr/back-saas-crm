@@ -15,13 +15,20 @@ function toRow(row: {
   numeroDisplay: string | null;
   nombreVerificado: string | null;
   estadoNumero: string | null;
+  rolLinea: string;
+  callingHabilitado: number;
+  callingUltimoError: string | null;
   webhookSuscrito: number;
   webhookSuscritoEn: Date | null;
   webhookUltimoCheckEn: Date | null;
   webhookUltimoError: string | null;
   fechaCreacion: Date;
 }): WhatsappConexionRow {
-  return { ...row, webhookSuscrito: row.webhookSuscrito === 1 };
+  return {
+    ...row,
+    callingHabilitado: row.callingHabilitado === 1,
+    webhookSuscrito: row.webhookSuscrito === 1,
+  };
 }
 
 @Injectable()
@@ -154,6 +161,38 @@ export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRep
         webhookSuscrito: suscrito ? 1 : 0,
         webhookUltimoCheckEn: new Date(),
         webhookUltimoError: error,
+      },
+    });
+  }
+
+  async actualizarRolLinea(
+    organizacionId: string,
+    id: string,
+    rolLinea: string,
+    usuarioEdicion: string,
+  ): Promise<WhatsappConexionRow | null> {
+    const existente = await this.prisma.whatsappConexion.findFirst({
+      where: { id, organizacionId, estado: 1 },
+    });
+    if (!existente) return null;
+
+    const conexion = await this.prisma.whatsappConexion.update({
+      where: { id },
+      data: { rolLinea, usuarioEdicion },
+    });
+    return toRow(conexion);
+  }
+
+  async actualizarCallingHabilitado(
+    id: string,
+    habilitado: boolean,
+    error: string | null,
+  ): Promise<void> {
+    await this.prisma.whatsappConexion.update({
+      where: { id },
+      data: {
+        callingHabilitado: habilitado ? 1 : 0,
+        callingUltimoError: error,
       },
     });
   }

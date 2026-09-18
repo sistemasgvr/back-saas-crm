@@ -28,6 +28,7 @@ import { ProcesarEcoMensajeWhatsAppUseCase } from '../../../whatsapp/messaging/a
 import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-estado-whatsapp.use-case';
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
 import { ProcesarEdicionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-edicion-whatsapp.use-case';
+import { ProcesarLlamadaWebhookUseCase } from '../../../whatsapp/calls/application/use-cases/procesar-llamada-webhook.use-case';
 
 function esErrorReintentable(error: unknown): boolean {
   if (error instanceof PageSinConexionError) return false;
@@ -60,6 +61,7 @@ export class MetaWebhooksController {
     private readonly procesarEstadoWhatsApp: ProcesarEstadoWhatsAppUseCase,
     private readonly procesarReaccionWhatsApp: ProcesarReaccionWhatsAppUseCase,
     private readonly procesarEdicionWhatsApp: ProcesarEdicionWhatsAppUseCase,
+    private readonly procesarLlamadaWhatsApp: ProcesarLlamadaWebhookUseCase,
   ) {}
 
   @Get()
@@ -191,7 +193,7 @@ export class MetaWebhooksController {
   private async procesarEventosWhatsApp(
     payload: WhatsappWebhookPayload,
   ): Promise<boolean> {
-    const { mensajes, ecos, estados, reacciones, ediciones } =
+    const { mensajes, ecos, estados, reacciones, ediciones, llamadas } =
       extraerEventosWhatsApp(payload);
     let huboFalloReintentable = false;
 
@@ -249,6 +251,18 @@ export class MetaWebhooksController {
       } catch (error) {
         this.logger.error(
           `Error procesando edición WhatsApp sobre ${evento.wamidOriginal}`,
+          error instanceof Error ? error.stack : error,
+        );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
+      }
+    }
+
+    for (const evento of llamadas) {
+      try {
+        await this.procesarLlamadaWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando llamada WhatsApp ${evento.callId} (phone_number_id ${evento.phoneNumberId})`,
           error instanceof Error ? error.stack : error,
         );
         if (esErrorReintentable(error)) huboFalloReintentable = true;
