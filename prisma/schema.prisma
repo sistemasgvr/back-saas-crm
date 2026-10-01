@@ -356,6 +356,8 @@ model LeadAutoAsignacionConfig {
    * por compatibilidad con configs existentes.
    */
   usuarioIds Json? @map("usuario_ids")
+  limitesDiarios Json @default("{}") @map("limites_diarios")
+  consumoDiario Json @default("{}") @map("consumo_diario")
 
   siguienteIndice Int @default(0) @map("siguiente_indice") @db.SmallInt
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz

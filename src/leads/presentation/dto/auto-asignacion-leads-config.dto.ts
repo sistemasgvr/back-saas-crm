@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsBoolean, IsUUID } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsUUID,
+  IsObject,
+  IsOptional,
+} from 'class-validator';
 
 export class AutoAsignacionLeadsConfigDto {
   @ApiProperty({
@@ -14,11 +20,21 @@ export class AutoAsignacionLeadsConfigDto {
       'IDs de usuarios del round-robin (ej. ["DavidId","DaimlerId","..."]). ' +
       'El índice del siguiente lead se alterna en forma circular (N usuarios).',
     type: [String],
-    example: ['00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002'],
+    example: [
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000000002',
+    ],
   })
   @IsArray()
-  @ArrayMinSize(2)
   @IsUUID(undefined, { each: true })
   usuarioIds: string[];
-}
 
+  @ApiProperty({
+    required: false,
+    description:
+      'Máximo diario por usuario. Omitir un usuario significa sin límite.',
+  })
+  @IsOptional()
+  @IsObject()
+  limitesDiarios?: Record<string, number>;
+}

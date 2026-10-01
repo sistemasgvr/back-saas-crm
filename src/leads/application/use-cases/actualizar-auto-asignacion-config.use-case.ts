@@ -5,7 +5,6 @@ import {
 } from '../ports/lead-auto-asignacion.repository.port';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
-import type { AutoAsignacionConfigDto } from './obtener-auto-asignacion-config.use-case';
 
 @Injectable()
 export class ActualizarAutoAsignacionConfigUseCase {
@@ -21,12 +20,35 @@ export class ActualizarAutoAsignacionConfigUseCase {
     input: {
       habilitado: boolean;
       usuarioIds: string[];
+      limitesDiarios?: Record<string, number>;
     },
   ): Promise<void> {
-    if (input.usuarioIds.length < 2) {
+    if (input.habilitado && input.usuarioIds.length < 1) {
       throw new BadRequestException(
-        'Se requiere al menos 2 usuarios para el round-robin',
+        'Se requiere al menos 1 usuario para habilitar la asignación automática',
       );
+    }
+
+    if (
+      input.limitesDiarios !== undefined &&
+      (!input.limitesDiarios ||
+        typeof input.limitesDiarios !== 'object' ||
+        Array.isArray(input.limitesDiarios))
+    ) {
+      throw new BadRequestException('Los límites diarios deben ser un objeto');
+    }
+    for (const [usuarioId, limite] of Object.entries(
+      input.limitesDiarios ?? {},
+    )) {
+      if (
+        !input.usuarioIds.includes(usuarioId) ||
+        !Number.isSafeInteger(limite) ||
+        limite < 1
+      ) {
+        throw new BadRequestException(
+          'Cada límite diario debe ser un entero positivo de un usuario seleccionado',
+        );
+      }
     }
 
     // Todos los usuarios del round-robin deben ser distintos.
@@ -55,7 +77,7 @@ export class ActualizarAutoAsignacionConfigUseCase {
       organizacionId,
       habilitado: input.habilitado,
       usuarioIds: input.usuarioIds,
+      ...(input.limitesDiarios !== undefined ? { limitesDiarios: input.limitesDiarios } : {}),
     });
   }
 }
-

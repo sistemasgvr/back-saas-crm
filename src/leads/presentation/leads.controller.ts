@@ -150,6 +150,7 @@ export class LeadsController {
     return this.actualizarAutoAsignacionConfig.execute(ctx.organizacionId!, {
       habilitado: dto.habilitado,
       usuarioIds: dto.usuarioIds,
+      limitesDiarios: dto.limitesDiarios,
     });
   }
 

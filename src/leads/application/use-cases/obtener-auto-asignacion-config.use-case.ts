@@ -8,6 +8,9 @@ export interface AutoAsignacionConfigDto {
   habilitado: boolean;
   usuarioIds: string[];
   siguienteIndice: number;
+  limitesDiarios?: Record<string, number>;
+  asignadosHoy?: Record<string, number>;
+  diaConsumo?: string;
 }
 
 @Injectable()
@@ -31,7 +34,9 @@ export class ObtenerAutoAsignacionConfigUseCase {
       habilitado: cfg.habilitado,
       usuarioIds: cfg.usuarioIds,
       siguienteIndice: cfg.siguienteIndice,
+      limitesDiarios: cfg.limitesDiarios ?? {},
+      asignadosHoy: cfg.asignadosHoy ?? {},
+      diaConsumo: cfg.diaConsumo,
     };
   }
 }
-

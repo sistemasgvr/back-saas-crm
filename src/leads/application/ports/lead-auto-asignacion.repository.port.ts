@@ -2,6 +2,9 @@ export interface LeadAutoAsignacionConfig {
   habilitado: boolean;
   usuarioIds: string[];
   siguienteIndice: number;
+  limitesDiarios?: Record<string, number>;
+  asignadosHoy?: Record<string, number>;
+  diaConsumo?: string;
 }
 
 export interface LeadAutoAsignacionRepository {
@@ -13,6 +16,7 @@ export interface LeadAutoAsignacionRepository {
     organizacionId: string;
     habilitado: boolean;
     usuarioIds: string[];
+    limitesDiarios?: Record<string, number>;
   }): Promise<void>;
 
   /**
@@ -32,7 +36,10 @@ export interface LeadAutoAsignacionRepository {
   obtenerLeadParaAutoAsignacion(input: {
     organizacionId: string;
     leadId: string;
-  }): Promise<{ asignadoUsuarioId: string | null; fechaLeadEfectiva: Date } | null>;
+  }): Promise<{
+    asignadoUsuarioId: string | null;
+    fechaLeadEfectiva: Date;
+  } | null>;
 
   /**
    * Asigna de inmediato un lead concreto (si sigue libre y el pool está ON).

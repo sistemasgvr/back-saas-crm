@@ -1,3 +1,9 @@
+import type { Prisma } from '@prisma/client';
+import { fechaLima } from '../../shared/application/lima-time';
+import {
+  consumoDelDia,
+  limitesDesdeJson,
+} from '../domain/consumo-auto-asignacion';
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
@@ -19,9 +25,7 @@ function configHabilitada(cfg: Pick<ConfigRow, 'habilitado'>): boolean {
 }
 
 @Injectable()
-export class PrismaLeadAutoAsignacionRepository
-  implements LeadAutoAsignacionRepository
-{
+export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRepository {
   private readonly logger = new Logger(PrismaLeadAutoAsignacionRepository.name);
 
   constructor(private readonly prisma: PrismaService) {}
@@ -39,6 +43,9 @@ export class PrismaLeadAutoAsignacionRepository
       habilitado: configHabilitada(cfg),
       usuarioIds: resolverUsuarioIdsRoundRobin(cfg),
       siguienteIndice: cfg.siguienteIndice,
+      limitesDiarios: limitesDesdeJson(cfg.limitesDiarios),
+      asignadosHoy: consumoDelDia(cfg.consumoDiario, fechaLima()).porUsuario,
+      diaConsumo: fechaLima(),
     };
   }
 
@@ -46,7 +53,15 @@ export class PrismaLeadAutoAsignacionRepository
     organizacionId: string;
     habilitado: boolean;
     usuarioIds: string[];
+    limitesDiarios?: Record<string, number>;
   }): Promise<void> {
+    if (!input.usuarioIds.length) {
+      await this.prisma.leadAutoAsignacionConfig.updateMany({
+        where: { organizacionId: input.organizacionId },
+        data: { habilitado: 0 },
+      });
+      return;
+    }
     const usuarioPrimeroId = input.usuarioIds[0];
     const usuarioSegundoId = input.usuarioIds[1] ?? input.usuarioIds[0];
 
@@ -58,6 +73,7 @@ export class PrismaLeadAutoAsignacionRepository
         usuarioPrimeroId,
         usuarioSegundoId,
         usuarioIds: input.usuarioIds as object,
+        limitesDiarios: input.limitesDiarios ?? {},
         siguienteIndice: 0,
       },
       update: {
@@ -65,6 +81,9 @@ export class PrismaLeadAutoAsignacionRepository
         usuarioPrimeroId,
         usuarioSegundoId,
         usuarioIds: input.usuarioIds as object,
+        ...(input.limitesDiarios !== undefined
+          ? { limitesDiarios: input.limitesDiarios }
+          : {}),
         // Si el usuario ajusta la configuración, reiniciamos la secuencia.
         siguienteIndice: 0,
       },
@@ -95,9 +114,16 @@ export class PrismaLeadAutoAsignacionRepository
   async obtenerLeadParaAutoAsignacion(input: {
     organizacionId: string;
     leadId: string;
-  }): Promise<{ asignadoUsuarioId: string | null; fechaLeadEfectiva: Date } | null> {
+  }): Promise<{
+    asignadoUsuarioId: string | null;
+    fechaLeadEfectiva: Date;
+  } | null> {
     const lead = await this.prisma.lead.findFirst({
-      where: { id: input.leadId, organizacionId: input.organizacionId, estado: 1 },
+      where: {
+        id: input.leadId,
+        organizacionId: input.organizacionId,
+        estado: 1,
+      },
       select: {
         asignadoUsuarioId: true,
         fechaLead: true,
@@ -112,204 +138,121 @@ export class PrismaLeadAutoAsignacionRepository
     };
   }
 
-  async asignarLeadPendiente(
+  /** Bloqueo por organización: cursor, cupos y asignación se confirman juntos. */
+  private async bloquearConfig(
+    tx: Prisma.TransactionClient,
+    organizacionId: string,
+  ) {
+    await tx.$queryRaw`SELECT id FROM lead_auto_asignacion_config
+      WHERE organizacion_id = ${organizacionId}::uuid FOR UPDATE`;
+    return tx.leadAutoAsignacionConfig.findUnique({
+      where: { organizacionId },
+    });
+  }
+
+  private async asignarEnTransaccion(
+    tx: Prisma.TransactionClient,
     organizacionId: string,
     leadId: string,
   ): Promise<string | null> {
-    return this.prisma.$transaction(async (tx) => {
-      const cfg = await tx.leadAutoAsignacionConfig.findUnique({
-        where: { organizacionId },
-      });
-      if (!cfg || !configHabilitada(cfg)) return null;
+    const cfg = await this.bloquearConfig(tx, organizacionId);
+    if (!cfg || !configHabilitada(cfg)) return null;
 
-      const lead = await tx.lead.findFirst({
+    const lead = await tx.lead.findFirst({
+      where: { id: leadId, organizacionId, estado: 1, asignadoUsuarioId: null },
+      select: { id: true },
+    });
+    if (!lead) {
+      await tx.leadAutoAsignacionQueue.deleteMany({
+        where: { organizacionId, leadId },
+      });
+      return null;
+    }
+
+    const usuarioIds = resolverUsuarioIdsRoundRobin(cfg);
+    const n = usuarioIds.length;
+    const ahora = new Date();
+    const consumo = consumoDelDia(cfg.consumoDiario, fechaLima(ahora));
+    const limites = limitesDesdeJson(cfg.limitesDiarios);
+    const inicio = n ? ((cfg.siguienteIndice % n) + n) % n : 0;
+    for (let intento = 0; intento < n; intento++) {
+      const indice = (inicio + intento) % n;
+      const usuarioId = usuarioIds[indice];
+      if (
+        limites[usuarioId] !== undefined &&
+        (consumo.porUsuario[usuarioId] ?? 0) >= limites[usuarioId]
+      )
+        continue;
+      const miembro = await tx.organizacionUsuario.findFirst({
+        where: { organizacionId, usuarioId, estado: 1, usuario: { estado: 1 } },
+        select: { id: true },
+      });
+      if (!miembro) continue;
+
+      const result = await tx.lead.updateMany({
         where: {
           id: leadId,
           organizacionId,
           estado: 1,
           asignadoUsuarioId: null,
         },
-        select: { id: true },
+        data: {
+          asignadoUsuarioId: usuarioId,
+          asignadoEn: ahora,
+          asignadoPorUsuarioId: null,
+          usuarioEdicion: usuarioId,
+        },
       });
-      if (!lead) return null;
-
-      const usuarioIds = resolverUsuarioIdsRoundRobin(cfg);
-      const N = usuarioIds.length;
-      if (N === 0) {
-        this.logger.warn(
-          `Auto-asignación org=${organizacionId}: pool vacío, no se asigna lead=${leadId}`,
-        );
-        return null;
-      }
-
-      let indiceActual =
-        ((Number(cfg.siguienteIndice) % N) + N) % N;
-
-      for (let intento = 0; intento < N; intento += 1) {
-        const usuarioDestinoId = usuarioIds[indiceActual];
-        if (!usuarioDestinoId) {
-          indiceActual = (indiceActual + 1) % N;
-          continue;
-        }
-
-        const miembroOk = await tx.organizacionUsuario.findFirst({
-          where: {
-            organizacionId,
-            usuarioId: usuarioDestinoId,
-            estado: 1,
-            usuario: { estado: 1 },
-          },
-          select: { id: true },
-        });
-        if (!miembroOk) {
-          this.logger.warn(
-            `Auto-asignación org=${organizacionId}: usuario ${usuarioDestinoId} sin membresía activa — se salta`,
-          );
-          indiceActual = (indiceActual + 1) % N;
-          continue;
-        }
-
-        const siguienteIndice = (indiceActual + 1) % N;
+      if (result.count === 1) {
+        consumo.porUsuario[usuarioId] =
+          (consumo.porUsuario[usuarioId] ?? 0) + 1;
         await tx.leadAutoAsignacionConfig.update({
           where: { organizacionId },
-          data: { siguienteIndice },
+          data: { siguienteIndice: (indice + 1) % n, consumoDiario: consumo },
         });
-
-        const result = await tx.lead.updateMany({
-          where: {
-            id: leadId,
-            organizacionId,
-            estado: 1,
-            asignadoUsuarioId: null,
-          },
-          data: {
-            asignadoUsuarioId: usuarioDestinoId,
-            asignadoEn: new Date(),
-            asignadoPorUsuarioId: null,
-            usuarioEdicion: usuarioDestinoId,
-          },
-        });
-
-        await tx.leadAutoAsignacionQueue.deleteMany({
-          where: { organizacionId, leadId },
-        });
-
-        if (result.count !== 1) {
-          await tx.leadAutoAsignacionConfig.update({
-            where: { organizacionId },
-            data: { siguienteIndice: indiceActual },
-          });
-          return null;
-        }
-
-        return usuarioDestinoId;
       }
-
-      this.logger.warn(
-        `Auto-asignación org=${organizacionId}: ningún miembro activo en el pool para lead=${leadId}`,
-      );
-      await tx.leadAutoAsignacionConfig.update({
-        where: { organizacionId },
-        data: { siguienteIndice: indiceActual },
+      await tx.leadAutoAsignacionQueue.deleteMany({
+        where: { organizacionId, leadId },
       });
-      return null;
+      return result.count === 1 ? usuarioId : null;
+    }
+
+    // Sin cupos: queda libre para gestión manual, sin reparto diferido al día siguiente.
+    await tx.leadAutoAsignacionQueue.deleteMany({
+      where: { organizacionId, leadId },
     });
+    return null;
+  }
+
+  async asignarLeadPendiente(
+    organizacionId: string,
+    leadId: string,
+  ): Promise<string | null> {
+    return this.prisma.$transaction((tx) =>
+      this.asignarEnTransaccion(tx, organizacionId, leadId),
+    );
   }
 
   async procesarCola(organizacionId: string): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      const cfg = await tx.leadAutoAsignacionConfig.findUnique({
-        where: { organizacionId },
+    // Una transacción por lead evita mantener un bloqueo durante toda la cola.
+    for (let i = 0; i < 500; i++) {
+      const procesado = await this.prisma.$transaction(async (tx) => {
+        const cfg = await this.bloquearConfig(tx, organizacionId);
+        if (!cfg || !configHabilitada(cfg)) return false;
+        const item = await tx.leadAutoAsignacionQueue.findFirst({
+          where: { organizacionId },
+          orderBy: [
+            { fechaLead: 'asc' },
+            { fechaEncolado: 'asc' },
+            { id: 'asc' },
+          ],
+          select: { leadId: true },
+        });
+        if (!item) return false;
+        await this.asignarEnTransaccion(tx, organizacionId, item.leadId);
+        return true;
       });
-      if (!cfg || !configHabilitada(cfg)) return;
-
-      for (let i = 0; i < 500; i += 1) {
-        const siguienteItem = await tx.leadAutoAsignacionQueue.findFirst({
-          where: { organizacionId },
-          orderBy: [{ fechaLead: 'asc' }, { fechaEncolado: 'asc' }],
-          select: { id: true, leadId: true },
-        });
-
-        if (!siguienteItem) return;
-
-        const cfgActual = await tx.leadAutoAsignacionConfig.findUnique({
-          where: { organizacionId },
-        });
-        if (!cfgActual || !configHabilitada(cfgActual)) return;
-
-        const usuarioIds = resolverUsuarioIdsRoundRobin(cfgActual);
-        const N = usuarioIds.length;
-        if (N === 0) {
-          this.logger.warn(
-            `Auto-asignación org=${organizacionId}: pool vacío al drenar cola`,
-          );
-          return;
-        }
-
-        const indiceActual =
-          ((Number(cfgActual.siguienteIndice) % N) + N) % N;
-        const usuarioDestinoId = usuarioIds[indiceActual];
-        if (!usuarioDestinoId) {
-          await tx.leadAutoAsignacionQueue.delete({
-            where: { id: siguienteItem.id },
-          });
-          continue;
-        }
-
-        const usuarioOk = await tx.organizacionUsuario.findFirst({
-          where: {
-            organizacionId,
-            usuarioId: usuarioDestinoId,
-            estado: 1,
-            usuario: { estado: 1 },
-          },
-          select: { id: true },
-        });
-        if (!usuarioOk) {
-          // Saltar destino inválido y reintentar el mismo lead con el siguiente.
-          await tx.leadAutoAsignacionConfig.update({
-            where: { organizacionId },
-            data: { siguienteIndice: (indiceActual + 1) % N },
-          });
-          continue;
-        }
-
-        const siguienteIndice = (indiceActual + 1) % N;
-        await tx.leadAutoAsignacionConfig.update({
-          where: { organizacionId },
-          data: { siguienteIndice },
-        });
-
-        const result = await tx.lead.updateMany({
-          where: {
-            id: siguienteItem.leadId,
-            organizacionId,
-            estado: 1,
-            asignadoUsuarioId: null,
-          },
-          data: {
-            asignadoUsuarioId: usuarioDestinoId,
-            asignadoEn: new Date(),
-            asignadoPorUsuarioId: null,
-            usuarioEdicion: usuarioDestinoId,
-          },
-        });
-
-        if (result.count === 1) {
-          await tx.leadAutoAsignacionQueue.delete({
-            where: { id: siguienteItem.id },
-          });
-        } else {
-          // Lead ya no libre (tomado/borrado): revertir cursor y sacar de cola.
-          await tx.leadAutoAsignacionConfig.update({
-            where: { organizacionId },
-            data: { siguienteIndice: indiceActual },
-          });
-          await tx.leadAutoAsignacionQueue.delete({
-            where: { id: siguienteItem.id },
-          });
-        }
-      }
-    });
+      if (!procesado) return;
+    }
   }
 }
