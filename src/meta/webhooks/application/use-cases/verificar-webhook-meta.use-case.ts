@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { META_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../connections/application/ports/meta-conexiones.repository.port';
@@ -43,6 +43,7 @@ function extraerIdsWhatsApp(payload: WhatsappWebhookPayload): {
 
 @Injectable()
 export class VerificarWebhookMetaUseCase {
+  private readonly logger = new Logger(VerificarWebhookMetaUseCase.name);
   constructor(
     @Inject(META_CONEXIONES_REPOSITORY)
     private readonly conexiones: MetaConexionesRepository,
@@ -93,6 +94,16 @@ export class VerificarWebhookMetaUseCase {
       }
     }
 
+    this.logger.warn(
+      {
+        event: 'meta_webhook_signature_rejected',
+        resolvedSecrets: secrets.length,
+        legacyFallbackAvailable:
+          secrets.length === 0 &&
+          Boolean(this.config.get<string>('META_APP_SECRET')),
+      },
+      'No se pudo validar la firma del webhook',
+    );
     return false;
   }
 
@@ -107,9 +118,8 @@ export class VerificarWebhookMetaUseCase {
       );
 
       for (const phoneNumberId of phoneNumberIds) {
-        const wa = await this.whatsappConexiones.findPorPhoneNumberId(
-          phoneNumberId,
-        );
+        const wa =
+          await this.whatsappConexiones.findPorPhoneNumberId(phoneNumberId);
         if (!wa) continue;
         await this.agregarSecretDeMetaConexion(
           wa.metaConexionId,

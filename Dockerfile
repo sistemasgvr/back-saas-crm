@@ -3,7 +3,7 @@
 # Puerto: EasyPanel inyecta PORT; local default 4000.
 
 # ── Stage 1: build ─────────────────────────────────────────────
-FROM node:20-bookworm-slim AS builder
+FROM node:24-bookworm-slim AS builder
 
 WORKDIR /usr/src/app
 
@@ -27,7 +27,7 @@ RUN npm run build \
   && npm prune --omit=dev
 
 # ── Stage 2: runtime ───────────────────────────────────────────
-FROM node:20-bookworm-slim AS runner
+FROM node:24-bookworm-slim AS runner
 
 WORKDIR /usr/src/app
 

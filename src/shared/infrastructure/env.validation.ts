@@ -31,6 +31,9 @@ function stripEnvQuotes(value: string): string {
  * NOTA: no definas PORT en hPanel — Hostinger lo inyecta vía Passenger.
  */
 export const envValidationSchema = Joi.object({
+  LOG_LEVEL: Joi.string()
+    .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent')
+    .default('info'),
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
     .default('production'),

@@ -168,7 +168,18 @@ export class MetaWebhooksController {
         payload,
       ))
     ) {
-      this.logger.warn('Firma de webhook inválida');
+      this.logger.warn(
+        {
+          event: 'meta_webhook_rejected',
+          reason: 'invalid_signature',
+          rawBodyAvailable: Buffer.isBuffer(req.rawBody),
+          signaturePresent: Boolean(signature),
+          signatureFormatValid:
+            typeof signature === 'string' &&
+            /^sha256=[a-f0-9]{64}$/i.test(signature),
+        },
+        'Firma de webhook inválida',
+      );
       res.status(403).send();
       return;
     }

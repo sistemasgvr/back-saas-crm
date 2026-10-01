@@ -1,4 +1,9 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
@@ -6,19 +11,13 @@ export class PrismaService
   extends PrismaClient
   implements OnModuleInit, OnModuleDestroy
 {
+  private readonly logger = new Logger(PrismaService.name);
   async onModuleInit() {
     try {
       await this.$connect();
-      console.log('[prisma] Conectado a PostgreSQL');
-    } catch (error) {
-      console.error(
-        '[prisma] Fallo al conectar (revisa DATABASE_URL en hPanel):',
-      );
-      if (error instanceof Error) {
-        console.error(error.message);
-      } else {
-        console.error(error);
-      }
+      this.logger.log('Conectado a PostgreSQL');
+    } catch (error: unknown) {
+      this.logger.error({ err: error }, 'Fallo al conectar a PostgreSQL');
       throw error;
     }
   }

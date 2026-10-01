@@ -4,6 +4,9 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { ConfigIoAdapter } from './shared/infrastructure/config-io.adapter';
+import { Logger as PinoNestLogger, LoggerErrorInterceptor } from 'nestjs-pino';
+import pino from 'pino';
+import { createLoggerOptions } from './shared/infrastructure/logging.config';
 
 /** EasyPanel a veces guarda DATABASE_URL con comillas literales; Prisma lee process.env. */
 function stripEnvQuotes(value: string): string {
@@ -26,7 +29,13 @@ async function bootstrap() {
   // rawBody: true — el webhook de Meta necesita los bytes exactos del body
   // para verificar la firma HMAC (X-Hub-Signature-256), antes de que Nest
   // lo parsee a JSON (PLAN.md §8.2).
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+    bufferLogs: true,
+  });
+  const logger = app.get(PinoNestLogger);
+  app.useLogger(logger);
+  app.useGlobalInterceptors(new LoggerErrorInterceptor());
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
@@ -108,23 +117,21 @@ async function bootstrap() {
   // Hostinger inyecta PORT. En local cae a 4000. Nunca fijes PORT en hPanel.
   const port = Number(process.env.PORT ?? 4000);
   if (!Number.isFinite(port) || port <= 0) {
-    console.error('[bootstrap] PORT inválido:', process.env.PORT);
+    logger.fatal('PORT inválido');
     process.exit(1);
   }
 
   await app.listen(port, '0.0.0.0');
-  console.log(
+  logger.log(
     `[bootstrap] NestJS OK — 0.0.0.0:${port} (NODE_ENV=${config.get('NODE_ENV')})`,
   );
 }
 
 void bootstrap().catch((error) => {
-  console.error('[bootstrap] NestJS falló al arrancar:');
-  if (error instanceof Error) {
-    console.error(error.message);
-    if (error.stack) console.error(error.stack);
-  } else {
-    console.error(error);
-  }
+  // También hay salida JSON si el arranque falla antes de resolver LoggerModule.
+  pino(createLoggerOptions(), pino.destination({ dest: 1, sync: true })).fatal(
+    { err: error },
+    'NestJS falló al arrancar',
+  );
   process.exit(1);
 });

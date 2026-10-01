@@ -1,5 +1,7 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
+import { createHttpLoggerOptions } from './shared/infrastructure/logging.config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import {
@@ -8,7 +10,6 @@ import {
 } from './shared/infrastructure/env.validation';
 import { PrismaModule } from './shared/infrastructure/prisma.module';
 import { ObjectStorageModule } from './shared/infrastructure/object-storage.module';
-import { RequestLoggerMiddleware } from './shared/presentation/middleware/request-logger.middleware';
 import { AuthModule } from './auth/auth.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { ModulesModule } from './modules/modules.module';
@@ -31,6 +32,12 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
       validationSchema: envValidationSchema,
       validationOptions: envValidationOptions,
     }),
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        pinoHttp: createHttpLoggerOptions(config.get<string>('LOG_LEVEL')),
+      }),
+    }),
     PrismaModule,
     ObjectStorageModule,
     AuthModule,
@@ -47,12 +54,4 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    // Watcher de solicitudes en tiempo real — solo en desarrollo (ver
-    // RequestLoggerMiddleware). En producción no se registra: cero overhead.
-    if ((process.env.NODE_ENV ?? 'development') !== 'production') {
-      consumer.apply(RequestLoggerMiddleware).forRoutes('*');
-    }
-  }
-}
+export class AppModule {}
