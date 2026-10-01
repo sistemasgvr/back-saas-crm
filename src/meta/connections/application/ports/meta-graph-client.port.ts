@@ -90,6 +90,20 @@ export interface MetaNumeroWhatsAppGraph {
   qualityRating?: string;
 }
 
+export interface SaludNumeroWhatsAppGraph {
+  status?: string;
+  platform_type?: string;
+  is_on_biz_app?: boolean;
+  code_verification_status?: string;
+  health_status?: {
+    can_send_message?: string;
+    entities?: {
+      can_send_message?: string;
+      errors?: { error_code?: number; error_description?: string; possible_solution?: string }[];
+    }[];
+  };
+}
+
 export interface MetaPlantillaWhatsAppGraph {
   nombre: string;
   idioma: string;
@@ -384,6 +398,8 @@ export interface MetaGraphClient {
     wabaId: string,
     accessToken: string,
   ): Promise<AppSuscritaGraph[]>;
+  obtenerSaludNumeroWhatsApp(phoneNumberId: string, accessToken: string): Promise<SaludNumeroWhatsAppGraph>;
+  obtenerSuscripcionAppWhatsApp(appId: string, appSecret: string): Promise<{ activa: boolean; campos: string[] } | null>;
   listarPlantillasWhatsApp(
     wabaId: string,
     accessToken: string,

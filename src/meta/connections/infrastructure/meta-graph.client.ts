@@ -13,6 +13,7 @@ import {
   payloadDestinatarioWhatsApp,
 } from '../../../whatsapp/messaging/domain/identidad-contacto-whatsapp';
 import type {
+  SaludNumeroWhatsAppGraph,
   AppSuscritaGraph,
   ContactoParaEnviar,
   CrearPlantillaWhatsAppInput,
@@ -757,6 +758,21 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
         camposSuscritos: app.subscribed_fields ?? [],
       }))
       .filter((app) => app.id.length > 0);
+  }
+
+  async obtenerSaludNumeroWhatsApp(phoneNumberId: string, accessToken: string): Promise<SaludNumeroWhatsAppGraph> {
+    return this.get<SaludNumeroWhatsAppGraph>(`/${phoneNumberId}`, {
+      access_token: accessToken,
+      fields: 'status,platform_type,is_on_biz_app,code_verification_status,health_status',
+    });
+  }
+
+  async obtenerSuscripcionAppWhatsApp(appId: string, appSecret: string): Promise<{ activa: boolean; campos: string[] } | null> {
+    const result = await this.get<GraphListResponse<{ object: string; active?: boolean; fields?: { name: string }[] }>>(`/${appId}/subscriptions`, {
+      access_token: `${appId}|${appSecret}`,
+    });
+    const subscription = result.data.find((item) => item.object === 'whatsapp_business_account');
+    return subscription ? { activa: subscription.active === true, campos: (subscription.fields ?? []).map((field) => field.name) } : null;
   }
 
   async listarPlantillasWhatsApp(

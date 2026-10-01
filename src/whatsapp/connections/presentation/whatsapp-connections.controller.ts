@@ -149,7 +149,7 @@ export class WhatsappConnectionsController {
   @ApiOperation({
     summary: 'Verificar salud del webhook WhatsApp',
     description:
-      'Consulta subscribed_apps del WABA y, si Graph expone campos, valida los de coexistencia.',
+      'Consulta la suscripción del WABA, los campos de la app y el estado del número en Meta. Incluye restricciones de envío y la última recepción guardada; no garantiza entrega de eventos reales.',
   })
   @ApiResponse({ status: 200, description: 'Resultado del chequeo de salud.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })

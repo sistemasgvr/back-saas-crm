@@ -21,6 +21,12 @@ Se añadieron logs de recepción y cantidades por tipo en el controller. No impr
 
 ## Próxima comprobación
 
+### Actualización tras desplegar Pino y realizar pruebas reales
+
+El usuario envió mensajes reales y confirmó que no apareció ningún POST del webhook en los logs. Las pruebas del panel de Meta sí llegaron y se rechazaron con `resolvedSecrets=0`, cuerpo crudo y firma presentes: no se encontró una conexión correspondiente a los IDs del payload de prueba.
+
+En una nueva consulta de Graph, tras revincular y resuscribir desde el CRM, el estado del número pasó a `DISCONNECTED`. La app sigue suscrita al WABA y los campos de v26.0 siguen activos. Una prueba firmada vacía sigue devolviendo 200. Esto sitúa el siguiente paso en revisar/restablecer la conexión de la línea con la plataforma de Meta; resuscribir la app al WABA no demuestra que el número esté operativo. No se ejecutó registro, desregistro ni cambio de conexión del número.
+
 Tras desplegar, realizar una prueba real desde otro celular y observar EasyPanel:
 
 1. Si no aparece `Webhook Meta recibido` ni una advertencia de rechazo, comprobar en Meta la entrega del evento y el vínculo de la app Business con la plataforma. El éxito del botón de prueba de Meta no demuestra entrega de eventos reales.

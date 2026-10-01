@@ -35,6 +35,21 @@ function toRow(row: {
 export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async obtenerUltimoMensajeEntrante(
+    organizacionId: string,
+    conexionId: string,
+  ): Promise<Date | null> {
+    const result = await this.prisma.whatsappMensaje.aggregate({
+      where: {
+        organizacionId,
+        direccion: 'entrante',
+        whatsappConversacion: { whatsappConexionId: conexionId },
+      },
+      _max: { fechaCreacion: true },
+    });
+    return result._max.fechaCreacion;
+  }
+
   async listarPorOrganizacion(
     organizacionId: string,
   ): Promise<WhatsappConexionRow[]> {

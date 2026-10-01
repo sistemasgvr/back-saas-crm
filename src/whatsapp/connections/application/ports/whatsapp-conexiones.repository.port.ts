@@ -34,6 +34,10 @@ export interface VincularNumeroInput {
 }
 
 export interface WhatsappConexionesRepository {
+  obtenerUltimoMensajeEntrante(
+    organizacionId: string,
+    conexionId: string,
+  ): Promise<Date | null>;
   listarPorOrganizacion(organizacionId: string): Promise<WhatsappConexionRow[]>;
   listarPhoneNumberIdsVinculados(organizacionId: string): Promise<string[]>;
   findPorId(

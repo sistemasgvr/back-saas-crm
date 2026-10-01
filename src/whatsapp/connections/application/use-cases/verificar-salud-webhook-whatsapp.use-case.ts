@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
@@ -9,17 +9,36 @@ import { WHATSAPP_CONEXIONES_REPOSITORY } from '../ports/whatsapp-conexiones.rep
 import type { WhatsappConexionesRepository } from '../ports/whatsapp-conexiones.repository.port';
 
 export interface ResultadoSaludWebhookWhatsapp {
-  webhookSuscrito: boolean;
+  webhookSuscrito: boolean | null;
+  suscripcionAppActiva: boolean | null;
+  camposVerificados: boolean;
+  numero: {
+    estado: string | null;
+    plataforma: string | null;
+    enAppBusiness: boolean | null;
+    verificacionCodigo: string | null;
+    saludEnvio: string | null;
+  };
+  erroresEnvio: {
+    codigo: number | null;
+    descripcion: string;
+    solucion: string | null;
+  }[];
+  erroresVerificacion: string[];
+  verificadoEn: string;
+  ultimoMensajeEntranteEn: string | null;
   camposSuscritos: string[];
   camposFaltantes: string[];
   webhookUltimoError: string | null;
 }
 
-/** Health-check contra Graph `/{wabaId}/subscribed_apps`. Si Graph expone
- * `subscribed_fields`, valida los de coexistencia; si viene vacío, solo
- * confirma que nuestra app está suscrita (los fields suelen vivir en el Dashboard). */
+/** Comprueba suscripción, número y envío de manera independiente. Una consulta
+ * fallida es desconocida; una suscripción activa no prueba recepción real. */
 @Injectable()
 export class VerificarSaludWebhookWhatsappUseCase {
+  private readonly logger = new Logger(
+    VerificarSaludWebhookWhatsappUseCase.name,
+  );
   constructor(
     @Inject(META_CONEXIONES_REPOSITORY)
     private readonly metaConexiones: MetaConexionesRepository,
@@ -52,52 +71,126 @@ export class VerificarSaludWebhookWhatsappUseCase {
 
     const accessToken = this.tokenEncryption.decrypt(metaConexion.tokenCifrado);
 
-    let suscrito = false;
-    let error: string | null = null;
-    let camposSuscritos: string[] = [];
-    let camposFaltantes: string[] = [];
-
-    try {
-      const apps = await this.graph.obtenerAppsSuscritasWaba(
-        conexionWa.wabaId,
-        accessToken,
-      );
-      const nuestraApp = apps.find((app) => app.id === metaConexion.appId);
-      suscrito = !!nuestraApp;
-      camposSuscritos = nuestraApp?.camposSuscritos ?? [];
-
-      if (!suscrito) {
-        error =
-          'La app no está suscrita al WABA en Meta — usa "Re-suscribir webhook"';
-        // No inventamos campos faltantes: Graph WABA no lista fields aquí.
-      } else if (camposSuscritos.length > 0) {
-        camposFaltantes = CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA.filter(
-          (c) => !camposSuscritos.includes(c),
-        );
-        if (camposFaltantes.length > 0) {
-          error = `Faltan campos de webhook en Meta: ${camposFaltantes.join(', ')}`;
-        }
-      }
-      // Si la app está suscrita y Graph no expone subscribed_fields (caso normal),
-      // el check de fields se hace en Meta App Dashboard, no vía este endpoint.
-    } catch (graphError) {
-      error =
-        graphError instanceof Error
-          ? graphError.message
-          : 'Error desconocido al verificar en Meta';
-    }
-
-    await this.whatsappConexiones.marcarWebhookCheck(
-      conexionWa.id,
-      suscrito,
-      error,
+    const secret = metaConexion.appSecretCifrado
+      ? this.tokenEncryption.decrypt(metaConexion.appSecretCifrado)
+      : null;
+    const [apps, phone, subscription, ultimoMensaje] = await Promise.allSettled(
+      [
+        this.graph.obtenerAppsSuscritasWaba(conexionWa.wabaId, accessToken),
+        this.graph.obtenerSaludNumeroWhatsApp(
+          conexionWa.phoneNumberId,
+          accessToken,
+        ),
+        secret
+          ? this.graph.obtenerSuscripcionAppWhatsApp(metaConexion.appId, secret)
+          : Promise.resolve(undefined),
+        this.whatsappConexiones.obtenerUltimoMensajeEntrante(
+          organizacionId,
+          conexionWa.id,
+        ),
+      ],
     );
+    const erroresVerificacion: string[] = [];
+    const registrarFallo = (
+      parte: string,
+      result: PromiseSettledResult<unknown>,
+    ) => {
+      if (result.status === 'rejected') {
+        this.logger.error(
+          { err: result.reason as unknown, parte },
+          'Error verificando WhatsApp en Meta',
+        );
+        erroresVerificacion.push(
+          `No se pudo consultar ${parte}. Revisa el acceso y los permisos de Meta y vuelve a verificar.`,
+        );
+      }
+    };
+    registrarFallo('la suscripción del WABA', apps);
+    registrarFallo('el estado del número', phone);
+    registrarFallo('los campos del webhook', subscription);
+    registrarFallo('la última recepción guardada', ultimoMensaje);
 
+    const nuestraApp =
+      apps.status === 'fulfilled'
+        ? apps.value.find((app) => app.id === metaConexion.appId)
+        : undefined;
+    const suscrito = apps.status === 'fulfilled' ? Boolean(nuestraApp) : null;
+    const sub =
+      subscription.status === 'fulfilled' ? subscription.value : undefined;
+    const camposVerificados = sub !== undefined;
+    const camposSuscritos = sub?.campos ?? [];
+    const numero = phone.status === 'fulfilled' ? phone.value : null;
+    const requeridos: string[] =
+      numero?.is_on_biz_app === true
+        ? [...CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA]
+        : ['messages'];
+    if (conexionWa.callingHabilitado && conexionWa.rolLinea !== 'MENSAJES')
+      requeridos.push('calls');
+    const camposFaltantes = camposVerificados
+      ? requeridos.filter((field) => !camposSuscritos.includes(field))
+      : [];
+    const suscripcionAppActiva =
+      sub === undefined ? null : (sub?.activa ?? false);
+    if (!secret)
+      erroresVerificacion.push(
+        'No se pudieron verificar los campos del webhook: falta el secreto de la app en la conexión de Meta.',
+      );
+    const problemasWebhook: string[] = [];
+    if (suscrito === false)
+      problemasWebhook.push(
+        'La app no está suscrita al WABA. Usa Re-suscribir webhook.',
+      );
+    if (suscripcionAppActiva === false)
+      problemasWebhook.push(
+        'La suscripción de WhatsApp de la app no está activa en Meta Developers.',
+      );
+    if (camposFaltantes.length)
+      problemasWebhook.push(
+        `Faltan campos en Meta Developers: ${camposFaltantes.join(', ')}.`,
+      );
+    const error =
+      [...problemasWebhook, ...erroresVerificacion].join(' ') || null;
+    // Un fallo de red deja la suscripción desconocida; no la marca como desactivada.
+    if (suscrito !== null)
+      await this.whatsappConexiones.marcarWebhookCheck(
+        conexionWa.id,
+        suscrito,
+        problemasWebhook.join(' ') || null,
+      );
+    const erroresEnvio = (numero?.health_status?.entities ?? [])
+      .filter(
+        (entity) =>
+          entity.can_send_message === 'BLOCKED' ||
+          entity.can_send_message === 'LIMITED',
+      )
+      .flatMap((entity) => entity.errors ?? [])
+      .map((issue) => ({
+        codigo: issue.error_code ?? null,
+        descripcion:
+          issue.error_description ?? 'Restricción de envío informada por Meta',
+        solucion: issue.possible_solution ?? null,
+      }));
     return {
       webhookSuscrito: suscrito,
+      suscripcionAppActiva,
       camposSuscritos,
-      camposFaltantes: [...camposFaltantes],
+      camposFaltantes,
+      camposVerificados,
       webhookUltimoError: error,
+      erroresVerificacion,
+      erroresEnvio,
+      numero: {
+        estado: numero?.status ?? null,
+        plataforma: numero?.platform_type ?? null,
+        enAppBusiness: numero?.is_on_biz_app ?? null,
+        verificacionCodigo: numero?.code_verification_status ?? null,
+        saludEnvio: numero?.health_status?.can_send_message ?? null,
+      },
+      verificadoEn: new Date().toISOString(),
+      ultimoMensajeEntranteEn:
+        ultimoMensaje.status === 'fulfilled'
+          ? (ultimoMensaje.value?.toISOString() ?? null)
+          : null,
     };
   }
 }
