@@ -154,6 +154,7 @@ export class MetaWebhooksController {
     @Res() res: Response,
   ): Promise<void> {
     if (token !== this.config.getOrThrow<string>('META_WEBHOOK_URL_TOKEN')) {
+      this.logger.warn('Webhook Meta rechazado: token de URL inválido');
       res.status(403).send();
       return;
     }
@@ -172,6 +173,14 @@ export class MetaWebhooksController {
       return;
     }
 
+    // Diagnóstico en producción sin registrar cuerpos, contactos ni secretos.
+    const campos = (payload.entry ?? []).flatMap((entry) =>
+      (entry.changes ?? []).map((change) => change.field),
+    );
+    this.logger.log(
+      `Webhook Meta recibido: object=${payload.object}, campos=${[...new Set(campos)].join(',') || 'ninguno'}`,
+    );
+
     let huboFalloReintentable = false;
 
     if (payload.object === 'whatsapp_business_account') {
@@ -184,6 +193,9 @@ export class MetaWebhooksController {
     }
 
     if (huboFalloReintentable) {
+      this.logger.warn(
+        'Webhook Meta: procesamiento incompleto, respuesta 503 para reintento',
+      );
       res.status(503).send('Retry');
       return;
     }
@@ -196,6 +208,10 @@ export class MetaWebhooksController {
     const { mensajes, ecos, estados, reacciones, ediciones, llamadas } =
       extraerEventosWhatsApp(payload);
     let huboFalloReintentable = false;
+
+    this.logger.log(
+      `Webhook WhatsApp: mensajes=${mensajes.length}, ecos=${ecos.length}, estados=${estados.length}, reacciones=${reacciones.length}, ediciones=${ediciones.length}, llamadas=${llamadas.length}`,
+    );
 
     for (const evento of mensajes) {
       try {
