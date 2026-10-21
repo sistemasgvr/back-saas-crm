@@ -60,7 +60,7 @@ import { ActualizarActividadAgendaDto } from './dto/actualizar-actividad-agenda.
 @ApiBearerAuth('JWT-auth')
 @Controller('leads')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@RequireModule('META_LEADS')
+@RequireModule('LEADS')
 export class LeadsController {
   constructor(
     private readonly listarLeads: ListarLeadsUseCase,
@@ -97,7 +97,7 @@ export class LeadsController {
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   @ApiResponse({
     status: 403,
-    description: 'La organización no tiene el módulo META_LEADS activo.',
+    description: 'La organización no tiene el módulo LEADS activo.',
   })
   findAll(
     @CurrentUser() ctx: RequestContext,
@@ -119,7 +119,10 @@ export class LeadsController {
   })
   @ApiResponse({ status: 200, description: 'Miembros asignables.' })
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
-  @ApiResponse({ status: 403, description: 'Solo administradores pueden listar asignables.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo administradores pueden listar asignables.',
+  })
   asignables(@CurrentUser() ctx: RequestContext) {
     return this.leadsLectura.listarMiembrosAsignables(ctx.organizacionId!);
   }
@@ -230,12 +233,21 @@ export class LeadsController {
       'Lista ítems de calendario en un rango: visitas del pipeline y actividades ' +
       '(llamada, reunión, seguimiento, visita u otra) creadas desde la agenda.',
   })
-  @ApiQuery({ name: 'desde', required: true, description: 'ISO 8601 inicio del rango' })
-  @ApiQuery({ name: 'hasta', required: true, description: 'ISO 8601 fin del rango' })
+  @ApiQuery({
+    name: 'desde',
+    required: true,
+    description: 'ISO 8601 inicio del rango',
+  })
+  @ApiQuery({
+    name: 'hasta',
+    required: true,
+    description: 'ISO 8601 fin del rango',
+  })
   @ApiQuery({
     name: 'asignado',
     required: false,
-    description: '"todos" (admin), "mios", o UUID de asesor (admin). Agentes siempre ven las suyas.',
+    description:
+      '"todos" (admin), "mios", o UUID de asesor (admin). Agentes siempre ven las suyas.',
   })
   agendaVisitas(
     @CurrentUser() ctx: RequestContext,
@@ -257,7 +269,10 @@ export class LeadsController {
       'Crea una actividad (VISITA, LLAMADA, REUNION, SEGUIMIENTO u OTRO) sin exigir transición de pipeline.',
   })
   @ApiResponse({ status: 201, description: 'Actividad creada.' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o fuera de horario.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o fuera de horario.',
+  })
   @ApiResponse({ status: 409, description: 'Solape con otra cita del asesor.' })
   crearActividad(
     @CurrentUser() ctx: RequestContext,
@@ -295,8 +310,14 @@ export class LeadsController {
       'Si el lead ya tenía otra visita abierta, se cancela. Valida horario laboral y anti-solape.',
   })
   @ApiResponse({ status: 201, description: 'Visita creada.' })
-  @ApiResponse({ status: 400, description: 'Datos inválidos o fuera de horario.' })
-  @ApiResponse({ status: 409, description: 'Solape con otra visita del asesor.' })
+  @ApiResponse({
+    status: 400,
+    description: 'Datos inválidos o fuera de horario.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Solape con otra visita del asesor.',
+  })
   crearVisita(
     @CurrentUser() ctx: RequestContext,
     @Body() body: CrearVisitaAgendaDto,
@@ -382,7 +403,8 @@ export class LeadsController {
   @Get(':id/visitas')
   @ApiOperation({
     summary: 'Visitas de un lead',
-    description: 'Historial de citas/visitas estructuradas — para detalle y seguimiento.',
+    description:
+      'Historial de citas/visitas estructuradas — para detalle y seguimiento.',
   })
   visitasLead(
     @CurrentUser() ctx: RequestContext,

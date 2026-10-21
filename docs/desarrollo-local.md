@@ -2,17 +2,42 @@
 
 ## Entorno Docker vigente desde el 21 de octubre de 2026
 
-`.env.development` ahora usa `crm_gvr_dev` en `127.0.0.1:5433`, contenedor
-`crm-postgres-dev` y volumen `crm-postgres-dev-data`. Es una base nueva con
-56 migraciones aplicadas; la copia anterior en el puerto `55432` se conserva.
+`.env.development` usa `crm_modulos_prod_20261021` en `127.0.0.1:5434`,
+contenedor existente `gvr-postgres-local` (`postgres:17.6`). No se crearon
+contenedores ni volúmenes. Producción solo se leyó mediante `pg_dump` y consultas
+de integridad; `.env.production` no fue modificado.
+
+Se restauraron las 42 tablas de producción, verificadas por conteo y huella de
+contenido antes de migrar: 10 usuarios, 1 201 leads, 1 090 conversaciones y
+12 632 mensajes. Se conservaron hashes de contraseña, sesiones, conexiones,
+tokens y configuraciones. No se ejecutó el seed ni se cambiaron contraseñas de
+usuarios. La contraseña del servidor Docker sigue siendo la existente; la
+revisión automática rechazó cambiar la del administrador porque afectaría otras
+bases del mismo servidor. La URL local utiliza esa credencial existente.
+
+La clave `META_TOKEN_ENCRYPTION_KEY` de desarrollo coincide con la utilizada
+para cifrar los datos copiados. Los demás controles del entorno de desarrollo
+se conservan, incluido `AGENDA_INLINE_CRON=0`.
+
+La migración `20261021180000_modulo_grupos` crea CRM/Meta, renombra el módulo
+CRM a INMUEBLES conservando su ID y copia la habilitación de META_LEADS a LEADS.
+No activa dependencias durante la migración: así conserva exactamente los
+accesos anteriores. Los cambios posteriores de permisos sí aplican dependencias.
+Al usar la aplicación pueden generarse o rotarse sesiones normalmente.
+
+El respaldo privado, el entorno anterior y las huellas están en
+`.tmp/postgres-docker/modulos/` (ignorado por Git). La base
+`crm_modulos_validacion_20261021`, en el mismo servidor, se utilizó para validar
+la migración sin actividad de la aplicación; contiene también datos sintéticos
+de QA separados de la base de desarrollo.
 
 ```powershell
-docker start crm-postgres-dev
-docker inspect crm-postgres-dev --format '{{.State.Health.Status}}'
+docker start gvr-postgres-local
+npm run start:dev
 ```
 
-El ensayo con el respaldo histórico se hizo en otra base del mismo contenedor,
-sin cambiar la conexión de desarrollo.
+Las secciones siguientes son antecedentes históricos; no describen la conexión
+vigente. Para desarrollar usar `npm run start:dev`, que carga `.env.development`.
 
 ## Referencia del entorno anterior
 

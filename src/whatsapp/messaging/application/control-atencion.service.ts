@@ -60,16 +60,31 @@ export class ControlAtencionService {
 
   /** Se ejecuta en la transacción de desactivación; no habilita el bot.
    * Los envíos ya despachados conservan su intento para reconciliación. */
-  async liberarPorMembresia(tx: Prisma.TransactionClient, org: string, usuarioId: string, actorId: string) {
+  async liberarPorMembresia(
+    tx: Prisma.TransactionClient,
+    org: string,
+    usuarioId: string,
+    actorId: string,
+  ) {
     await lockBotOrganizacion(tx, org);
-    const chats = await tx.whatsappConversacion.findMany({ where: { organizacionId: org, controlUsuarioId: usuarioId }, orderBy: { id: 'asc' } });
+    const chats = await tx.whatsappConversacion.findMany({
+      where: { organizacionId: org, controlUsuarioId: usuarioId },
+      orderBy: { id: 'asc' },
+    });
     const liberados: WhatsappConversacion[] = [];
     for (const chat of chats) {
       await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${org.toLowerCase() + ':' + chat.id.toLowerCase()}, 0))::text`;
-      const nuevo = await tx.whatsappConversacion.update({ where: { id: chat.id }, data: {
-        modoAtencion: 'MANUAL', controlUsuarioId: null, controlSolicitadoEn: null,
-        controlTomadoEn: null, controlVersion: { increment: 1 }, controlMotivo: 'membresia_desactivada',
-      } });
+      const nuevo = await tx.whatsappConversacion.update({
+        where: { id: chat.id },
+        data: {
+          modoAtencion: 'MANUAL',
+          controlUsuarioId: null,
+          controlSolicitadoEn: null,
+          controlTomadoEn: null,
+          controlVersion: { increment: 1 },
+          controlMotivo: 'membresia_desactivada',
+        },
+      });
       await this.auditar(tx, nuevo, 'membresia_desactivada', 'HUMAN', actorId);
       liberados.push(nuevo);
     }
@@ -77,7 +92,7 @@ export class ControlAtencionService {
   }
 
   notificarLiberacionMembresia(chats: WhatsappConversacion[]) {
-    chats.forEach(c => this.emitir(c));
+    chats.forEach((c) => this.emitir(c));
   }
 
   private async conversacion(
@@ -685,7 +700,7 @@ export class ControlAtencionService {
             organizacionId: org,
             estado: 1,
             habilitado: 1,
-            modulo: { codigo: 'WHATSAPP', estado: 1 },
+            modulo: { codigo: 'WHATSAPP', estado: 1, grupo: { estado: 1 } },
           },
         });
         const automatizaciones = await tx.organizacionModulo.findFirst({
@@ -693,7 +708,11 @@ export class ControlAtencionService {
             organizacionId: org,
             estado: 1,
             habilitado: 1,
-            modulo: { codigo: 'AUTOMATIZACIONES', estado: 1 },
+            modulo: {
+              codigo: 'AUTOMATIZACIONES',
+              estado: 1,
+              grupo: { estado: 1 },
+            },
           },
         });
         if (

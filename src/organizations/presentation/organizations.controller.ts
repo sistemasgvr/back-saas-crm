@@ -1,3 +1,5 @@
+import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
+import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -64,6 +66,8 @@ export class OrganizationsController {
     );
   }
 
+  @UseGuards(ModuleGuard)
+  @RequireModule('LEADS')
   @Get('current/pipeline-config')
   @ApiOperation({
     summary: 'Override de matrices del pipeline (o null = defaults de código)',
@@ -73,6 +77,8 @@ export class OrganizationsController {
     return this.obtenerPipelineConfig.execute(context.organizacionId!);
   }
 
+  @UseGuards(ModuleGuard)
+  @RequireModule('LEADS')
   @Patch('current/pipeline-config')
   @ApiOperation({
     summary: 'Guardar o restaurar el override de pipeline de la organización',

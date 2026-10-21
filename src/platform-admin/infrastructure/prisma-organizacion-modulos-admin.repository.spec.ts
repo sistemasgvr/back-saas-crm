@@ -3,8 +3,20 @@ import { PrismaOrganizacionModulosAdminRepository } from './prisma-organizacion-
 
 function fixture(codigo: string, habilitado = 1) {
   const tx = {
+    $executeRaw: jest.fn().mockResolvedValue(0),
     $queryRaw: jest.fn().mockResolvedValue([]),
+    organizacion: { findUnique: jest.fn().mockResolvedValue({ id: 'org-a' }) },
     organizacionModulo: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([
+          {
+            moduloId: 'modulo',
+            habilitado,
+            estado: 1,
+            fechaActivacion: new Date(),
+          },
+        ]),
       findUnique: jest.fn().mockResolvedValue({
         habilitado,
         estado: 1,
@@ -12,7 +24,19 @@ function fixture(codigo: string, habilitado = 1) {
       }),
       upsert: jest.fn().mockResolvedValue({}),
     },
-    modulo: { findUnique: jest.fn().mockResolvedValue({ codigo }) },
+    modulo: {
+      findMany: jest
+        .fn()
+        .mockResolvedValue([
+          {
+            id: 'modulo',
+            codigo,
+            requiere: [],
+            estado: 1,
+            grupo: { estado: 1 },
+          },
+        ]),
+    },
     whatsappBotConfiguracion: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
@@ -43,7 +67,7 @@ describe('Jerarquía de automatizaciones por organización', () => {
     expect(f.tx.whatsappBotConfiguracion.updateMany).not.toHaveBeenCalled();
   });
   it('cambiar otro módulo no afecta propuestas del bot', async () => {
-    const f = fixture('CRM');
+    const f = fixture('INMUEBLES');
     await f.repo.toggle('org-a', 'modulo', false, 'admin');
     expect(f.tx.whatsappBotConfiguracion.updateMany).not.toHaveBeenCalled();
   });

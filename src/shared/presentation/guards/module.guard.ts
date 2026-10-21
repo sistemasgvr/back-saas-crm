@@ -46,7 +46,7 @@ export class ModuleGuard implements CanActivate {
         organizacionId: user.organizacionId,
         habilitado: 1,
         estado: 1,
-        modulo: { codigo, estado: 1 },
+        modulo: { codigo, estado: 1, grupo: { estado: 1 } },
       },
     });
 

@@ -1,5 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsArray,
+  ArrayUnique,
+  IsUUID,
+  ValidateIf,
   IsInt,
   IsOptional,
   IsString,
@@ -10,6 +14,18 @@ import {
 } from 'class-validator';
 
 export class CreateModuloDto {
+  @ApiProperty()
+  @IsUUID()
+  grupoId: string;
+
+  @ApiPropertyOptional({ type: [String] })
+  @ValidateIf((_object, value) => value !== undefined)
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  requiere?: string[];
+
   @ApiProperty({
     example: 'WHATSAPP',
     maxLength: 50,

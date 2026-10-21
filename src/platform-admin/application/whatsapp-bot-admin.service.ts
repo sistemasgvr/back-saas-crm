@@ -84,7 +84,7 @@ export class WhatsappBotAdminService {
               organizacionId: org,
               estado: 1,
               habilitado: 1,
-              modulo: { codigo: 'WHATSAPP', estado: 1 },
+              modulo: { codigo: 'WHATSAPP', estado: 1, grupo: { estado: 1 } },
             },
           });
           if (!modulo)
@@ -96,7 +96,11 @@ export class WhatsappBotAdminService {
               organizacionId: org,
               estado: 1,
               habilitado: 1,
-              modulo: { codigo: 'AUTOMATIZACIONES', estado: 1 },
+              modulo: {
+                codigo: 'AUTOMATIZACIONES',
+                estado: 1,
+                grupo: { estado: 1 },
+              },
             },
           });
           if (!automatizaciones)

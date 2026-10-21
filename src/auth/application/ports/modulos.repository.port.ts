@@ -2,6 +2,7 @@ export const MODULOS_REPOSITORY = Symbol('MODULOS_REPOSITORY');
 
 export interface ModuloOrganizacion {
   codigo: string;
+  grupo: string;
   habilitado: boolean;
 }
 

@@ -5,6 +5,8 @@ export const MODULOS_CATALOGO_REPOSITORY = Symbol(
 );
 
 export interface CrearModuloInput {
+  grupoId: string;
+  requiere?: string[];
   codigo: string;
   nombre: string;
   descripcion?: string;
@@ -13,6 +15,8 @@ export interface CrearModuloInput {
 }
 
 export interface ActualizarModuloInput {
+  grupoId?: string;
+  requiere?: string[];
   nombre?: string;
   descripcion?: string;
   icono?: string;

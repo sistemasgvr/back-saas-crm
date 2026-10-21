@@ -11,7 +11,12 @@ import type {
 } from '../application/ports/organizaciones-admin.repository.port';
 
 // Módulos que quedan encendidos por defecto al crear una organización — PLAN.md §4.5/§5.1.
-const MODULOS_ENCENDIDOS_POR_DEFECTO = ['META_LEADS', 'DASHBOARD', 'CRM'];
+const MODULOS_ENCENDIDOS_POR_DEFECTO = [
+  'DASHBOARD',
+  'LEADS',
+  'INMUEBLES',
+  'META_LEADS',
+];
 
 @Injectable()
 export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminRepository {

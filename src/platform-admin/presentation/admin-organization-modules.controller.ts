@@ -81,6 +81,7 @@ export class AdminOrganizationModulesController {
       moduloId,
       dto.habilitado,
       ctx.usuarioId,
+      dto.desactivarDependientes,
     );
   }
 }

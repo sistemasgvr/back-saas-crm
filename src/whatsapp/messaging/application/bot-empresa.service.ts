@@ -31,7 +31,11 @@ export class BotEmpresaService {
         estado: 1,
         habilitado: 1,
         organizacion: { estado: 1 },
-        modulo: { estado: 1, codigo: { in: ['WHATSAPP', 'AUTOMATIZACIONES'] } },
+        modulo: {
+          estado: 1,
+          grupo: { estado: 1 },
+          codigo: { in: ['WHATSAPP', 'AUTOMATIZACIONES'] },
+        },
       },
       select: { modulo: { select: { codigo: true } } },
     });

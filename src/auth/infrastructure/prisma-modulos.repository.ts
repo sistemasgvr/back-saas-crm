@@ -13,13 +13,18 @@ export class PrismaModulosRepository implements ModulosRepository {
     organizacionId: string,
   ): Promise<ModuloOrganizacion[]> {
     const filas = await this.prisma.organizacionModulo.findMany({
-      where: { organizacionId, estado: 1, modulo: { estado: 1 } },
-      include: { modulo: true },
+      where: {
+        organizacionId,
+        estado: 1,
+        modulo: { estado: 1, grupo: { estado: 1 } },
+      },
+      include: { modulo: { include: { grupo: true } } },
       orderBy: { modulo: { orden: 'asc' } },
     });
 
     return filas.map((fila) => ({
       codigo: fila.modulo.codigo,
+      grupo: fila.modulo.grupo!.codigo,
       habilitado: fila.habilitado === 1,
     }));
   }

@@ -827,6 +827,23 @@ model OrganizacionUsuarioEvento {
   @@map("organizacion_usuario_eventos")
 }
 
+model ModuloGrupo {
+  id                String   @id @default(uuid()) @db.Uuid
+  codigo            String   @unique @db.VarChar(50)
+  nombre            String   @db.VarChar(120)
+  descripcion       String?
+  icono             String?  @db.VarChar(80)
+  orden             Int      @default(0)
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+  modulos           Modulo[]
+
+  @@map("modulo_grupos")
+}
+
 model Modulo {
   id          String  @id @default(uuid()) @db.Uuid
   codigo      String  @unique @db.VarChar(50) // ej. META_LEADS
@@ -842,6 +859,9 @@ model Modulo {
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacionModulos OrganizacionModulo[]
+  grupoId String? @map("grupo_id") @db.Uuid
+  grupo ModuloGrupo? @relation(fields: [grupoId], references: [id])
+  requiere String[] @default([]) @db.VarChar(50)
 
   @@map("modulos")
 }

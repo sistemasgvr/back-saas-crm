@@ -1,3 +1,5 @@
+import { AdminModuleGroupsController } from './presentation/admin-module-groups.controller';
+import { AdminOrganizationModuleGroupsController } from './presentation/admin-organization-module-groups.controller';
 import { WhatsappBotAdminService } from './application/whatsapp-bot-admin.service';
 import { AdminAutomationsController } from './presentation/admin-automations.controller';
 import { AdminWhatsappBotController } from './presentation/admin-whatsapp-bot.controller';
@@ -31,6 +33,8 @@ import { PrismaOrganizacionModulosAdminRepository } from './infrastructure/prism
 @Module({
   imports: [AuthModule, ModulesModule, MembresiasModule],
   controllers: [
+    AdminModuleGroupsController,
+    AdminOrganizationModuleGroupsController,
     AdminAutomationsController,
     AdminWhatsappBotController,
     AdminOrganizationsController,

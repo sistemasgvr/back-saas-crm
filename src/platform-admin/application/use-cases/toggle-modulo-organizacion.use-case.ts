@@ -22,6 +22,7 @@ export class ToggleModuloOrganizacionUseCase {
     moduloId: string,
     habilitado: boolean,
     usuarioEdicion: string,
+    desactivarDependientes = false,
   ) {
     const [organizacion, modulo] = await Promise.all([
       this.organizaciones.obtenerPorId(organizacionId),
@@ -36,6 +37,7 @@ export class ToggleModuloOrganizacionUseCase {
       moduloId,
       habilitado,
       usuarioEdicion,
+      desactivarDependientes,
     );
     return this.organizacionModulos.listarMatrizPorOrganizacion(organizacionId);
   }

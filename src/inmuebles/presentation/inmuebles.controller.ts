@@ -41,7 +41,7 @@ import { ActualizarInmuebleDto } from './dto/actualizar-inmueble.dto';
 @ApiBearerAuth('JWT-auth')
 @Controller('inmuebles')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@RequireModule('CRM')
+@RequireModule('INMUEBLES')
 export class InmueblesController {
   constructor(
     private readonly listarInmuebles: ListarInmueblesUseCase,
@@ -56,7 +56,7 @@ export class InmueblesController {
   @Get()
   @ApiOperation({ summary: 'Listar inmuebles (paginado + filtros)' })
   @ApiResponse({ status: 200, description: 'Página de inmuebles.' })
-  @ApiResponse({ status: 403, description: 'Módulo CRM no habilitado.' })
+  @ApiResponse({ status: 403, description: 'Módulo INMUEBLES no habilitado.' })
   findAll(
     @CurrentUser() ctx: RequestContext,
     @Query() query: ListarInmueblesQueryDto,
@@ -115,10 +115,7 @@ export class InmueblesController {
   @ApiOperation({ summary: 'Crear inmueble' })
   @ApiResponse({ status: 201, description: 'Inmueble creado.' })
   @ApiResponse({ status: 409, description: 'Código duplicado.' })
-  create(
-    @CurrentUser() ctx: RequestContext,
-    @Body() body: CrearInmuebleDto,
-  ) {
+  create(@CurrentUser() ctx: RequestContext, @Body() body: CrearInmuebleDto) {
     return this.crearInmueble.execute(ctx.organizacionId!, body, ctx.usuarioId);
   }
 
@@ -150,10 +147,6 @@ export class InmueblesController {
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    await this.eliminarInmueble.execute(
-      ctx.organizacionId!,
-      id,
-      ctx.usuarioId,
-    );
+    await this.eliminarInmueble.execute(ctx.organizacionId!, id, ctx.usuarioId);
   }
 }
