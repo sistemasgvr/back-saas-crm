@@ -12,8 +12,7 @@ docker inspect crm-postgres-dev --format '{{.State.Health.Status}}'
 ```
 
 El ensayo con el respaldo histórico se hizo en otra base del mismo contenedor,
-sin cambiar la conexión de desarrollo. Resultados y pendientes antes de producción:
-[validación de migraciones del 21/10/2026](validacion-bd-local-20261021.md).
+sin cambiar la conexión de desarrollo.
 
 ## Referencia del entorno anterior
 
