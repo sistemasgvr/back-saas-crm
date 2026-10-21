@@ -1,3 +1,4 @@
+import { ControlAtencionService } from '../control-atencion.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -35,13 +36,7 @@ export const MAX_MENSAJES_REENVIAR = 30;
 /** Tope de chats destino por reenvío (WhatsApp multi-forward típico: 5). */
 export const MAX_DESTINOS_REENVIAR = 5;
 
-const TIPOS_MEDIA = new Set([
-  'image',
-  'video',
-  'audio',
-  'document',
-  'sticker',
-]);
+const TIPOS_MEDIA = new Set(['image', 'video', 'audio', 'document', 'sticker']);
 
 export type ReenviarLoteFallido = {
   conversacionDestinoId: string;
@@ -62,6 +57,7 @@ export type ReenviarLoteResultado = {
 @Injectable()
 export class ReenviarMensajeWhatsAppUseCase {
   constructor(
+    private readonly control: ControlAtencionService,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
@@ -101,10 +97,7 @@ export class ReenviarMensajeWhatsAppUseCase {
     conversacionDestinoIds: string[],
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ): Promise<ReenviarLoteResultado> {
-    if (
-      mensajeIds.length < 1 ||
-      mensajeIds.length > MAX_MENSAJES_REENVIAR
-    ) {
+    if (mensajeIds.length < 1 || mensajeIds.length > MAX_MENSAJES_REENVIAR) {
       throw new BadRequestException(
         `Puedes reenviar entre 1 y ${MAX_MENSAJES_REENVIAR} mensajes a la vez`,
       );
@@ -133,10 +126,6 @@ export class ReenviarMensajeWhatsAppUseCase {
     if (!origen) {
       throw new NotFoundException('Conversación de origen no encontrada');
     }
-
-    const { phoneNumberId, accessToken } = await this.credenciales(
-      organizacionId,
-    );
 
     let enviados = 0;
     const fallidos: ReenviarLoteFallido[] = [];
@@ -184,6 +173,10 @@ export class ReenviarMensajeWhatsAppUseCase {
 
       for (const mensajeId of mensajeIds) {
         try {
+          const { phoneNumberId, accessToken } = await this.credenciales(
+            organizacionId,
+            destino.whatsappConexionId,
+          );
           await this.reenviarUno(
             organizacionId,
             conversacionOrigenId,
@@ -283,16 +276,23 @@ export class ReenviarMensajeWhatsAppUseCase {
         mensaje.mediaMimeType,
         mensaje.mediaNombreArchivo ?? undefined,
       );
-      const enviado = await this.graph.enviarMediaWhatsApp(
-        phoneNumberId,
-        accessToken,
-        destinoWaId,
-        categoria,
-        subido.mediaId,
-        {
-          caption: mensaje.mediaCaption ?? mensaje.texto ?? undefined,
-          filename: mensaje.mediaNombreArchivo ?? undefined,
-        },
+      const enviado = await this.control.despachar(
+        organizacionId,
+        conversacionDestinoId,
+        { tipo: 'HUMAN', ...ctx },
+        'enviarMediaWhatsApp',
+        () =>
+          this.graph.enviarMediaWhatsApp(
+            phoneNumberId,
+            accessToken,
+            destinoWaId,
+            categoria,
+            subido.mediaId,
+            {
+              caption: mensaje.mediaCaption ?? mensaje.texto ?? undefined,
+              filename: mensaje.mediaNombreArchivo ?? undefined,
+            },
+          ),
       );
       await this.conversaciones.registrarMensaje({
         organizacionId,
@@ -329,11 +329,18 @@ export class ReenviarMensajeWhatsAppUseCase {
         nombre: mensaje.ubicacionNombre ?? undefined,
         direccion: mensaje.ubicacionDireccion ?? undefined,
       };
-      const enviado = await this.graph.enviarUbicacionWhatsApp(
-        phoneNumberId,
-        accessToken,
-        destinoWaId,
-        ubicacion,
+      const enviado = await this.control.despachar(
+        organizacionId,
+        conversacionDestinoId,
+        { tipo: 'HUMAN', ...ctx },
+        'enviarUbicacionWhatsApp',
+        () =>
+          this.graph.enviarUbicacionWhatsApp(
+            phoneNumberId,
+            accessToken,
+            destinoWaId,
+            ubicacion,
+          ),
       );
       await this.conversaciones.registrarMensaje({
         organizacionId,
@@ -358,11 +365,18 @@ export class ReenviarMensajeWhatsAppUseCase {
       if (lista.length === 0) {
         throw new BadRequestException('Contacto incompleto');
       }
-      const enviado = await this.graph.enviarContactoWhatsApp(
-        phoneNumberId,
-        accessToken,
-        destinoWaId,
-        lista,
+      const enviado = await this.control.despachar(
+        organizacionId,
+        conversacionDestinoId,
+        { tipo: 'HUMAN', ...ctx },
+        'enviarContactoWhatsApp',
+        () =>
+          this.graph.enviarContactoWhatsApp(
+            phoneNumberId,
+            accessToken,
+            destinoWaId,
+            lista,
+          ),
       );
       await this.conversaciones.registrarMensaje({
         organizacionId,
@@ -383,11 +397,18 @@ export class ReenviarMensajeWhatsAppUseCase {
     if (!texto) {
       throw new BadRequestException('No hay contenido para reenviar');
     }
-    const enviado = await this.graph.enviarMensajeTextoWhatsApp(
-      phoneNumberId,
-      accessToken,
-      destinoWaId,
-      texto,
+    const enviado = await this.control.despachar(
+      organizacionId,
+      conversacionDestinoId,
+      { tipo: 'HUMAN', ...ctx },
+      'enviarMensajeTextoWhatsApp',
+      () =>
+        this.graph.enviarMensajeTextoWhatsApp(
+          phoneNumberId,
+          accessToken,
+          destinoWaId,
+          texto,
+        ),
     );
     await this.conversaciones.registrarMensaje({
       organizacionId,
@@ -414,21 +435,30 @@ export class ReenviarMensajeWhatsAppUseCase {
     }
   }
 
-  private async credenciales(organizacionId: string): Promise<{
+  private async credenciales(
+    organizacionId: string,
+    whatsappConexionId: string,
+  ): Promise<{
     phoneNumberId: string;
     accessToken: string;
   }> {
-    const whatsappConexion =
-      await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    const conexionActiva = whatsappConexion[0];
+    const conexionActiva = await this.conexionesWa.findPorId(
+      organizacionId,
+      whatsappConexionId,
+    );
     if (!conexionActiva) {
       throw new NotFoundException(
         'No hay un número de WhatsApp vinculado a esta organización',
       );
     }
-    const conexion =
-      await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion?.tokenCifrado) {
+    const conexion = await this.conexiones.findActivaPorId(
+      organizacionId,
+      conexionActiva.metaConexionId,
+    );
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    ) {
       throw new NotFoundException(
         'No hay una sesión de Meta conectada para esta organización',
       );

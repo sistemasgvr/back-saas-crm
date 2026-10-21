@@ -20,6 +20,10 @@ export interface ActualizarTokenInput {
 }
 
 export interface MetaConexionesRepository {
+  findActivaPorId(
+    organizacionId: string,
+    id: string,
+  ): Promise<MetaConexion | null>;
   findActivaPorOrganizacion(
     organizacionId: string,
   ): Promise<MetaConexion | null>;

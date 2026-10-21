@@ -1,3 +1,4 @@
+import { lockBotOrganizacion } from '../../whatsapp/messaging/application/bot-organizacion-lock';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
@@ -43,33 +44,44 @@ export class PrismaOrganizacionModulosAdminRepository implements OrganizacionMod
     habilitado: boolean,
     usuarioEdicion: string,
   ): Promise<void> {
-    const existente = await this.prisma.organizacionModulo.findUnique({
-      where: { organizacionId_moduloId: { organizacionId, moduloId } },
-    });
-
-    if (!existente) {
-      await this.prisma.organizacionModulo.create({
-        data: {
+    await this.prisma.$transaction(async (tx) => {
+      await lockBotOrganizacion(tx, organizacionId);
+      const existente = await tx.organizacionModulo.findUnique({
+        where: { organizacionId_moduloId: { organizacionId, moduloId } },
+      });
+      const cambio =
+        !existente ||
+        existente.habilitado !== (habilitado ? 1 : 0) ||
+        existente.estado !== 1;
+      await tx.organizacionModulo.upsert({
+        where: { organizacionId_moduloId: { organizacionId, moduloId } },
+        create: {
           organizacionId,
           moduloId,
           habilitado: habilitado ? 1 : 0,
           fechaActivacion: habilitado ? new Date() : null,
           usuarioCreacion: usuarioEdicion,
         },
+        update: {
+          estado: 1,
+          habilitado: habilitado ? 1 : 0,
+          usuarioEdicion,
+          fechaActivacion:
+            habilitado && existente?.habilitado !== 1
+              ? new Date()
+              : existente?.fechaActivacion,
+        },
       });
-      return;
-    }
-
-    await this.prisma.organizacionModulo.update({
-      where: { id: existente.id },
-      data: {
-        habilitado: habilitado ? 1 : 0,
-        usuarioEdicion,
-        fechaActivacion:
-          habilitado && existente.habilitado === 0
-            ? new Date()
-            : existente.fechaActivacion,
-      },
+      const modulo = await tx.modulo.findUnique({ where: { id: moduloId } });
+      if (
+        cambio &&
+        ['WHATSAPP', 'AUTOMATIZACIONES'].includes(modulo?.codigo ?? '')
+      ) {
+        await tx.whatsappBotConfiguracion.updateMany({
+          where: { organizacionId },
+          data: { version: { increment: 1 } },
+        });
+      }
     });
   }
 }

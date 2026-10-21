@@ -140,7 +140,10 @@ export class WhatsappCallsController {
     @CurrentUser() ctx: RequestContext,
     @Body() dto: SolicitarPermisoDto,
   ) {
-    return this.solicitarPermiso.execute(ctx.organizacionId!, dto);
+    return this.solicitarPermiso.execute(ctx.organizacionId!, dto, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
   }
 
   @Get('settings')
@@ -248,11 +251,7 @@ export class WhatsappCallsController {
     @CurrentUser() ctx: RequestContext,
     @Param('callId') callId: string,
   ) {
-    return this.reject.execute(
-      ctx.organizacionId!,
-      callId,
-      ctx.usuarioId,
-    );
+    return this.reject.execute(ctx.organizacionId!, callId, ctx.usuarioId);
   }
 
   @Post(':callId/terminate')

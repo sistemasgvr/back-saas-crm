@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, type WhatsappConversacion } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
   ContactoMensajeRow,
@@ -54,10 +54,7 @@ const LEAD_CON_INMUEBLE_SELECT = {
   inmuebleInteres: { select: { id: true, codigo: true, titulo: true } },
 } as const;
 
-function nombreUsuario(u: {
-  nombre: string;
-  apellido: string | null;
-}): string {
+function nombreUsuario(u: { nombre: string; apellido: string | null }): string {
   return [u.nombre, u.apellido].filter(Boolean).join(' ');
 }
 
@@ -143,6 +140,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         });
         return {
           id: c.id,
+          whatsappConexionId: c.whatsappConexionId,
+          modoAtencion: c.modoAtencion,
+          controlVersion: c.controlVersion,
+          controlUsuarioId: c.controlUsuarioId,
           waId: c.waId,
           bsuid: c.bsuid,
           username: c.username,
@@ -152,12 +153,14 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           ultimoMensajeEn: c.mensajes[0]?.fechaMensaje ?? c.ultimoMensajeEn,
           ventanaExpiraEn: c.ventanaExpiraEn,
           noLeidos: c.noLeidos,
-          ultimoMensajeTexto: previewDesdeMensaje(c.mensajes[0] ?? {
-            texto: null,
-            mediaCaption: null,
-            tipo: '',
-            mediaEsVoz: null,
-          }),
+          ultimoMensajeTexto: previewDesdeMensaje(
+            c.mensajes[0] ?? {
+              texto: null,
+              mediaCaption: null,
+              tipo: '',
+              mediaEsVoz: null,
+            },
+          ),
           bloqueado: c.bloqueado === 1,
         };
       })
@@ -223,6 +226,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   }
 
   private mapearResumen(c: {
+    whatsappConexionId: string;
+    modoAtencion: string;
+    controlVersion: number;
+    controlUsuarioId: string | null;
     id: string;
     waId: string | null;
     bsuid: string | null;
@@ -261,6 +268,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
     return {
       id: c.id,
+      whatsappConexionId: c.whatsappConexionId,
+      modoAtencion: c.modoAtencion,
+      controlVersion: c.controlVersion,
+      controlUsuarioId: c.controlUsuarioId,
       waId: c.waId,
       bsuid: c.bsuid,
       username: c.username,
@@ -308,6 +319,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     const mensajes = recientes.slice().reverse();
     return mensajes.map((m) => ({
       id: m.id,
+      autorTipo: m.autorTipo,
       wamid: m.wamid,
       direccion: m.direccion,
       tipo: m.tipo,
@@ -490,27 +502,27 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       );
     }
 
-    let existente:
-      | {
-          id: string;
-          leadId: string | null;
-          waId: string | null;
-          bsuid: string | null;
-          username: string | null;
-          nombreContacto: string | null;
-        }
-      | null = null;
+    let existente: {
+      id: string;
+      leadId: string | null;
+      waId: string | null;
+      bsuid: string | null;
+      username: string | null;
+      nombreContacto: string | null;
+    } | null = null;
 
     if (waId) {
-      const existenteExacto =
-        await this.prisma.whatsappConversacion.findUnique({
+      const existenteExacto = await this.prisma.whatsappConversacion.findUnique(
+        {
           where: {
-            organizacionId_waId: {
+            organizacionId_whatsappConexionId_waId: {
               organizacionId: input.organizacionId,
+              whatsappConexionId: input.whatsappConexionId,
               waId,
             },
           },
-        });
+        },
+      );
       // Ecos de coexistencia a veces traen `to` con '+' u otro formato; el
       // chat ya existe con el wa_id del webhook entrante. Emparejar por sufijo.
       existente =
@@ -519,6 +531,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           ? await this.prisma.whatsappConversacion.findFirst({
               where: {
                 organizacionId: input.organizacionId,
+                whatsappConexionId: input.whatsappConexionId,
                 estado: 1,
                 waId: { endsWith: ultimosDigitos(waId) },
               },
@@ -533,6 +546,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       existente = await this.prisma.whatsappConversacion.findFirst({
         where: {
           organizacionId: input.organizacionId,
+          whatsappConexionId: input.whatsappConexionId,
           bsuid,
           estado: 1,
         },
@@ -599,7 +613,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       leadId = leadCandidato?.id;
     }
 
-    let conversacion;
+    let conversacion: WhatsappConversacion;
     let esNueva = true;
     try {
       conversacion = await this.prisma.whatsappConversacion.create({
@@ -614,29 +628,21 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         },
       });
     } catch (error: unknown) {
-      // Carrera concurrente en @@unique([organizacionId, waId]): reusa la fila.
       if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002' &&
-        waId
-      ) {
-        const recien = await this.prisma.whatsappConversacion.findUnique({
-          where: {
-            organizacionId_waId: {
-              organizacionId: input.organizacionId,
-              waId,
-            },
-          },
-        });
-        if (recien) {
-          conversacion = recien;
-          esNueva = false;
-        } else {
-          throw error;
-        }
-      } else {
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      )
         throw error;
-      }
+      const recien = await this.prisma.whatsappConversacion.findFirst({
+        where: {
+          organizacionId: input.organizacionId,
+          whatsappConexionId: input.whatsappConexionId,
+          OR: [...(waId ? [{ waId }] : []), ...(bsuid ? [{ bsuid }] : [])],
+        },
+      });
+      if (!recien) throw error;
+      conversacion = recien;
+      esNueva = false;
     }
     const nombreRelleno = input.nombreContacto?.trim() || null;
     if (leadId && nombreRelleno) {
@@ -656,89 +662,157 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async registrarMensaje(
     input: RegistrarMensajeInput,
   ): Promise<{ id: string; creado: boolean }> {
-    const existente = await this.prisma.whatsappMensaje.findUnique({
-      where: {
-        organizacionId_wamid: {
-          organizacionId: input.organizacionId,
-          wamid: input.wamid,
-        },
-      },
-    });
-    if (existente) return { id: existente.id, creado: false };
+    return this.prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${input.organizacionId.toLowerCase() + ':' + input.whatsappConversacionId.toLowerCase()}, 0))::text`;
+        const c = await tx.whatsappConversacion.findFirst({
+          where: {
+            id: input.whatsappConversacionId,
+            organizacionId: input.organizacionId,
+          },
+        });
+        if (!c) throw new Error('Conversación fuera de la organización');
+        const existente = await tx.whatsappMensaje.findUnique({
+          where: {
+            organizacionId_wamid: {
+              organizacionId: input.organizacionId,
+              wamid: input.wamid,
+            },
+          },
+        });
+        if (existente) {
+          if (existente.whatsappConversacionId !== input.whatsappConversacionId)
+            throw new Error('wamid pertenece a otra conversación');
+          const intento = await tx.whatsappSalidaIntento.findFirst({
+            where: {
+              organizacionId: input.organizacionId,
+              conversacionId: input.whatsappConversacionId,
+              wamid: input.wamid,
+            },
+          });
+          if (intento) {
+            await tx.whatsappMensaje.update({
+              where: { id: existente.id },
+              data: {
+                autorTipo: intento.actor,
+                usuarioCreacion: intento.usuarioId,
+              },
+            });
+            await tx.whatsappSalidaIntento.update({
+              where: { id: intento.id },
+              data: { mensajePersistido: true },
+            });
+          }
+          return { id: existente.id, creado: false };
+        }
+        const intento =
+          input.direccion === 'saliente'
+            ? await tx.whatsappSalidaIntento.findFirst({
+                where: {
+                  organizacionId: input.organizacionId,
+                  conversacionId: input.whatsappConversacionId,
+                  wamid: input.wamid,
+                },
+              })
+            : null;
 
-    // Si Meta (o un lote local) repite el mismo segundo, desplazar +1ms para
-    // que el orden cronológico coincida con el de llegada/envío.
-    const fechaMensaje = await this.fechaMensajeSinColision(
-      input.whatsappConversacionId,
-      input.fechaMensaje,
+        // Si Meta (o un lote local) repite el mismo segundo, desplazar +1ms para
+        // que el orden cronológico coincida con el de llegada/envío.
+        const fechaMensaje = await this.fechaMensajeSinColision(
+          input.whatsappConversacionId,
+          input.fechaMensaje,
+          tx,
+        );
+
+        const mensaje = await tx.whatsappMensaje.create({
+          data: {
+            organizacionId: input.organizacionId,
+            whatsappConversacionId: input.whatsappConversacionId,
+            wamid: input.wamid,
+            direccion: input.direccion,
+            autorTipo:
+              intento?.actor ??
+              input.autorTipo ??
+              (input.direccion === 'entrante'
+                ? 'CUSTOMER'
+                : input.usuarioCreacion
+                  ? 'HUMAN'
+                  : 'UNKNOWN'),
+            tipo: input.tipo,
+            texto: input.texto,
+            plantillaNombre: input.plantillaNombre,
+            estadoEntrega: input.estadoEntrega,
+            datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
+            fechaMensaje,
+            usuarioCreacion: intento?.usuarioId ?? input.usuarioCreacion,
+            mediaId: input.mediaId,
+            mediaMimeType: input.mediaMimeType,
+            mediaNombreArchivo: input.mediaNombreArchivo,
+            mediaCaption: input.mediaCaption,
+            mediaEsVoz: input.mediaEsVoz,
+            mediaTamanoBytes: input.mediaTamanoBytes,
+            respondeAMensajeId: input.respondeAMensajeId,
+            ubicacionLatitud: input.ubicacionLatitud,
+            ubicacionLongitud: input.ubicacionLongitud,
+            ubicacionNombre: input.ubicacionNombre,
+            ubicacionDireccion: input.ubicacionDireccion,
+            contactos: input.contactos
+              ? (input.contactos as unknown as Prisma.InputJsonValue)
+              : undefined,
+            interactivo: input.interactivo
+              ? (input.interactivo as unknown as Prisma.InputJsonValue)
+              : undefined,
+            ...(input.mediaObjetoId
+              ? { media: { create: { mediaObjetoId: input.mediaObjetoId } } }
+              : {}),
+          },
+        });
+
+        if (input.direccion === 'entrante' && !input.esHistorial) {
+          await tx.whatsappConversacion.update({
+            where: { id: input.whatsappConversacionId },
+            data: { entradaRevision: { increment: 1 } },
+          });
+        }
+        if (input.mediaObjetoId) {
+          await tx.whatsappMediaObjeto.update({
+            where: { id: input.mediaObjetoId },
+            data: { usos: { increment: 1 } },
+          });
+        }
+
+        // Lista de chats ordena/muestra por ultimoMensajeEn. Varios envíos
+        // salientes del CRM olvidaban llamar actualizarTrasSaliente — al
+        // actualizar aquí el preview y la hora quedan alineados con el mensaje.
+        // Responder = ya se leyó el chat (mismo criterio que WhatsApp).
+        await tx.whatsappConversacion.update({
+          where: { id: input.whatsappConversacionId },
+          data: {
+            ultimoMensajeEn: fechaMensaje,
+            ...(input.direccion === 'saliente' ? { noLeidos: 0 } : {}),
+          },
+        });
+
+        if (intento)
+          await tx.whatsappSalidaIntento.update({
+            where: { id: intento.id },
+            data: { mensajePersistido: true },
+          });
+        return { id: mensaje.id, creado: true };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted },
     );
-
-    const mensaje = await this.prisma.whatsappMensaje.create({
-      data: {
-        organizacionId: input.organizacionId,
-        whatsappConversacionId: input.whatsappConversacionId,
-        wamid: input.wamid,
-        direccion: input.direccion,
-        tipo: input.tipo,
-        texto: input.texto,
-        plantillaNombre: input.plantillaNombre,
-        estadoEntrega: input.estadoEntrega,
-        datosCrudos: input.datosCrudos as Prisma.InputJsonValue,
-        fechaMensaje,
-        usuarioCreacion: input.usuarioCreacion,
-        mediaId: input.mediaId,
-        mediaMimeType: input.mediaMimeType,
-        mediaNombreArchivo: input.mediaNombreArchivo,
-        mediaCaption: input.mediaCaption,
-        mediaEsVoz: input.mediaEsVoz,
-        mediaTamanoBytes: input.mediaTamanoBytes,
-        respondeAMensajeId: input.respondeAMensajeId,
-        ubicacionLatitud: input.ubicacionLatitud,
-        ubicacionLongitud: input.ubicacionLongitud,
-        ubicacionNombre: input.ubicacionNombre,
-        ubicacionDireccion: input.ubicacionDireccion,
-        contactos: input.contactos
-          ? (input.contactos as unknown as Prisma.InputJsonValue)
-          : undefined,
-        interactivo: input.interactivo
-          ? (input.interactivo as unknown as Prisma.InputJsonValue)
-          : undefined,
-        ...(input.mediaObjetoId
-          ? { media: { create: { mediaObjetoId: input.mediaObjetoId } } }
-          : {}),
-      },
-    });
-
-    if (input.mediaObjetoId) {
-      await this.prisma.whatsappMediaObjeto.update({
-        where: { id: input.mediaObjetoId },
-        data: { usos: { increment: 1 } },
-      });
-    }
-
-    // Lista de chats ordena/muestra por ultimoMensajeEn. Varios envíos
-    // salientes del CRM olvidaban llamar actualizarTrasSaliente — al
-    // actualizar aquí el preview y la hora quedan alineados con el mensaje.
-    // Responder = ya se leyó el chat (mismo criterio que WhatsApp).
-    await this.prisma.whatsappConversacion.update({
-      where: { id: input.whatsappConversacionId },
-      data: {
-        ultimoMensajeEn: fechaMensaje,
-        ...(input.direccion === 'saliente' ? { noLeidos: 0 } : {}),
-      },
-    });
-
-    return { id: mensaje.id, creado: true };
   }
 
   /** Evita empates de segundo (Meta / lotes): el nuevo mensaje queda justo después. */
   private async fechaMensajeSinColision(
     whatsappConversacionId: string,
     fecha: Date,
+    db: Prisma.TransactionClient = this.prisma,
   ): Promise<Date> {
     const segundoInicio = new Date(Math.floor(fecha.getTime() / 1000) * 1000);
     const segundoFin = new Date(segundoInicio.getTime() + 1000);
-    const ultimoEnSegundo = await this.prisma.whatsappMensaje.findFirst({
+    const ultimoEnSegundo = await db.whatsappMensaje.findFirst({
       where: {
         whatsappConversacionId,
         fechaMensaje: { gte: segundoInicio, lt: segundoFin },
@@ -943,9 +1017,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       ubicacionDireccion: mensaje.ubicacionDireccion,
       contactos:
         (mensaje.contactos as unknown as
-          | ContactoMensajeRow
-          | ContactoMensajeRow[]
-          | null) ?? null,
+          ContactoMensajeRow | ContactoMensajeRow[] | null) ?? null,
     };
   }
 }

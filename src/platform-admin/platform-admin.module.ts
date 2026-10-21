@@ -1,3 +1,6 @@
+import { WhatsappBotAdminService } from './application/whatsapp-bot-admin.service';
+import { AdminAutomationsController } from './presentation/admin-automations.controller';
+import { AdminWhatsappBotController } from './presentation/admin-whatsapp-bot.controller';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { ModulesModule } from '../modules/modules.module';
@@ -27,12 +30,15 @@ import { PrismaOrganizacionModulosAdminRepository } from './infrastructure/prism
 @Module({
   imports: [AuthModule, ModulesModule],
   controllers: [
+    AdminAutomationsController,
+    AdminWhatsappBotController,
     AdminOrganizationsController,
     AdminUsersController,
     AdminModulesController,
     AdminOrganizationModulesController,
   ],
   providers: [
+    WhatsappBotAdminService,
     CrearOrganizacionUseCase,
     ListarOrganizacionesUseCase,
     ObtenerOrganizacionUseCase,

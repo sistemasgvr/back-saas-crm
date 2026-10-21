@@ -1,0 +1,7 @@
+{
+  "rootDir": "..",
+  "testEnvironment": "node",
+  "testRegex": "test/whatsapp-control.integration-spec.ts$",
+  "transform": { "^.+\\.ts$": "ts-jest" },
+  "testTimeout": 120000
+}

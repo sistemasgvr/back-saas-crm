@@ -1,3 +1,4 @@
+import { WhatsappMessagingModule } from '../messaging/whatsapp-messaging.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { MetaConnectionsModule } from '../../meta/connections/meta-connections.module';
 import { WhatsappConnectionsModule } from '../connections/whatsapp-connections.module';
@@ -28,6 +29,7 @@ import { MetricasLlamadasUseCase } from './application/use-cases/metricas-llamad
 
 @Module({
   imports: [
+    forwardRef(() => WhatsappMessagingModule),
     forwardRef(() => MetaConnectionsModule),
     WhatsappConnectionsModule,
     forwardRef(() => NotificationsModule),

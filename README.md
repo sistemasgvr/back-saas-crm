@@ -1,3 +1,7 @@
+# Backend SaaS CRM
+
+[Fase 1: control humano de WhatsApp](docs/whatsapp-control-humano.md): endpoints, coordinación, autoría, migración y pruebas. El bot está deshabilitado por defecto; aplicar y validar la migración antes de desplegar este backend.
+
 <p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
@@ -96,3 +100,7 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+### Base local de desarrollo
+
+La copia de producción y las migraciones de fase 1 están aplicadas únicamente en local. Consulta [desarrollo local](docs/desarrollo-local.md) para conectar e iniciar PostgreSQL y revisar las dependencias pendientes.

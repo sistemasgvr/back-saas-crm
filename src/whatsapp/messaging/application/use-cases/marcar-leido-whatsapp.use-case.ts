@@ -36,18 +36,30 @@ export class MarcarLeidoWhatsAppUseCase {
     conversacionId: string,
     opciones?: { escribiendo?: boolean },
   ): Promise<void> {
+    const conversacion = await this.conversaciones.findPorId(
+      organizacionId,
+      conversacionId,
+    );
+    if (!conversacion) return;
     const wamid =
       await this.conversaciones.buscarUltimoWamidEntrante(conversacionId);
     if (!wamid) return;
 
-    const whatsappConexion =
-      await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    const conexionActiva = whatsappConexion[0];
+    const conexionActiva = await this.conexionesWa.findPorId(
+      organizacionId,
+      conversacion.whatsappConexionId,
+    );
     if (!conexionActiva) return;
 
-    const conexion =
-      await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion?.tokenCifrado) return;
+    const conexion = await this.conexiones.findActivaPorId(
+      organizacionId,
+      conexionActiva.metaConexionId,
+    );
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    )
+      return;
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
 
     await this.graph.enviarConfirmacionLecturaWhatsApp(

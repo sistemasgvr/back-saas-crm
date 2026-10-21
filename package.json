@@ -20,6 +20,7 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+    "test:control:integration": "jest --config test/jest-control-integration.json --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "media:migrar-minio": "ts-node -r tsconfig-paths/register prisma/scripts/migrar-media-minio.ts",
     "media:estimar-unica": "ts-node -r tsconfig-paths/register prisma/scripts/estimar-media-unica.ts",

@@ -6,6 +6,7 @@ import {
 export const TOKEN_SERVICE = Symbol('TOKEN_SERVICE');
 
 export interface EmitidoRefreshToken {
+  sesionId: string;
   token: string;
   tokenHash: string;
   expiraEn: Date;

@@ -11,6 +11,12 @@ import type {
 export class PrismaMetaConexionesRepository implements MetaConexionesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  findActivaPorId(organizacionId: string, id: string) {
+    return this.prisma.metaConexion.findFirst({
+      where: { id, organizacionId, estado: 1 },
+    });
+  }
+
   findActivaPorOrganizacion(organizacionId: string) {
     return this.prisma.metaConexion.findFirst({
       where: { organizacionId, estado: 1 },

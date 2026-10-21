@@ -37,7 +37,6 @@ export class RefreshUseCase {
 
     const tokenHash = this.tokens.hashToken(input.refreshToken);
     let fila = await this.tokensRefresco.findVigentePorHash(tokenHash);
-    let yaRotado = false;
     if (!fila) {
       const reciente = await this.tokensRefresco.findRevocadoRecientePorHash(
         tokenHash,
@@ -47,7 +46,6 @@ export class RefreshUseCase {
         throw new UnauthorizedException('Refresh token inválido o revocado');
       }
       fila = reciente;
-      yaRotado = true;
     }
 
     const usuario = await this.usuarios.findActivoById(payload.sub);
@@ -68,10 +66,6 @@ export class RefreshUseCase {
       }
     }
 
-    if (!yaRotado) {
-      await this.tokensRefresco.revocar(fila.id);
-    }
-
     const accessToken = this.tokens.firmarAccessToken({
       sub: usuario.id,
       organizacionId,
@@ -82,14 +76,22 @@ export class RefreshUseCase {
     const nuevoRefresh = this.tokens.firmarRefreshToken({
       sub: usuario.id,
       organizacionId,
+      sesionId: fila.familiaId ?? fila.id,
     });
-    await this.tokensRefresco.crear({
-      usuarioId: usuario.id,
-      tokenHash: nuevoRefresh.tokenHash,
-      expiraEn: nuevoRefresh.expiraEn,
-      ip: input.ip,
-      userAgent: input.userAgent,
-    });
+    const rotado = await this.tokensRefresco.rotar(
+      fila.id,
+      {
+        familiaId: nuevoRefresh.sesionId,
+        usuarioId: usuario.id,
+        tokenHash: nuevoRefresh.tokenHash,
+        expiraEn: nuevoRefresh.expiraEn,
+        ip: input.ip,
+        userAgent: input.userAgent,
+      },
+      GRACIA_ROTACION_MS,
+    );
+    if (!rotado)
+      throw new UnauthorizedException('Sesión cerrada o refresh revocado');
 
     return { accessToken, refreshToken: nuevoRefresh.token };
   }

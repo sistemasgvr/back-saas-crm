@@ -48,6 +48,12 @@ model Usuario {
   leadAutoAsignacionConfigsPrimero LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionPrimero")
   leadAutoAsignacionConfigsSegundo LeadAutoAsignacionConfig[] @relation("LeadAutoAsignacionSegundo")
   whatsappLlamadasAsignadas       WhatsappLlamada[]          @relation("WhatsappLlamadaAsignado")
+  automatizacionesActualizadas AutomatizacionIntegracion[]
+  automatizacionEventos AutomatizacionIntegracionEvento[]
+  botConfiguracionesActualizadas WhatsappBotConfiguracion[] @relation("BotConfiguracionAdmin")
+  botPreferenciasActualizadas WhatsappBotConfiguracion[] @relation("BotPreferenciasAdmin")
+  botConfiguracionEventos WhatsappBotConfiguracionEvento[]
+  botPreferenciaEventos WhatsappBotPreferenciaEvento[]
 
   @@index([esAdminPlataforma])
   @@index([estado])
@@ -58,6 +64,7 @@ model TokenRefresco {
   id         String    @id @default(uuid()) @db.Uuid
   usuarioId  String    @map("usuario_id") @db.Uuid
   tokenHash  String    @map("token_hash") @db.VarChar(255)
+  familiaId String? @map("familia_id") @db.Uuid
   expiraEn   DateTime  @map("expira_en") @db.Timestamptz
   revocadoEn DateTime? @map("revocado_en") @db.Timestamptz
   ip         String?   @db.VarChar(64)
@@ -73,6 +80,7 @@ model TokenRefresco {
 
   @@index([usuarioId])
   @@index([tokenHash])
+  @@index([familiaId])
   @@index([expiraEn])
   @@index([estado])
   @@map("tokens_refresco")
@@ -127,6 +135,9 @@ model Organizacion {
   whatsappConversaciones   WhatsappConversacion[]
   whatsappLlamadas         WhatsappLlamada[]
   whatsappMediaObjetos     WhatsappMediaObjeto[]
+  whatsappBotConfiguracion WhatsappBotConfiguracion?
+  whatsappBotConfiguracionEventos WhatsappBotConfiguracionEvento[]
+  whatsappBotPreferenciaEventos WhatsappBotPreferenciaEvento[]
 
   @@index([estado])
   @@index([rubro])
@@ -340,7 +351,7 @@ model Lead {
 model LeadAutoAsignacionConfig {
   id String @id @default(uuid()) @db.Uuid
 
-  organizacionId String @unique @map("organizacion_id") @db.Uuid
+  organizacionId String @unique(map: "lead_auto_asignacion_config_organizacion_id_unique") @map("organizacion_id") @db.Uuid
   habilitado Int @default(0) @map("habilitado") @db.SmallInt
 
   /**
@@ -360,7 +371,7 @@ model LeadAutoAsignacionConfig {
   consumoDiario Json @default("{}") @map("consumo_diario")
 
   siguienteIndice Int @default(0) @map("siguiente_indice") @db.SmallInt
-  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+  fechaModificacion DateTime @default(now()) @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
   usuarioPrimero Usuario @relation("LeadAutoAsignacionPrimero", fields: [usuarioPrimeroId], references: [id])
@@ -386,7 +397,7 @@ model LeadAutoAsignacionQueue {
   lead Lead @relation(fields: [leadId], references: [id])
 
   @@unique([organizacionId, leadId])
-  @@index([organizacionId, fechaLead, fechaEncolado])
+  @@index([organizacionId, fechaLead, fechaEncolado], map: "lead_auto_asignacion_queue_organizacion_id_fecha_lead_fecha_enc")
   @@map("lead_auto_asignacion_queue")
 }
 
@@ -458,7 +469,7 @@ model LeadVisita {
   creadoPorUsuarioId String? @map("creado_por_usuario_id") @db.Uuid
 
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
-  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+  fechaModificacion DateTime @default(now()) @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   lead            Lead                 @relation(fields: [leadId], references: [id])
   inmueble        Inmueble?            @relation(fields: [inmuebleId], references: [id])
@@ -471,7 +482,7 @@ model LeadVisita {
   @@index([leadId, programadaEn])
   @@index([inmuebleId])
   @@index([asignadoUsuarioId, programadaEn])
-  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin])
+  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin], map: "lead_visitas_asignado_usuario_id_estado_programada_en_progra_id")
   @@index([organizacionId, estado, programadaEn])
   @@map("lead_visitas")
 }
@@ -514,7 +525,7 @@ model LeadActividad {
 
   @@index([organizacionId, programadaEn])
   @@index([leadId, programadaEn])
-  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin])
+  @@index([asignadoUsuarioId, estado, programadaEn, programadaFin], map: "lead_actividades_asignado_usuario_id_estado_programada_en_pr_id")
   @@index([organizacionId, estado, programadaEn])
   @@map("lead_actividades")
 }
@@ -780,6 +791,10 @@ model OrganizacionUsuario {
 
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
   usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  conversacionesControladas WhatsappConversacion[] @relation("ControlResponsable")
+  controlEventosActor WhatsappControlEvento[] @relation("ControlEventoActor")
+  controlEventosResponsable WhatsappControlEvento[] @relation("ControlEventoResponsable")
+  salidaIntentos WhatsappSalidaIntento[]
 
   @@unique([organizacionId, usuarioId])
   @@index([usuarioId])
@@ -937,6 +952,13 @@ model WhatsappConexion {
    */
   metaConexionId String @map("meta_conexion_id") @db.Uuid
 
+  // Columnas históricas presentes en el respaldo de producción. Se conservan
+  // sin exponerlas en Prisma Client; la aplicación usa el token de MetaConexion.
+  businessIdLegacy String? @map("business_id") @db.VarChar(64) @ignore
+  origenLegacy String @default("MANUAL") @map("origen") @db.VarChar(40) @ignore
+  tokenCifradoLegacy String? @map("token_cifrado") @db.Text @ignore
+  tokenExpiraEnLegacy DateTime? @map("token_expira_en") @db.Timestamptz @ignore
+
   wabaId           String  @map("waba_id") @db.VarChar(64)
   phoneNumberId    String  @map("phone_number_id") @db.VarChar(64)
   numeroDisplay    String? @map("numero_display") @db.VarChar(40)
@@ -1012,6 +1034,18 @@ model WhatsappConversacion {
    */
   bloqueado       Int       @default(0) @db.SmallInt
 
+  fasePrecalificacion String @default("NO_INICIADA") @map("fase_precalificacion") @db.VarChar(30)
+  modoAtencion String @default("MANUAL") @map("modo_atencion") @db.VarChar(20)
+  controlVersion Int @default(0) @map("control_version")
+  entradaRevision Int @default(0) @map("entrada_revision")
+  controlUsuarioId String? @map("control_usuario_id") @db.Uuid
+  controlResponsable OrganizacionUsuario? @relation("ControlResponsable", fields: [organizacionId, controlUsuarioId], references: [organizacionId, usuarioId], onDelete: Restrict, onUpdate: NoAction, map: "wa_control_responsable_fkey")
+  controlSolicitadoEn DateTime? @map("control_solicitado_en") @db.Timestamptz
+  controlTomadoEn DateTime? @map("control_tomado_en") @db.Timestamptz
+  controlMotivo String? @map("control_motivo") @db.VarChar(100)
+  controlEventos WhatsappControlEvento[]
+  salidaIntentos WhatsappSalidaIntento[]
+
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
   usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
@@ -1024,7 +1058,9 @@ model WhatsappConversacion {
   mensajes         WhatsappMensaje[]
   llamadas         WhatsappLlamada[]
 
-  @@unique([organizacionId, waId])
+  @@unique([organizacionId, whatsappConexionId, waId], map: "whatsapp_conversaciones_org_linea_wa_key")
+  @@unique([organizacionId, whatsappConexionId, bsuid], map: "whatsapp_conversaciones_org_linea_bsuid_key")
+  @@unique([organizacionId, id])
   @@index([leadId])
   @@index([whatsappConexionId])
   @@index([ultimoMensajeEn])
@@ -1044,6 +1080,7 @@ model WhatsappMensaje {
   /**
    * entrante | saliente
    */
+  autorTipo String @default("UNKNOWN") @map("autor_tipo") @db.VarChar(20)
   direccion       String   @db.VarChar(10)
   /**
    * text | template | image | document | audio | video | sticker | location |
@@ -1183,7 +1220,7 @@ model WhatsappMensajeMedia {
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
   whatsappMensaje WhatsappMensaje     @relation(fields: [whatsappMensajeId], references: [id])
-  mediaObjeto     WhatsappMediaObjeto? @relation(fields: [mediaObjetoId], references: [id])
+  mediaObjeto     WhatsappMediaObjeto? @relation(fields: [mediaObjetoId], references: [id], onDelete: Restrict)
 
   @@index([mediaObjetoId])
   @@map("whatsapp_mensajes_media")
@@ -1243,4 +1280,111 @@ model WhatsappLlamada {
   @@index([leadId])
   @@index([asignadoUsuarioId, inicioEn])
   @@map("whatsapp_llamadas")
+}
+
+model AutomatizacionIntegracion {
+  id String @id @default("n8n") @db.VarChar(20)
+  webhookUrl String @map("webhook_url") @db.VarChar(2048)
+  headerNombre String @default("X-CRM-Secret") @map("header_nombre") @db.VarChar(100)
+  secretoCifrado String? @map("secreto_cifrado") @db.Text
+  version Int @default(0)
+  actualizadoPor String @map("actualizado_por") @db.Uuid
+  actualizadoEn DateTime @updatedAt @map("actualizado_en") @db.Timestamptz
+  administrador Usuario @relation(fields: [actualizadoPor], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("automatizacion_integraciones")
+}
+
+model AutomatizacionIntegracionEvento {
+  id String @id @default(uuid()) @db.Uuid
+  version Int @unique
+  usuarioId String @map("usuario_id") @db.Uuid
+  secretoAccion String @map("secreto_accion") @db.VarChar(20)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("automatizacion_integracion_eventos")
+}
+
+model WhatsappBotConfiguracion {
+  organizacionId String @id @map("organizacion_id") @db.Uuid
+  habilitado Boolean @default(false)
+  version Int @default(0)
+  actualizadoPor String? @map("actualizado_por") @db.Uuid
+  actualizadoEn DateTime? @map("actualizado_en") @db.Timestamptz
+  modoInicial String @default("HUMANO") @map("modo_inicial") @db.VarChar(10)
+  preferenciasVersion Int @default(0) @map("preferencias_version")
+  preferenciasActualizadoPor String? @map("preferencias_actualizado_por") @db.Uuid
+  preferenciasActualizadoEn DateTime? @map("preferencias_actualizado_en") @db.Timestamptz
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "wa_bot_org_fkey")
+  administrador Usuario? @relation("BotConfiguracionAdmin", fields: [actualizadoPor], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "wa_bot_config_admin_fkey")
+  administradorPreferencias Usuario? @relation("BotPreferenciasAdmin", fields: [preferenciasActualizadoPor], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@map("whatsapp_bot_configuraciones")
+}
+
+model WhatsappBotPreferenciaEvento {
+  id String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  usuarioId String @map("usuario_id") @db.Uuid
+  version Int
+  modoAnterior String @map("modo_anterior") @db.VarChar(10)
+  modoNuevo String @map("modo_nuevo") @db.VarChar(10)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@unique([organizacionId, version])
+  @@map("whatsapp_bot_preferencia_eventos")
+}
+model WhatsappControlEvento {
+  id String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  conversacionId String @map("conversacion_id") @db.Uuid
+  wamid String? @db.VarChar(128)
+  version Int
+  modo String @db.VarChar(20)
+  motivo String @db.VarChar(100)
+  actor String @db.VarChar(20)
+  usuarioId String? @map("usuario_id") @db.Uuid
+  responsableId String? @map("responsable_id") @db.Uuid
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  conversacion WhatsappConversacion @relation(fields: [organizacionId, conversacionId], references: [organizacionId, id])
+  usuario OrganizacionUsuario? @relation("ControlEventoActor", fields: [organizacionId, usuarioId], references: [organizacionId, usuarioId], onDelete: Restrict, onUpdate: NoAction, map: "wa_evento_actor_fkey")
+  responsable OrganizacionUsuario? @relation("ControlEventoResponsable", fields: [organizacionId, responsableId], references: [organizacionId, usuarioId], onDelete: Restrict, onUpdate: NoAction, map: "wa_evento_responsable_fkey")
+  @@unique([organizacionId, conversacionId, version])
+  @@unique([organizacionId, wamid])
+  @@map("whatsapp_control_eventos")
+}
+model WhatsappSalidaIntento {
+  id String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  conversacionId String @map("conversacion_id") @db.Uuid
+  actor String @db.VarChar(20)
+  usuarioId String? @map("usuario_id") @db.Uuid
+  clave String @db.VarChar(200)
+  tipo String @db.VarChar(80)
+  controlVersion Int @map("control_version")
+  estado String @db.VarChar(20)
+  mensajePersistido Boolean @default(false) @map("mensaje_persistido")
+  wamid String? @db.VarChar(128)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  terminadoEn DateTime? @map("terminado_en") @db.Timestamptz
+  conversacion WhatsappConversacion @relation(fields: [organizacionId, conversacionId], references: [organizacionId, id])
+  usuario OrganizacionUsuario? @relation(fields: [organizacionId, usuarioId], references: [organizacionId, usuarioId], onDelete: Restrict, onUpdate: NoAction, map: "wa_intento_usuario_fkey")
+  @@unique([organizacionId, clave])
+  @@index([organizacionId, conversacionId, estado])
+  @@index([organizacionId, wamid])
+  @@map("whatsapp_salida_intentos")
+}
+
+model WhatsappBotConfiguracionEvento {
+  id String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  usuarioId String @map("usuario_id") @db.Uuid
+  version Int
+  habilitadoAnterior Boolean @map("habilitado_anterior")
+  habilitadoNuevo Boolean @map("habilitado_nuevo")
+  motivo String @db.VarChar(500)
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  @@unique([organizacionId, version])
+  @@map("whatsapp_bot_configuracion_eventos")
 }

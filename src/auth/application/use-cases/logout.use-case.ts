@@ -14,7 +14,12 @@ export class LogoutUseCase {
 
   async execute(refreshToken: string): Promise<void> {
     const tokenHash = this.tokens.hashToken(refreshToken);
-    const fila = await this.tokensRefresco.findVigentePorHash(tokenHash);
+    const fila =
+      (await this.tokensRefresco.findVigentePorHash(tokenHash)) ??
+      (await this.tokensRefresco.findRevocadoRecientePorHash(
+        tokenHash,
+        30_000,
+      ));
     if (fila) {
       await this.tokensRefresco.revocar(fila.id);
     }

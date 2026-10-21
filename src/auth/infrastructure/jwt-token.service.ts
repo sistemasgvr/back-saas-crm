@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import type { JwtSignOptions } from '@nestjs/jwt';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type {
   AccessTokenPayload,
   RefreshTokenPayload,
@@ -30,13 +30,18 @@ export class JwtTokenService implements TokenService {
   }
 
   firmarRefreshToken(payload: RefreshTokenPayload): EmitidoRefreshToken {
-    const token = this.jwt.sign(payload, {
-      secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.config.get<string>(
-        'JWT_REFRESH_EXPIRES_IN',
-        '30d',
-      ) as JwtSignOptions['expiresIn'],
-    });
+    const sesionId = payload.sesionId ?? randomUUID();
+    const token = this.jwt.sign(
+      { ...payload, sesionId },
+      {
+        jwtid: randomUUID(),
+        secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.config.get<string>(
+          'JWT_REFRESH_EXPIRES_IN',
+          '30d',
+        ) as JwtSignOptions['expiresIn'],
+      },
+    );
 
     const decoded: unknown = this.jwt.decode(token);
     const exp =
@@ -51,6 +56,7 @@ export class JwtTokenService implements TokenService {
     }
 
     return {
+      sesionId,
       token,
       tokenHash: this.hashToken(token),
       expiraEn: new Date(exp * 1000),
@@ -62,7 +68,11 @@ export class JwtTokenService implements TokenService {
       const payload = this.jwt.verify<RefreshTokenPayload>(token, {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
-      return { sub: payload.sub, organizacionId: payload.organizacionId };
+      return {
+        sub: payload.sub,
+        organizacionId: payload.organizacionId,
+        sesionId: payload.sesionId,
+      };
     } catch {
       return null;
     }

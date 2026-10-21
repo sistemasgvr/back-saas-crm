@@ -65,6 +65,7 @@ export class LoginUseCase {
     });
 
     await this.tokensRefresco.crear({
+      familiaId: refresh.sesionId,
       usuarioId: usuario.id,
       tokenHash: refresh.tokenHash,
       expiraEn: refresh.expiraEn,

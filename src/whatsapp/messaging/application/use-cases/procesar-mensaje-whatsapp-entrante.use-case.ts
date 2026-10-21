@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ControlAtencionService } from '../control-atencion.service';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
@@ -10,7 +11,10 @@ import type { MetaConexionesRepository } from '../../../../meta/connections/appl
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
-import { previewUltimoMensajeWhatsApp, truncarConEllipsis } from '../preview-ultimo-mensaje';
+import {
+  previewUltimoMensajeWhatsApp,
+  truncarConEllipsis,
+} from '../preview-ultimo-mensaje';
 import { AsegurarLeadParaConversacionWhatsAppUseCase } from './asegurar-lead-para-conversacion-whatsapp.use-case';
 import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
 
@@ -49,6 +53,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly asegurarLead: AsegurarLeadParaConversacionWhatsAppUseCase,
     private readonly guardarMedia: GuardarMediaWhatsAppService,
+    private readonly control: ControlAtencionService,
   ) {}
 
   async execute(
@@ -64,7 +69,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       return { procesado: false };
     }
 
-    const { id: conversacionId } =
+    const { id: conversacionId, esNueva } =
       await this.conversaciones.findOCrearConversacion({
         organizacionId: conexion.organizacionId,
         whatsappConexionId: conexion.id,
@@ -103,7 +108,9 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         const objeto = await this.guardarMedia.asegurar(
           conexion.organizacionId,
           media.buffer,
-          media.mimeType ?? evento.media?.mimeType ?? 'application/octet-stream',
+          media.mimeType ??
+            evento.media?.mimeType ??
+            'application/octet-stream',
         );
         mediaObjetoId = objeto.id;
       } catch (error: unknown) {
@@ -130,6 +137,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       whatsappConversacionId: conversacionId,
       wamid: evento.wamid,
       direccion: 'entrante',
+      esHistorial: evento.esHistorial,
       tipo: evento.tipo,
       texto: evento.texto,
       datosCrudos: evento.raw,
@@ -176,6 +184,12 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       };
     }
 
+    if (esNueva) {
+      await this.control.aplicarModoInicial(
+        conexion.organizacionId,
+        conversacionId,
+      );
+    }
     const conversacion = await this.conversaciones.findPorId(
       conexion.organizacionId,
       conversacionId,

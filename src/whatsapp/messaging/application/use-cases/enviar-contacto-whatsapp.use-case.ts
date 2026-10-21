@@ -1,3 +1,4 @@
+import { ControlAtencionService } from '../control-atencion.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -31,6 +32,7 @@ export interface EnviarContactoInput {
 @Injectable()
 export class EnviarContactoWhatsAppUseCase {
   constructor(
+    private readonly control: ControlAtencionService,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
@@ -74,18 +76,24 @@ export class EnviarContactoWhatsAppUseCase {
       );
     }
 
-    const whatsappConexion =
-      await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    const conexionActiva = whatsappConexion[0];
+    const conexionActiva = await this.conexionesWa.findPorId(
+      organizacionId,
+      conversacion.whatsappConexionId,
+    );
     if (!conexionActiva) {
       throw new NotFoundException(
         'No hay un número de WhatsApp vinculado a esta organización',
       );
     }
 
-    const conexion =
-      await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion?.tokenCifrado) {
+    const conexion = await this.conexiones.findActivaPorId(
+      organizacionId,
+      conexionActiva.metaConexionId,
+    );
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    ) {
       throw new NotFoundException(
         'No hay una sesión de Meta conectada para esta organización',
       );
@@ -113,12 +121,19 @@ export class EnviarContactoWhatsAppUseCase {
       respondeAWamid = citado.wamid;
     }
 
-    const resultado = await this.graph.enviarContactoWhatsApp(
-      conexionActiva.phoneNumberId,
-      accessToken,
-      para,
-      input.contactos,
-      respondeAWamid,
+    const resultado = await this.control.despachar(
+      organizacionId,
+      conversacionId,
+      { tipo: 'HUMAN', ...ctx },
+      'enviarContactoWhatsApp',
+      () =>
+        this.graph.enviarContactoWhatsApp(
+          conexionActiva.phoneNumberId,
+          accessToken,
+          para,
+          input.contactos,
+          respondeAWamid,
+        ),
     );
 
     await this.conversaciones.registrarMensaje({

@@ -1,3 +1,4 @@
+import { ControlAtencionService } from '../control-atencion.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
@@ -33,6 +34,7 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
   );
 
   constructor(
+    private readonly control: ControlAtencionService,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
@@ -72,10 +74,10 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
       return { ok: false, motivo: 'sin_destinatario' };
     }
 
-    const whatsappConexion = await this.conexionesWa.listarPorOrganizacion(
+    const conexionActiva = await this.conexionesWa.findPorId(
       input.organizacionId,
+      conversacion.whatsappConexionId,
     );
-    const conexionActiva = whatsappConexion[0];
     if (!conexionActiva) {
       this.logger.warn(
         `Org ${input.organizacionId}: sin número WhatsApp vinculado — se omite`,
@@ -83,10 +85,14 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
       return { ok: false, motivo: 'sin_conexion_wa' };
     }
 
-    const conexion = await this.conexiones.findActivaPorOrganizacion(
+    const conexion = await this.conexiones.findActivaPorId(
       input.organizacionId,
+      conexionActiva.metaConexionId,
     );
-    if (!conexion?.tokenCifrado) {
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    ) {
       this.logger.warn(
         `Org ${input.organizacionId}: sin sesión Meta activa — se omite`,
       );
@@ -100,11 +106,18 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
 
     try {
       if (dentroDeVentana) {
-        const resultado = await this.graph.enviarMensajeTextoWhatsApp(
-          conexionActiva.phoneNumberId,
-          accessToken,
-          para,
-          input.texto,
+        const resultado = await this.control.despachar(
+          input.organizacionId,
+          conversacion.id,
+          { tipo: 'SYSTEM', origen: 'agenda_recordatorio' },
+          'enviarMensajeTextoWhatsApp',
+          () =>
+            this.graph.enviarMensajeTextoWhatsApp(
+              conexionActiva.phoneNumberId,
+              accessToken,
+              para,
+              input.texto,
+            ),
         );
         await this.conversaciones.registrarMensaje({
           organizacionId: input.organizacionId,
@@ -142,12 +155,19 @@ export class EnviarRecordatorioAgendaWhatsAppUseCase {
           .get<string>('WHATSAPP_AGENDA_REMINDER_TEMPLATE_LANG')
           ?.trim() || 'es';
 
-      const resultado = await this.graph.enviarMensajePlantillaWhatsApp(
-        conexionActiva.phoneNumberId,
-        accessToken,
-        para,
-        plantilla,
-        idioma,
+      const resultado = await this.control.despachar(
+        input.organizacionId,
+        conversacion.id,
+        { tipo: 'SYSTEM', origen: 'agenda_recordatorio' },
+        'enviarMensajePlantillaWhatsApp',
+        () =>
+          this.graph.enviarMensajePlantillaWhatsApp(
+            conexionActiva.phoneNumberId,
+            accessToken,
+            para,
+            plantilla,
+            idioma,
+          ),
       );
       await this.conversaciones.registrarMensaje({
         organizacionId: input.organizacionId,

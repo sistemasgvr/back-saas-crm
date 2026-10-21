@@ -1,3 +1,6 @@
+import { ControlAtencionService } from './application/control-atencion.service';
+import { BotEmpresaService } from './application/bot-empresa.service';
+import { BotEmpresaController } from './presentation/bot-empresa.controller';
 import { Module, forwardRef } from '@nestjs/common';
 import { MetaConnectionsModule } from '../../meta/connections/meta-connections.module';
 import { WhatsappConnectionsModule } from '../connections/whatsapp-connections.module';
@@ -42,8 +45,10 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     forwardRef(() => NotificationsModule),
     LeadsModule,
   ],
-  controllers: [WhatsappChatsController],
+  controllers: [WhatsappChatsController, BotEmpresaController],
   providers: [
+    ControlAtencionService,
+    BotEmpresaService,
     ListarConversacionesUseCase,
     ContarNoLeidosWhatsAppUseCase,
     ObtenerConversacionUseCase,
@@ -78,6 +83,8 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     },
   ],
   exports: [
+    WHATSAPP_CONVERSACIONES_REPOSITORY,
+    ControlAtencionService,
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEcoMensajeWhatsAppUseCase,
     ProcesarEstadoWhatsAppUseCase,

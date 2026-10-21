@@ -37,6 +37,7 @@ export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid('development', 'production', 'test')
     .default('production'),
+  AUTOMATIZACIONES_CLIENTES_HABILITADAS: Joi.boolean().default(false),
 
   // postgres:// y postgresql:// son equivalentes; EasyPanel/algunos paneles
   // suelen emitir postgres:// y Joi no debe tumbar el arranque por eso.

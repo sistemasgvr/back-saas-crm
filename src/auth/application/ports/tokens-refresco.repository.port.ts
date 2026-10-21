@@ -3,6 +3,7 @@ import { TokenRefresco } from '@prisma/client';
 export const TOKENS_REFRESCO_REPOSITORY = Symbol('TOKENS_REFRESCO_REPOSITORY');
 
 export interface CrearTokenRefrescoInput {
+  familiaId?: string;
   usuarioId: string;
   tokenHash: string;
   expiraEn: Date;
@@ -19,4 +20,9 @@ export interface TokensRefrescoRepository {
     graciaMs: number,
   ): Promise<TokenRefresco | null>;
   revocar(id: string): Promise<void>;
+  rotar(
+    id: string,
+    nuevo: CrearTokenRefrescoInput,
+    graciaMs: number,
+  ): Promise<boolean>;
 }

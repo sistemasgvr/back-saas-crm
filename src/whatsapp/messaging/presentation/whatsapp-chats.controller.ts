@@ -1,3 +1,9 @@
+import { ControlAtencionService } from '../application/control-atencion.service';
+import {
+  TomarControlDto,
+  TransferirControlDto,
+  AsumirHumanoDto,
+} from './dto/control-atencion.dto';
 import {
   BadRequestException,
   Body,
@@ -82,6 +88,7 @@ const LIMITE_MULTER_BYTES = 100 * 1024 * 1024;
 @RequireModule('WHATSAPP')
 export class WhatsappChatsController {
   constructor(
+    private readonly controlAtencion: ControlAtencionService,
     private readonly listarConversaciones: ListarConversacionesUseCase,
     private readonly contarNoLeidos: ContarNoLeidosWhatsAppUseCase,
     private readonly obtenerConversacion: ObtenerConversacionUseCase,
@@ -102,6 +109,104 @@ export class WhatsappChatsController {
     private readonly reenviarMensaje: ReenviarMensajeWhatsAppUseCase,
     private readonly renombrarConversacion: RenombrarConversacionWhatsAppUseCase,
   ) {}
+
+  @Get(':id/control')
+  @ApiOperation({ summary: 'Estado canónico del control y envíos inciertos' })
+  control(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.controlAtencion.estado(ctx.organizacionId!, id);
+  }
+
+  @Post(':id/control/asumir-humano')
+  asumirHumano(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AsumirHumanoDto,
+  ) {
+    return this.controlAtencion.asumirHumano(
+      ctx.organizacionId!,
+      id,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      dto.controlVersion,
+      dto.asignadoUsuarioId,
+    );
+  }
+
+  @Post(':id/control/tomar')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Tomar control humano; nunca reactiva el bot' })
+  tomarControl(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: TomarControlDto,
+  ) {
+    return this.controlAtencion.tomar(
+      ctx.organizacionId!,
+      id,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      body.controlVersion,
+    );
+  }
+
+  @Post(':id/control/asignar-bot')
+  @HttpCode(HttpStatus.OK)
+  asignarBot(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: TomarControlDto,
+  ) {
+    return this.controlAtencion.asignarBot(
+      ctx.organizacionId!,
+      id,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      body.controlVersion,
+    );
+  }
+
+  @Post(':id/control/transferir')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Transferir responsable manteniendo el control humano',
+  })
+  transferirControl(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: TransferirControlDto,
+  ) {
+    return this.controlAtencion.transferir(
+      ctx.organizacionId!,
+      id,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      body.usuarioId,
+      body.controlVersion,
+    );
+  }
+
+  @Get(':id/control/asesores')
+  @ApiOperation({
+    summary:
+      'Asesores activos autorizados para recibir el control de este chat',
+  })
+  asesoresControl(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.controlAtencion.asesores(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
+  }
+
+  @Get(':id/control/historial')
+  @ApiOperation({ summary: 'Historial inmutable de control' })
+  historialControl(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.controlAtencion.historial(ctx.organizacionId!, id);
+  }
 
   @Get()
   @ApiOperation({
@@ -396,9 +501,7 @@ export class WhatsappChatsController {
       throw new BadRequestException('Falta el archivo');
     }
     const esVoz =
-      dto.esVoz === '1' ||
-      dto.esVoz === 'true' ||
-      dto.esVoz === 'True';
+      dto.esVoz === '1' || dto.esVoz === 'true' || dto.esVoz === 'True';
     return this.enviarMedia.execute(
       ctx.organizacionId!,
       id,
@@ -533,7 +636,10 @@ export class WhatsappChatsController {
   })
   @ApiResponse({ status: 204, description: 'Nombre actualizado.' })
   @ApiResponse({ status: 400, description: 'Nombre vacío o demasiado largo.' })
-  @ApiResponse({ status: 403, description: 'Sin permiso de escritura en el chat.' })
+  @ApiResponse({
+    status: 403,
+    description: 'Sin permiso de escritura en el chat.',
+  })
   @ApiResponse({ status: 404, description: 'Conversación no encontrada.' })
   renombrar(
     @CurrentUser() ctx: RequestContext,
@@ -570,18 +676,20 @@ export class WhatsappChatsController {
       `Hasta ${MAX_MENSAJES_REENVIAR} mensajes y varios destinos (ventana 24h por chat). ` +
       'La Cloud API no tiene forward nativo: se reenvía el contenido en orden.',
   })
-  @ApiResponse({ status: 200, description: 'Resultado del lote (enviados + fallidos parciales).' })
+  @ApiResponse({
+    status: 200,
+    description: 'Resultado del lote (enviados + fallidos parciales).',
+  })
   forwardMessages(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ReenviarMensajesLoteDto,
   ) {
-    const destinaciones =
-      dto.conversacionDestinoIds?.length
-        ? dto.conversacionDestinoIds
-        : dto.conversacionDestinoId
-          ? [dto.conversacionDestinoId]
-          : [];
+    const destinaciones = dto.conversacionDestinoIds?.length
+      ? dto.conversacionDestinoIds
+      : dto.conversacionDestinoId
+        ? [dto.conversacionDestinoId]
+        : [];
     return this.reenviarMensaje.executeLote(
       ctx.organizacionId!,
       id,
@@ -628,12 +736,10 @@ export class WhatsappChatsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('mensajeId', ParseUUIDPipe) mensajeId: string,
   ) {
-    return this.eliminarMensajeCrm.execute(
-      ctx.organizacionId!,
-      id,
-      mensajeId,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
-    );
+    return this.eliminarMensajeCrm.execute(ctx.organizacionId!, id, mensajeId, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+    });
   }
 
   @Post(':id/typing')

@@ -1,3 +1,4 @@
+import { ControlAtencionService } from '../control-atencion.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -40,6 +41,7 @@ export interface EnviarMensajeInput {
 @Injectable()
 export class EnviarMensajeWhatsAppUseCase {
   constructor(
+    private readonly control: ControlAtencionService,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
@@ -70,20 +72,24 @@ export class EnviarMensajeWhatsAppUseCase {
       );
     }
 
-    const whatsappConexion =
-      await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    // Solo hay 1 número por org en v1 (PLAN §3) — si en el futuro hay varios,
-    // aquí hace falta guardar a qué conexión pertenece cada conversación.
-    const conexionActiva = whatsappConexion[0];
+    const conexionActiva = await this.conexionesWa.findPorId(
+      organizacionId,
+      conversacion.whatsappConexionId,
+    );
     if (!conexionActiva) {
       throw new NotFoundException(
         'No hay un número de WhatsApp vinculado a esta organización',
       );
     }
 
-    const conexion =
-      await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion?.tokenCifrado) {
+    const conexion = await this.conexiones.findActivaPorId(
+      organizacionId,
+      conexionActiva.metaConexionId,
+    );
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    ) {
       throw new NotFoundException(
         'No hay una sesión de Meta conectada para esta organización',
       );
@@ -123,12 +129,19 @@ export class EnviarMensajeWhatsAppUseCase {
         respondeAWamid = citado.wamid;
       }
 
-      resultado = await this.graph.enviarMensajeTextoWhatsApp(
-        conexionActiva.phoneNumberId,
-        accessToken,
-        para,
-        input.texto,
-        respondeAWamid,
+      resultado = await this.control.despachar(
+        organizacionId,
+        conversacionId,
+        { tipo: 'HUMAN', ...ctx },
+        'enviarMensajeTextoWhatsApp',
+        () =>
+          this.graph.enviarMensajeTextoWhatsApp(
+            conexionActiva.phoneNumberId,
+            accessToken,
+            para,
+            input.texto!,
+            respondeAWamid,
+          ),
       );
       tipo = 'text';
     } else {
@@ -137,14 +150,21 @@ export class EnviarMensajeWhatsAppUseCase {
           'La ventana de 24h expiró — hace falta enviar una plantilla aprobada (nombre + idioma)',
         );
       }
-      resultado = await this.graph.enviarMensajePlantillaWhatsApp(
-        conexionActiva.phoneNumberId,
-        accessToken,
-        para,
-        input.plantillaNombre,
-        input.plantillaIdioma,
-        input.parametros,
-        input.plantillaFormatoParametros,
+      resultado = await this.control.despachar(
+        organizacionId,
+        conversacionId,
+        { tipo: 'HUMAN', ...ctx },
+        'enviarMensajePlantillaWhatsApp',
+        () =>
+          this.graph.enviarMensajePlantillaWhatsApp(
+            conexionActiva.phoneNumberId,
+            accessToken,
+            para,
+            input.plantillaNombre!,
+            input.plantillaIdioma!,
+            input.parametros,
+            input.plantillaFormatoParametros,
+          ),
       );
       tipo = 'template';
     }

@@ -9,5 +9,6 @@ export interface AccessTokenPayload {
 
 export interface RefreshTokenPayload {
   sub: string;
+  sesionId?: string;
   organizacionId?: string;
 }

@@ -24,6 +24,10 @@ export interface LeadEnConversacion extends ReferenciaNombrada {
 }
 
 export interface ConversacionResumen {
+  whatsappConexionId: string;
+  modoAtencion: string;
+  controlVersion: number;
+  controlUsuarioId: string | null;
   id: string;
   /** Teléfono E.164 sin '+' — null si Meta omitió wa_id (username privacy). */
   waId: string | null;
@@ -41,6 +45,7 @@ export interface ConversacionResumen {
 }
 
 export interface MensajeRow {
+  autorTipo: string;
   id: string;
   wamid: string;
   direccion: string;
@@ -179,6 +184,8 @@ export type FiltroVisibilidadChats =
   { modo: 'todos' } | { modo: 'usuario'; usuarioId: string };
 
 export interface RegistrarMensajeInput {
+  autorTipo?: string;
+  esHistorial?: boolean;
   organizacionId: string;
   whatsappConversacionId: string;
   wamid: string;

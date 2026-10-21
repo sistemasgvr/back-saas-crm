@@ -1,3 +1,4 @@
+import { ControlAtencionService } from '../control-atencion.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
@@ -23,6 +24,7 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
   private readonly logger = new Logger(ProcesarEcoMensajeWhatsAppUseCase.name);
 
   constructor(
+    private readonly control: ControlAtencionService,
     @Inject(WHATSAPP_CONEXIONES_REPOSITORY)
     private readonly conexiones: WhatsappConexionesRepository,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
@@ -57,6 +59,13 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
         nombreContacto: evento.nombreContacto,
       });
 
+    const autorTipo = await this.control.ecoExterno(
+      conexion.organizacionId,
+      conversacionId,
+      evento.wamid,
+      evento.esHistorial === true,
+    );
+
     const media = evento.media
       ? await this.descargarMediaSiPosible(
           conexion.organizacionId,
@@ -70,7 +79,9 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
         const objeto = await this.guardarMedia.asegurar(
           conexion.organizacionId,
           media.buffer,
-          media.mimeType ?? evento.media?.mimeType ?? 'application/octet-stream',
+          media.mimeType ??
+            evento.media?.mimeType ??
+            'application/octet-stream',
         );
         mediaObjetoId = objeto.id;
       } catch (error: unknown) {
@@ -93,6 +104,7 @@ export class ProcesarEcoMensajeWhatsAppUseCase {
       whatsappConversacionId: conversacionId,
       wamid: evento.wamid,
       direccion: 'saliente',
+      autorTipo,
       tipo: evento.tipo,
       texto: evento.texto,
       estadoEntrega: 'enviado',

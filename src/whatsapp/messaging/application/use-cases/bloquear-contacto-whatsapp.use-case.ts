@@ -62,18 +62,24 @@ export class BloquearContactoWhatsAppUseCase {
       );
     }
 
-    const whatsappConexion =
-      await this.conexionesWa.listarPorOrganizacion(organizacionId);
-    const conexionActiva = whatsappConexion[0];
+    const conexionActiva = await this.conexionesWa.findPorId(
+      organizacionId,
+      conversacion.whatsappConexionId,
+    );
     if (!conexionActiva) {
       throw new NotFoundException(
         'No hay un número de WhatsApp vinculado a esta organización',
       );
     }
 
-    const conexion =
-      await this.conexiones.findActivaPorOrganizacion(organizacionId);
-    if (!conexion?.tokenCifrado) {
+    const conexion = await this.conexiones.findActivaPorId(
+      organizacionId,
+      conexionActiva.metaConexionId,
+    );
+    if (
+      !conexion?.tokenCifrado ||
+      conexion.id !== conexionActiva.metaConexionId
+    ) {
       throw new NotFoundException(
         'No hay una sesión de Meta conectada para esta organización',
       );

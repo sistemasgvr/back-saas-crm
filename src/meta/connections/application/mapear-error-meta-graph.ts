@@ -89,7 +89,29 @@ export function esRateLimitMeta(error: unknown): boolean {
  * Traduce un error de Graph/Axios a HttpException Nest con mensaje usable en UI.
  * Códigos frecuentes: 190 token, 10/200 permisos, 4/17/32 rate limit, 100 parámetro.
  */
+const RECHAZADO_POR_META = Symbol('rechazadoPorMeta');
+
+/** true si Meta respondió con un 4xx: la petición se rechazó y no se entregó.
+ * Timeouts, cortes de red y 5xx no prueban la no entrega. */
+export function esRechazoMeta(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as Record<symbol, unknown>)[RECHAZADO_POR_META] === true
+  );
+}
+
 export function excepcionDesdeErrorMeta(error: unknown): HttpException {
+  const excepcion = construirExcepcionMeta(error);
+  const status = error instanceof AxiosError ? error.response?.status : 0;
+  if (status && status >= 400 && status < 500) {
+    (excepcion as unknown as Record<symbol, unknown>)[RECHAZADO_POR_META] =
+      true;
+  }
+  return excepcion;
+}
+
+function construirExcepcionMeta(error: unknown): HttpException {
   if (!(error instanceof AxiosError)) {
     return new BadGatewayException(
       'Error desconocido al llamar a Meta Graph API',
