@@ -1,3 +1,4 @@
+import type { ResultadoPaginado } from '../../shared/application/paginacion';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
@@ -13,10 +14,6 @@ import type {
   ListaLeadsResultado,
   ReferenciaNombrada,
 } from '../application/ports/leads-lectura.repository.port';
-
-/** Tope de seguridad para el tablero — no pagina, así que hace falta un
- * límite duro para no traer miles de filas de una organización con mucho volumen. */
-const TOPE_TABLERO = 300;
 
 const INMUEBLE_INTERES_SELECT = {
   id: true,
@@ -306,8 +303,14 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
 
   async listarParaTablero(
     organizacionId: string,
-    filtro: { tipoLead?: string; asignacion: FiltroAsignacion },
-  ): Promise<LeadTableroRow[]> {
+    filtro: {
+      tipoLead?: string;
+      asignacion: FiltroAsignacion;
+      page?: number;
+      pageSize?: number;
+      q?: string;
+    },
+  ): Promise<ResultadoPaginado<LeadTableroRow>> {
     const whereTipo: Prisma.LeadWhereInput =
       filtro.tipoLead === undefined
         ? {}
@@ -315,22 +318,53 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
           ? { OR: [{ tipoLead: 'OTRO' }, { tipoLead: null }] }
           : { tipoLead: filtro.tipoLead };
 
+    const page = filtro.page ?? 1;
+    const pageSize = filtro.pageSize ?? 20;
+    const q = filtro.q?.trim();
+    const where: Prisma.LeadWhereInput = {
+      organizacionId,
+      estado: 1,
+      ...whereTipo,
+      AND: [
+        whereDeAsignacion(filtro.asignacion),
+        ...(q
+          ? [
+              {
+                OR: [
+                  ...['nombre', 'telefono', 'email'].map((campo) => ({
+                    [campo]: { contains: q, mode: 'insensitive' as const },
+                  })),
+                  {
+                    asignadoUsuario: {
+                      nombre: { contains: q, mode: 'insensitive' as const },
+                    },
+                  },
+                  {
+                    inmuebleInteres: {
+                      OR: ['codigo', 'titulo'].map((campo) => ({
+                        [campo]: { contains: q, mode: 'insensitive' as const },
+                      })),
+                    },
+                  },
+                ],
+              },
+            ]
+          : []),
+      ],
+    };
+    const total = await this.prisma.lead.count({ where });
     const leads = await this.prisma.lead.findMany({
-      where: {
-        organizacionId,
-        estado: 1,
-        ...whereTipo,
-        AND: [whereDeAsignacion(filtro.asignacion)],
-      },
+      where,
       include: {
         asignadoUsuario: true,
         inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
       },
-      orderBy: { fechaLead: 'desc' },
-      take: TOPE_TABLERO,
+      orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
 
-    return leads.map((lead) => ({
+    const data = leads.map((lead) => ({
       id: lead.id,
       nombre: lead.nombre,
       telefono: lead.telefono,
@@ -342,6 +376,13 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       fechaLead: lead.fechaLead,
       inmuebleInteres: inmuebleInteresRef(lead.inmuebleInteres),
     }));
+    return {
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   async contarNuevos(

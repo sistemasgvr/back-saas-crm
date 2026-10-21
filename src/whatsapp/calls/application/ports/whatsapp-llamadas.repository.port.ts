@@ -98,7 +98,13 @@ export interface WhatsappLlamadasRepository {
   listar(
     organizacionId: string,
     filtro: FiltroListarLlamadas,
-  ): Promise<{ items: WhatsappLlamadaRow[]; total: number; page: number }>;
+  ): Promise<{
+    items: WhatsappLlamadaRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }>;
   actualizar(
     organizacionId: string,
     id: string,

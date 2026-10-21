@@ -252,9 +252,9 @@ if (connection) {
       await db.usuario.update({ where: { id: libre.id }, data: { estado: 0 } });
       const listado = await service.listar(otra, ctx(platform, true));
       expect(listado.activos).toBe(0);
-      expect(
-        listado.usuarios.find((u) => u.id === libre.id)?.cuentaActiva,
-      ).toBe(false);
+      expect(listado.data.find((u) => u.id === libre.id)?.cuentaActiva).toBe(
+        false,
+      );
       await service.asignar(
         otra,
         otroCliente.id,

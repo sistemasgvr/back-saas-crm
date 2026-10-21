@@ -1,7 +1,9 @@
+import { PaginacionQueryDto } from '../../shared/presentation/dto/paginacion.query.dto';
 import {
   Body,
   Controller,
   Get,
+  Query,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -89,7 +91,8 @@ export class AdminWhatsappBotController {
   historial(
     @Param('organizacionId', ParseUUIDPipe) org: string,
     @CurrentUser() ctx: RequestContext,
+    @Query() query: PaginacionQueryDto,
   ) {
-    return this.bot.historial(org, ctx.usuarioId);
+    return this.bot.historial(org, ctx.usuarioId, query.page, query.pageSize);
   }
 }

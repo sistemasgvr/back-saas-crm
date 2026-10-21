@@ -1,3 +1,4 @@
+import type { ResultadoPaginado } from '../../../shared/application/paginacion';
 export const LEADS_LECTURA_REPOSITORY = Symbol('LEADS_LECTURA_REPOSITORY');
 
 /** Decide qué leads puede ver quien consulta — se resuelve en el use-case a
@@ -118,8 +119,14 @@ export interface LeadsLecturaRepository {
    * `tipoLead` omitido = todos los tipos; `OTRO` incluye sin clasificar. */
   listarParaTablero(
     organizacionId: string,
-    filtro: { tipoLead?: string; asignacion: FiltroAsignacion },
-  ): Promise<LeadTableroRow[]>;
+    filtro: {
+      tipoLead?: string;
+      asignacion: FiltroAsignacion;
+      page?: number;
+      pageSize?: number;
+      q?: string;
+    },
+  ): Promise<ResultadoPaginado<LeadTableroRow>>;
   /** Leads en estado NUEVO visibles para el usuario (misma regla de asignación). */
   contarNuevos(
     organizacionId: string,

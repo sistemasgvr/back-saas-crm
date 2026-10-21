@@ -41,12 +41,12 @@ function toRow(row: {
 }
 
 @Injectable()
-export class PrismaWhatsappLlamadasRepository
-  implements WhatsappLlamadasRepository
-{
+export class PrismaWhatsappLlamadasRepository implements WhatsappLlamadasRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async upsertPorCallId(input: UpsertLlamadaInput): Promise<WhatsappLlamadaRow> {
+  async upsertPorCallId(
+    input: UpsertLlamadaInput,
+  ): Promise<WhatsappLlamadaRow> {
     const existente = await this.prisma.whatsappLlamada.findUnique({
       where: {
         organizacionId_callId: {
@@ -145,7 +145,13 @@ export class PrismaWhatsappLlamadasRepository
   async listar(
     organizacionId: string,
     filtro: FiltroListarLlamadas,
-  ): Promise<{ items: WhatsappLlamadaRow[]; total: number; page: number }> {
+  ): Promise<{
+    items: WhatsappLlamadaRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalPages: number;
+  }> {
     const page = Math.max(1, filtro.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, filtro.pageSize ?? 20));
     const where: Prisma.WhatsappLlamadaWhereInput = {
@@ -170,13 +176,19 @@ export class PrismaWhatsappLlamadasRepository
       this.prisma.whatsappLlamada.count({ where }),
       this.prisma.whatsappLlamada.findMany({
         where,
-        orderBy: { inicioEn: 'desc' },
+        orderBy: [{ inicioEn: 'desc' }, { id: 'desc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
     ]);
 
-    return { items: filas.map(toRow), total, page };
+    return {
+      items: filas.map(toRow),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   }
 
   async actualizar(
@@ -286,9 +298,7 @@ export class PrismaWhatsappLlamadasRepository
       .filter((d): d is number => d != null && d >= 0);
     const duracionMediaSeg =
       duraciones.length > 0
-        ? Math.round(
-            duraciones.reduce((a, b) => a + b, 0) / duraciones.length,
-          )
+        ? Math.round(duraciones.reduce((a, b) => a + b, 0) / duraciones.length)
         : null;
 
     const porAsesorMap = new Map<
@@ -303,7 +313,8 @@ export class PrismaWhatsappLlamadasRepository
         duraciones: [],
       };
       actual.total += 1;
-      if (f.resultado === RESULTADOS_LLAMADA.CONTESTADA) actual.contestadas += 1;
+      if (f.resultado === RESULTADOS_LLAMADA.CONTESTADA)
+        actual.contestadas += 1;
       if (f.duracionSeg != null) actual.duraciones.push(f.duracionSeg);
       porAsesorMap.set(f.asignadoUsuarioId, actual);
     }

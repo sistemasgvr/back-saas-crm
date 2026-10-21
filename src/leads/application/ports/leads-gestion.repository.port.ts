@@ -1,3 +1,4 @@
+import type { ResultadoPaginado } from '../../../shared/application/paginacion';
 export const LEADS_GESTION_REPOSITORY = Symbol('LEADS_GESTION_REPOSITORY');
 
 export interface LeadParaGestion {
@@ -133,7 +134,9 @@ export interface LeadsGestionRepository {
   listarHistorial(
     organizacionId: string,
     leadId: string,
-  ): Promise<HistorialEstadoRow[]>;
+    page?: number,
+    pageSize?: number,
+  ): Promise<ResultadoPaginado<HistorialEstadoRow>>;
   /** leadgen_id de Meta (Lead.idExterno) — lo pide Conversions API como
    * user_data.lead_id para Conversion Leads. Null si el lead no existe. */
   obtenerIdExternoMeta(

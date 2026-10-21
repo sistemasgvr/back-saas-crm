@@ -6,6 +6,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
@@ -23,13 +24,18 @@ import {
   ReasignarLeadsUsuarioDto,
 } from './dto/usuario-empresa.dto';
 
+import { ListarUsuariosEmpresaQueryDto } from './dto/listar-usuarios-empresa.query.dto';
+
 @Controller('organizations/current/users')
 @UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard)
 @Roles('PROPIETARIO', 'ADMINISTRADOR')
 export class UsuariosEmpresaController {
   constructor(private readonly gestion: GestionMembresiasService) {}
-  @Get() listar(@CurrentUser() ctx: RequestContext) {
-    return this.gestion.listar(ctx.organizacionId!, ctx);
+  @Get() listar(
+    @CurrentUser() ctx: RequestContext,
+    @Query() query: ListarUsuariosEmpresaQueryDto,
+  ) {
+    return this.gestion.listar(ctx.organizacionId!, ctx, query);
   }
   @Post() crear(
     @CurrentUser() ctx: RequestContext,

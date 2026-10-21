@@ -112,6 +112,7 @@ function fixture() {
         return data;
       }),
       findMany: jest.fn(async () => eventos),
+      count: jest.fn(async () => eventos.length),
     },
     whatsappSalidaIntento: {
       count: jest.fn(
@@ -770,7 +771,7 @@ describe('Selección de asesores para transferencia', () => {
     f.miembros.push(miembro('ana'));
     await f.service.tomar('org', 'chat', humano, 0);
     const eventos = await f.service.historial('org', 'chat');
-    expect(eventos[0].usuario?.nombre).toBe('ana');
+    expect(eventos.data[0].usuario?.nombre).toBe('ana');
     expect(f.tx.usuario.findMany).toHaveBeenCalledWith({
       where: { id: { in: ['ana'] } },
       select: { id: true, nombre: true, apellido: true },

@@ -27,6 +27,7 @@ export class ObtenerConversacionUseCase {
     organizacionId: string,
     id: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
+    before?: string,
   ) {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,
@@ -40,11 +41,15 @@ export class ObtenerConversacionUseCase {
       throw new ForbiddenException('No tienes acceso a esta conversación');
     }
 
-    const mensajes = await this.conversaciones.listarMensajes(
+    const limite = before ? 50 : LIMITE_MENSAJES;
+    const filas = await this.conversaciones.listarMensajes(
       id,
-      LIMITE_MENSAJES,
+      limite + 1,
+      before,
     );
-    if (conversacion.noLeidos > 0) {
+    const hayMensajesAnteriores = filas.length > limite;
+    const mensajes = hayMensajesAnteriores ? filas.slice(1) : filas;
+    if (!before && conversacion.noLeidos > 0) {
       await this.conversaciones.marcarLeida(id);
       // Efecto secundario de UX (checks azules en el WhatsApp real del
       // contacto) — nunca debe tumbar la carga de la conversación si Meta
@@ -54,6 +59,6 @@ export class ObtenerConversacionUseCase {
         .catch(() => undefined);
     }
 
-    return { ...conversacion, noLeidos: 0, mensajes };
+    return { ...conversacion, noLeidos: 0, mensajes, hayMensajesAnteriores };
   }
 }

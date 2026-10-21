@@ -1,3 +1,4 @@
+import type { ResultadoPaginado } from '../../../shared/application/paginacion';
 export const LEAD_VISITAS_REPOSITORY = Symbol('LEAD_VISITAS_REPOSITORY');
 
 export interface InmuebleVisitaResumen {
@@ -95,7 +96,9 @@ export interface LeadVisitasRepository {
   listarPorLead(
     organizacionId: string,
     leadId: string,
-  ): Promise<VisitaLeadRow[]>;
+    page?: number,
+    pageSize?: number,
+  ): Promise<ResultadoPaginado<VisitaLeadRow>>;
 
   obtenerPorId(
     organizacionId: string,

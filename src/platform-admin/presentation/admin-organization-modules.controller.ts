@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -46,6 +47,7 @@ export class AdminOrganizationModulesController {
     description: 'El usuario no es admin de plataforma.',
   })
   @ApiResponse({ status: 404, description: 'La organización no existe.' })
+  @PaginarColeccion()
   findAll(@Param('organizacionId', ParseUUIDPipe) organizacionId: string) {
     return this.listarMatriz.execute(organizacionId);
   }

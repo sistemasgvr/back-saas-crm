@@ -1,3 +1,4 @@
+import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import {
   BadRequestException,
   ConflictException,
@@ -21,6 +22,14 @@ import { ControlAtencionService } from '../../whatsapp/messaging/application/con
 import { resolverUsuarioIdsRoundRobin } from '../../leads/domain/resolver-usuario-ids-round-robin';
 import { membresiaQueConsumeCupo } from './membresia-cupo';
 import { CrearNotificacionUseCase } from '../../notifications/application/use-cases/crear-notificacion.use-case';
+
+export interface FiltrosUsuariosEmpresa {
+  page: number;
+  pageSize: number;
+  q?: string;
+  rol?: 'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO';
+  estado?: 'activo' | 'inactivo' | 'suspendido';
+}
 
 type Tx = Prisma.TransactionClient;
 export interface DatosMiembro {
@@ -198,10 +207,46 @@ export class GestionMembresiasService {
     });
   }
 
-  async listar(org: string, ctx: RequestContext) {
+  async listar(
+    org: string,
+    ctx: RequestContext,
+    query: FiltrosUsuariosEmpresa = { page: 1, pageSize: 20 },
+  ) {
     return this.ejecutar(org, ctx, async (tx) => {
+      const { page, pageSize } = query;
+      const q = query.q?.trim();
+      const where: Prisma.OrganizacionUsuarioWhereInput = {
+        organizacionId: org,
+        ...(query.rol ? { rol: query.rol } : {}),
+        ...(query.estado === 'suspendido'
+          ? { usuario: { estado: 0 } }
+          : query.estado
+            ? {
+                estado: query.estado === 'activo' ? 1 : 0,
+                usuario: { estado: 1 },
+              }
+            : {}),
+        ...(q
+          ? {
+              AND: [
+                {
+                  usuario: {
+                    OR: ['nombre', 'apellido', 'email', 'telefono'].map(
+                      (campo) => ({
+                        [campo]: { contains: q, mode: 'insensitive' },
+                      }),
+                    ),
+                  },
+                },
+              ],
+            }
+          : {}),
+      };
+      const total = await tx.organizacionUsuario.count({ where });
       const miembros = await tx.organizacionUsuario.findMany({
-        where: { organizacionId: org },
+        where,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
         include: {
           usuario: {
             select: {
@@ -215,7 +260,7 @@ export class GestionMembresiasService {
             },
           },
         },
-        orderBy: { fechaCreacion: 'asc' },
+        orderBy: [{ fechaCreacion: 'asc' }, { usuarioId: 'asc' }],
       });
       const empresa = await tx.organizacion.findUniqueOrThrow({
         where: { id: org },
@@ -226,14 +271,20 @@ export class GestionMembresiasService {
         _count: true,
       });
       return {
-        usuarios: miembros.map((m) => ({
-          ...m.usuario,
-          estado: m.estado,
-          cuentaActiva: m.usuario.estado === 1,
-          rol: m.rol,
-          leadsAsignados:
-            leads.find((l) => l.asignadoUsuarioId === m.usuarioId)?._count ?? 0,
-        })),
+        ...construirResultadoPaginado(
+          miembros.map((m) => ({
+            ...m.usuario,
+            estado: m.estado,
+            cuentaActiva: m.usuario.estado === 1,
+            rol: m.rol,
+            leadsAsignados:
+              leads.find((l) => l.asignadoUsuarioId === m.usuarioId)?._count ??
+              0,
+          })),
+          total,
+          page,
+          pageSize,
+        ),
         activos: await tx.organizacionUsuario.count({
           where: { organizacionId: org, ...membresiaQueConsumeCupo },
         }),

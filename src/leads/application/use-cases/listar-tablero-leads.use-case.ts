@@ -60,10 +60,12 @@ export class ListarTableroLeadsUseCase {
     tipoLeadParam: string | undefined,
     asignadoParam: string | undefined,
     ctx: { usuarioId: string; rol: RolOrganizacion },
-  ): Promise<{ columnas: ColumnaTablero[] }> {
-    const tipoFiltro = TIPOS_LEAD_INMOBILIARIA.includes(
-      tipoLeadParam as never,
-    )
+    pagination: { page: number; pageSize: number; q?: string } = {
+      page: 1,
+      pageSize: 20,
+    },
+  ) {
+    const tipoFiltro = TIPOS_LEAD_INMOBILIARIA.includes(tipoLeadParam as never)
       ? (tipoLeadParam as string)
       : undefined;
 
@@ -71,7 +73,8 @@ export class ListarTableroLeadsUseCase {
       await this.organizaciones.obtenerPipelineConfig(organizacionId),
     );
 
-    const filas = await this.leads.listarParaTablero(organizacionId, {
+    const resultado = await this.leads.listarParaTablero(organizacionId, {
+      ...pagination,
       tipoLead: tipoFiltro,
       asignacion: this.resolverAsignacion(asignadoParam, ctx),
     });
@@ -81,10 +84,11 @@ export class ListarTableroLeadsUseCase {
       (codigo) => ({
         codigo,
         etiqueta: etiquetas[codigo] ?? codigo,
-        leads: filas.filter((f) => f.estadoGestion === codigo),
+        leads: resultado.data.filter((f) => f.estadoGestion === codigo),
       }),
     );
 
-    return { columnas };
+    const { data: _data, ...metadata } = resultado;
+    return { columnas, ...metadata };
   }
 }

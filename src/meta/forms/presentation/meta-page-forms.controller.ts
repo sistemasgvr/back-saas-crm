@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -65,6 +66,7 @@ export class MetaPageFormsController {
     status: 404,
     description: 'La página no existe o no pertenece a la organización.',
   })
+  @PaginarColeccion()
   findAll(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,

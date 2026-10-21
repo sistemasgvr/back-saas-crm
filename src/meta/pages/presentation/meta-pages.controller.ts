@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -89,6 +90,7 @@ export class MetaPagesController {
     status: 403,
     description: 'Rol insuficiente o módulo META_LEADS no activo.',
   })
+  @PaginarColeccion()
   findAvailable(@CurrentUser() ctx: RequestContext) {
     return this.listarDisponibles.execute(ctx.organizacionId!);
   }

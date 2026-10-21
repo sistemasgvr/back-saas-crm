@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -50,6 +51,7 @@ export class AdminModulesController {
     status: 403,
     description: 'El usuario no es admin de plataforma.',
   })
+  @PaginarColeccion()
   findAll() {
     return this.listarModulos.execute();
   }

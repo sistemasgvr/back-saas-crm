@@ -18,13 +18,24 @@ export class ListarConversacionesUseCase {
   execute(
     organizacionId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
-    query?: { asignado?: string },
+    query?: {
+      asignado?: string;
+      page?: number;
+      pageSize?: number;
+      q?: string;
+      borradores?: string;
+    },
   ) {
     const filtro: FiltroVisibilidadChats =
       query?.asignado === 'mios'
         ? { modo: 'usuario', usuarioId: ctx.usuarioId }
         : { modo: 'todos' };
 
-    return this.conversaciones.listar(organizacionId, filtro);
+    return this.conversaciones.listar(organizacionId, filtro, {
+      page: query?.page ?? 1,
+      pageSize: query?.pageSize ?? 20,
+      q: query?.q,
+      borradores: query?.borradores,
+    });
   }
 }

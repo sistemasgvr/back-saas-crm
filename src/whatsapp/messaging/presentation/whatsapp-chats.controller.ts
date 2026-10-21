@@ -1,3 +1,7 @@
+import { MensajesAnterioresQueryDto } from './dto/mensajes-anteriores.query.dto';
+import { ListarChatsQueryDto } from './dto/listar-chats.query.dto';
+import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
+import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.query.dto';
 import { ControlAtencionService } from '../application/control-atencion.service';
 import {
   TomarControlDto,
@@ -204,8 +208,14 @@ export class WhatsappChatsController {
   historialControl(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PaginacionQueryDto,
   ) {
-    return this.controlAtencion.historial(ctx.organizacionId!, id);
+    return this.controlAtencion.historial(
+      ctx.organizacionId!,
+      id,
+      query.page,
+      query.pageSize,
+    );
   }
 
   @Get()
@@ -221,7 +231,7 @@ export class WhatsappChatsController {
   @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
   findAll(
     @CurrentUser() ctx: RequestContext,
-    @Query('asignado') asignado?: string,
+    @Query() query: ListarChatsQueryDto,
   ) {
     return this.listarConversaciones.execute(
       ctx.organizacionId!,
@@ -229,7 +239,7 @@ export class WhatsappChatsController {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
       },
-      { asignado },
+      query,
     );
   }
 
@@ -280,6 +290,7 @@ export class WhatsappChatsController {
     status: 403,
     description: 'Rol insuficiente o módulo WHATSAPP no activo.',
   })
+  @PaginarColeccion()
   templatesAll(@CurrentUser() ctx: RequestContext) {
     return this.listarPlantillas.execute(ctx.organizacionId!, false);
   }
@@ -385,6 +396,24 @@ export class WhatsappChatsController {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
     });
+  }
+
+  @Get(':id/messages')
+  @ApiOperation({ summary: 'Cargar mensajes anteriores por cursor' })
+  mensajesAnteriores(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: MensajesAnterioresQueryDto,
+  ) {
+    return this.obtenerConversacion.execute(
+      ctx.organizacionId!,
+      id,
+      {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+      },
+      query.before,
+    );
   }
 
   @Post(':id/messages')

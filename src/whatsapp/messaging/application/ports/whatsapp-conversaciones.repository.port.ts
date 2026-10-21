@@ -1,3 +1,4 @@
+import type { ResultadoPaginado } from '../../../../shared/application/paginacion';
 export const WHATSAPP_CONVERSACIONES_REPOSITORY = Symbol(
   'WHATSAPP_CONVERSACIONES_REPOSITORY',
 );
@@ -224,7 +225,13 @@ export interface WhatsappConversacionesRepository {
   listar(
     organizacionId: string,
     filtro: FiltroVisibilidadChats,
-  ): Promise<ConversacionResumen[]>;
+    pagination?: {
+      page: number;
+      pageSize: number;
+      q?: string;
+      borradores?: string;
+    },
+  ): Promise<ResultadoPaginado<ConversacionResumen>>;
   /** Cantidad de conversaciones visibles con `noLeidos > 0` (no la suma de
    * mensajes) — para el badge del sidebar, sin traer la lista completa solo
    * para contar. */
@@ -244,6 +251,7 @@ export interface WhatsappConversacionesRepository {
   listarMensajes(
     whatsappConversacionId: string,
     limite: number,
+    before?: string,
   ): Promise<MensajeRow[]>;
   marcarLeida(id: string): Promise<void>;
 

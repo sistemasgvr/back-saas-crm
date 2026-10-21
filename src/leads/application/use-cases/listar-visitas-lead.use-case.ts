@@ -25,6 +25,8 @@ export class ListarVisitasLeadUseCase {
     organizacionId: string,
     leadId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
+    page = 1,
+    pageSize = 20,
   ) {
     const lead = await this.leads.obtenerPorId(organizacionId, leadId);
     if (!lead) {
@@ -37,6 +39,6 @@ export class ListarVisitasLeadUseCase {
       throw new ForbiddenException('No puedes ver las visitas de este lead');
     }
 
-    return this.visitas.listarPorLead(organizacionId, leadId);
+    return this.visitas.listarPorLead(organizacionId, leadId, page, pageSize);
   }
 }

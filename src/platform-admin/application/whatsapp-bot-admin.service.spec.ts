@@ -69,6 +69,7 @@ function fixture() {
         ),
     },
     whatsappBotConfiguracionEvento: {
+      count: jest.fn(async () => 0),
       create: jest.fn().mockResolvedValue({}),
       findMany: jest.fn().mockResolvedValue([]),
     },
@@ -201,11 +202,19 @@ describe('Administración del bot por organización', () => {
   );
   it('consulta el historial únicamente de la organización solicitada', async () => {
     const f = fixture();
-    await f.service.historial('org-b', 'platform');
+    f.tx.whatsappBotConfiguracionEvento.count.mockResolvedValue(105);
+    const result = await f.service.historial('org-b', 'platform', 6, 20);
+    expect(result).toMatchObject({
+      total: 105,
+      page: 6,
+      pageSize: 20,
+      totalPages: 6,
+    });
     expect(f.tx.whatsappBotConfiguracionEvento.findMany).toHaveBeenCalledWith({
       where: { organizacionId: 'org-b' },
       orderBy: { version: 'desc' },
-      take: 100,
+      skip: 100,
+      take: 20,
     });
   });
 });

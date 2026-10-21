@@ -1,3 +1,4 @@
+import { construirResultadoPaginado } from '../../../shared/application/paginacion';
 import { lockBotOrganizacion } from './bot-organizacion-lock';
 import { BotEmpresaService } from './bot-empresa.service';
 import {
@@ -417,12 +418,13 @@ export class ControlAtencionService {
     };
   }
 
-  async historial(org: string, id: string) {
+  async historial(org: string, id: string, page = 1, pageSize = 20) {
     await this.conversacion(this.prisma, org, id);
     const eventos = await this.prisma.whatsappControlEvento.findMany({
       where: { organizacionId: org, conversacionId: id },
       orderBy: { version: 'desc' },
-      take: 100,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
     const ids = [
       ...new Set(
@@ -437,11 +439,19 @@ export class ControlAtencionService {
           select: { id: true, nombre: true, apellido: true },
         })
       : [];
-    return eventos.map((e) => ({
-      ...e,
-      usuario: usuarios.find((u) => u.id === e.usuarioId) ?? null,
-      responsable: usuarios.find((u) => u.id === e.responsableId) ?? null,
-    }));
+    const total = await this.prisma.whatsappControlEvento.count({
+      where: { organizacionId: org, conversacionId: id },
+    });
+    return construirResultadoPaginado(
+      eventos.map((e) => ({
+        ...e,
+        usuario: usuarios.find((u) => u.id === e.usuarioId) ?? null,
+        responsable: usuarios.find((u) => u.id === e.responsableId) ?? null,
+      })),
+      total,
+      page,
+      pageSize,
+    );
   }
 
   async asesores(org: string, id: string, ctx: ContextoHumano) {

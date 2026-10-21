@@ -1,3 +1,5 @@
+import { ListarTableroQueryDto } from './dto/listar-tablero.query.dto';
+import { PaginacionQueryDto } from '../../shared/presentation/dto/paginacion.query.dto';
 import {
   Body,
   Controller,
@@ -199,7 +201,7 @@ export class LeadsController {
   @ApiOperation({
     summary: 'Tablero kanban del pipeline',
     description:
-      'Todos los leads del tipo pedido (tope 300, más recientes primero), agrupados por columna de estado. ' +
+      'Leads paginados del tipo pedido (más recientes primero), agrupados por columna de estado. ' +
       'Sin tipoLead devuelve todos los embudos en columnas unificadas. ' +
       'Mover una tarjeta usa el mismo PATCH .../gestion que la vista de detalle — misma validación de transición.',
   })
@@ -217,13 +219,20 @@ export class LeadsController {
   @ApiResponse({ status: 401, description: 'Token ausente o inválido.' })
   tablero(
     @CurrentUser() ctx: RequestContext,
+    @Query() pagination: ListarTableroQueryDto,
     @Query('tipoLead') tipoLead?: string,
     @Query('asignado') asignado?: string,
   ) {
-    return this.listarTablero.execute(ctx.organizacionId!, tipoLead, asignado, {
-      usuarioId: ctx.usuarioId,
-      rol: ctx.rol!,
-    });
+    return this.listarTablero.execute(
+      ctx.organizacionId!,
+      tipoLead,
+      asignado,
+      {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+      },
+      pagination,
+    );
   }
 
   @Get('visitas/agenda')
@@ -393,11 +402,18 @@ export class LeadsController {
   historialEstados(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() pagination: PaginacionQueryDto,
   ) {
-    return this.obtenerHistorial.execute(ctx.organizacionId!, id, {
-      usuarioId: ctx.usuarioId,
-      rol: ctx.rol!,
-    });
+    return this.obtenerHistorial.execute(
+      ctx.organizacionId!,
+      id,
+      {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+      },
+      pagination.page,
+      pagination.pageSize,
+    );
   }
 
   @Get(':id/visitas')
@@ -409,11 +425,18 @@ export class LeadsController {
   visitasLead(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query() pagination: PaginacionQueryDto,
   ) {
-    return this.listarVisitasLead.execute(ctx.organizacionId!, id, {
-      usuarioId: ctx.usuarioId,
-      rol: ctx.rol!,
-    });
+    return this.listarVisitasLead.execute(
+      ctx.organizacionId!,
+      id,
+      {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+      },
+      pagination.page,
+      pagination.pageSize,
+    );
   }
 
   @Post(':id/claim')

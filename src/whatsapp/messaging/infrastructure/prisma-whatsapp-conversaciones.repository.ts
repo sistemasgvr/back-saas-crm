@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  construirResultadoPaginado,
+  type ResultadoPaginado,
+} from '../../../shared/application/paginacion';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma, type WhatsappConversacion } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import type {
@@ -109,13 +113,55 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async listar(
     organizacionId: string,
     filtro: FiltroVisibilidadChats,
-  ): Promise<ConversacionResumen[]> {
+    pagination = { page: 1, pageSize: 20 } as {
+      page: number;
+      pageSize: number;
+      q?: string;
+      borradores?: string;
+    },
+  ): Promise<ResultadoPaginado<ConversacionResumen>> {
+    const { page, pageSize } = pagination;
+    const q = pagination.q?.trim();
+    const draftIds =
+      pagination.borradores
+        ?.split(',')
+        .filter((id) =>
+          /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(id),
+        ) ?? [];
+    const where: Prisma.WhatsappConversacionWhereInput = {
+      organizacionId,
+      estado: 1,
+      ...this.whereVisibilidad(filtro),
+      ...(q
+        ? {
+            OR: [
+              ...['nombreContacto', 'waId', 'username', 'bsuid'].map(
+                (campo) => ({
+                  [campo]: {
+                    contains: q.replace(/^@/, ''),
+                    mode: 'insensitive',
+                  },
+                }),
+              ),
+              { lead: { nombre: { contains: q, mode: 'insensitive' } } },
+              {
+                mensajes: {
+                  some: { texto: { contains: q, mode: 'insensitive' } },
+                },
+              },
+              ...(q.replace(/\D/g, '').length >= 3
+                ? [{ waId: { contains: q.replace(/\D/g, '') } }]
+                : []),
+              { id: { in: draftIds } },
+            ],
+          }
+        : {}),
+    };
+    const total = await this.prisma.whatsappConversacion.count({ where });
     const conversaciones = await this.prisma.whatsappConversacion.findMany({
-      where: {
-        organizacionId,
-        estado: 1,
-        ...this.whereVisibilidad(filtro),
-      },
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: {
         lead: { select: LEAD_CON_INMUEBLE_SELECT },
         mensajes: {
@@ -127,10 +173,13 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
       // sin "nulls: 'last'" las conversaciones sin ningún mensaje todavía
       // (ultimoMensajeEn null) se colaban arriba de todo, antes que chats
       // con actividad reciente real.
-      orderBy: { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+      orderBy: [
+        { ultimoMensajeEn: { sort: 'desc', nulls: 'last' } },
+        { id: 'desc' },
+      ],
     });
 
-    return conversaciones
+    const data = conversaciones
       .map((c) => {
         const etiqueta = etiquetaContactoWhatsApp({
           nombre: c.nombreContacto,
@@ -169,6 +218,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
         const tb = b.ultimoMensajeEn?.getTime() ?? 0;
         return tb - ta;
       });
+    return construirResultadoPaginado(data, total, page, pageSize);
   }
 
   async contarNoLeidos(
@@ -295,13 +345,29 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
   async listarMensajes(
     whatsappConversacionId: string,
     limite: number,
+    before?: string,
   ): Promise<MensajeRow[]> {
+    if (before) {
+      const cursor = await this.prisma.whatsappMensaje.findFirst({
+        where: { id: before, whatsappConversacionId },
+        select: { id: true },
+      });
+      if (!cursor)
+        throw new NotFoundException(
+          'Mensaje no encontrado en esta conversación',
+        );
+    }
     // Meta a veces marca varios mensajes con el mismo segundo (ecos /
     // envíos en lote). Desempatar por fechaCreacion = orden de llegada real.
     // Pedimos los más recientes y los devolvemos ascendente para el chat.
     const recientes = await this.prisma.whatsappMensaje.findMany({
       where: { whatsappConversacionId },
-      orderBy: [{ fechaMensaje: 'desc' }, { fechaCreacion: 'desc' }],
+      orderBy: [
+        { fechaMensaje: 'desc' },
+        { fechaCreacion: 'desc' },
+        { id: 'desc' },
+      ],
+      ...(before ? { cursor: { id: before }, skip: 1 } : {}),
       take: limite,
       include: {
         respondeA: {

@@ -1,3 +1,7 @@
+import {
+  construirResultadoPaginado,
+  type ResultadoPaginado,
+} from '../../shared/application/paginacion';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
@@ -240,9 +244,13 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
   async listarHistorial(
     organizacionId: string,
     leadId: string,
-  ): Promise<HistorialEstadoRow[]> {
+    page = 1,
+    pageSize = 20,
+  ): Promise<ResultadoPaginado<HistorialEstadoRow>> {
     const filas = await this.prisma.leadEstadoHistorial.findMany({
       where: { organizacionId, leadId },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: {
         usuario: { select: { id: true, nombre: true, apellido: true } },
         visitaAgendo: {
@@ -272,47 +280,55 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           },
         },
       },
-      orderBy: { fechaCreacion: 'asc' },
+      orderBy: [{ fechaCreacion: 'desc' }, { id: 'desc' }],
     });
-    return filas.map((f) => ({
-      id: f.id,
-      tipoLead: f.tipoLead,
-      desde: f.desde,
-      hacia: f.hacia,
-      motivoCierre: f.motivoCierre,
-      nota: f.nota,
-      metadata:
-        f.metadata &&
-        typeof f.metadata === 'object' &&
-        !Array.isArray(f.metadata)
-          ? (f.metadata as Record<string, string>)
+    const total = await this.prisma.leadEstadoHistorial.count({
+      where: { organizacionId, leadId },
+    });
+    return construirResultadoPaginado(
+      filas.map((f) => ({
+        id: f.id,
+        tipoLead: f.tipoLead,
+        desde: f.desde,
+        hacia: f.hacia,
+        motivoCierre: f.motivoCierre,
+        nota: f.nota,
+        metadata:
+          f.metadata &&
+          typeof f.metadata === 'object' &&
+          !Array.isArray(f.metadata)
+            ? (f.metadata as Record<string, string>)
+            : null,
+        visita: f.visitaAgendo
+          ? {
+              id: f.visitaAgendo.id,
+              programadaEn: f.visitaAgendo.programadaEn,
+              programadaFin: f.visitaAgendo.programadaFin,
+              duracionMinutos: f.visitaAgendo.duracionMinutos,
+              referenciaInmueble: f.visitaAgendo.referenciaInmueble,
+              inmuebleId: f.visitaAgendo.inmuebleId,
+              inmueble: f.visitaAgendo.inmueble,
+              modalidad: f.visitaAgendo.modalidad,
+              estado: f.visitaAgendo.estado,
+              resultado: f.visitaAgendo.resultado,
+              nota: f.visitaAgendo.nota,
+            }
           : null,
-      visita: f.visitaAgendo
-        ? {
-            id: f.visitaAgendo.id,
-            programadaEn: f.visitaAgendo.programadaEn,
-            programadaFin: f.visitaAgendo.programadaFin,
-            duracionMinutos: f.visitaAgendo.duracionMinutos,
-            referenciaInmueble: f.visitaAgendo.referenciaInmueble,
-            inmuebleId: f.visitaAgendo.inmuebleId,
-            inmueble: f.visitaAgendo.inmueble,
-            modalidad: f.visitaAgendo.modalidad,
-            estado: f.visitaAgendo.estado,
-            resultado: f.visitaAgendo.resultado,
-            nota: f.visitaAgendo.nota,
-          }
-        : null,
-      calificacion: f.calificacion,
-      usuario: f.usuario
-        ? {
-            id: f.usuario.id,
-            nombre: [f.usuario.nombre, f.usuario.apellido]
-              .filter(Boolean)
-              .join(' '),
-          }
-        : null,
-      fechaCreacion: f.fechaCreacion,
-    }));
+        calificacion: f.calificacion,
+        usuario: f.usuario
+          ? {
+              id: f.usuario.id,
+              nombre: [f.usuario.nombre, f.usuario.apellido]
+                .filter(Boolean)
+                .join(' '),
+            }
+          : null,
+        fechaCreacion: f.fechaCreacion,
+      })),
+      total,
+      page,
+      pageSize,
+    );
   }
 
   async obtenerIdExternoMeta(

@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -103,6 +104,7 @@ export class InmueblesController {
   })
   @ApiResponse({ status: 200, description: 'Lista ordenada de interesados.' })
   @ApiResponse({ status: 404, description: 'Inmueble no encontrado.' })
+  @PaginarColeccion()
   findInteresados(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,

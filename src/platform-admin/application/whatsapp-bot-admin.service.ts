@@ -1,3 +1,4 @@
+import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import {
   ConflictException,
   ForbiddenException,
@@ -147,13 +148,14 @@ export class WhatsappBotAdminService {
     );
   }
 
-  async historial(org: string, usuarioId: string) {
+  async historial(org: string, usuarioId: string, page = 1, pageSize = 20) {
     return this.prisma.$transaction(async (tx) => {
       await this.autorizar(tx, org, usuarioId);
       const eventos = await tx.whatsappBotConfiguracionEvento.findMany({
         where: { organizacionId: org },
         orderBy: { version: 'desc' },
-        take: 100,
+        skip: (page - 1) * pageSize,
+        take: pageSize,
       });
       const ids = [...new Set(eventos.map((e) => e.usuarioId))];
       const usuarios = ids.length
@@ -162,10 +164,18 @@ export class WhatsappBotAdminService {
             select: { id: true, nombre: true, apellido: true },
           })
         : [];
-      return eventos.map((e) => ({
-        ...e,
-        usuario: usuarios.find((u) => u.id === e.usuarioId) ?? null,
-      }));
+      const total = await tx.whatsappBotConfiguracionEvento.count({
+        where: { organizacionId: org },
+      });
+      return construirResultadoPaginado(
+        eventos.map((e) => ({
+          ...e,
+          usuario: usuarios.find((u) => u.id === e.usuarioId) ?? null,
+        })),
+        total,
+        page,
+        pageSize,
+      );
     });
   }
 }

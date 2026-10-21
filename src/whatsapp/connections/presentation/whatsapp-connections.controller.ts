@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   Controller,
@@ -60,6 +61,7 @@ export class WhatsappConnectionsController {
     status: 403,
     description: 'Rol insuficiente o módulo WHATSAPP no activo.',
   })
+  @PaginarColeccion()
   findAll(@CurrentUser() ctx: RequestContext) {
     return this.listarVinculados.execute(ctx.organizacionId!);
   }
@@ -76,6 +78,7 @@ export class WhatsappConnectionsController {
     status: 403,
     description: 'Rol insuficiente o módulo WHATSAPP no activo.',
   })
+  @PaginarColeccion()
   findAvailable(@CurrentUser() ctx: RequestContext) {
     return this.listarDisponibles.execute(ctx.organizacionId!);
   }
@@ -165,11 +168,7 @@ export class WhatsappConnectionsController {
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.verificarSalud.execute(
-      ctx.organizacionId!,
-      id,
-      ctx.usuarioId,
-    );
+    return this.verificarSalud.execute(ctx.organizacionId!, id, ctx.usuarioId);
   }
 
   @Delete(':id')

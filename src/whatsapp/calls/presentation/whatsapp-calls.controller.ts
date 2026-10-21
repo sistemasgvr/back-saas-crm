@@ -1,3 +1,4 @@
+import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.query.dto';
 import {
   Body,
   Controller,
@@ -177,13 +178,13 @@ export class WhatsappCallsController {
   @ApiOperation({ summary: 'Listar historial de llamadas' })
   findAll(
     @CurrentUser() ctx: RequestContext,
+    @Query() pagination: PaginacionQueryDto,
     @Query('desde') desde?: string,
     @Query('hasta') hasta?: string,
     @Query('asesorId') asesorId?: string,
     @Query('resultado') resultado?: string,
     @Query('leadId') leadId?: string,
     @Query('conversacionId') conversacionId?: string,
-    @Query('page') page?: string,
   ) {
     return this.listar.execute(ctx.organizacionId!, {
       desde: desde ? new Date(desde) : undefined,
@@ -192,7 +193,8 @@ export class WhatsappCallsController {
       resultado,
       leadId,
       conversacionId,
-      page: page ? Number(page) : 1,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
     });
   }
 

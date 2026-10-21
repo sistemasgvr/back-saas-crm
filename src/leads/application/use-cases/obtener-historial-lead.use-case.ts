@@ -24,6 +24,8 @@ export class ObtenerHistorialLeadUseCase {
     organizacionId: string,
     leadId: string,
     ctx: { usuarioId: string; rol: RolOrganizacion },
+    page = 1,
+    pageSize = 20,
   ) {
     const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
     if (!lead) {
@@ -36,6 +38,6 @@ export class ObtenerHistorialLeadUseCase {
       throw new ForbiddenException('No tienes acceso a este lead');
     }
 
-    return this.leads.listarHistorial(organizacionId, leadId);
+    return this.leads.listarHistorial(organizacionId, leadId, page, pageSize);
   }
 }

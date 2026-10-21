@@ -1,3 +1,4 @@
+import { PaginarColeccion } from '../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
   ConflictException,
@@ -44,7 +45,9 @@ class UpdateGrupoDto extends PartialType(GrupoFieldsDto) {}
 @UseGuards(JwtAuthGuard, PlatformAdminGuard)
 export class AdminModuleGroupsController {
   constructor(private readonly prisma: PrismaService) {}
-  @Get() listar() {
+  @Get()
+  @PaginarColeccion()
+  listar() {
     return this.prisma.moduloGrupo.findMany({
       orderBy: [{ orden: 'asc' }, { codigo: 'asc' }],
     });

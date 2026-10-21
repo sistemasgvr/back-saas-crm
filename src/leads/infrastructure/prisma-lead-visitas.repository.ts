@@ -1,3 +1,7 @@
+import {
+  construirResultadoPaginado,
+  type ResultadoPaginado,
+} from '../../shared/application/paginacion';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
@@ -54,28 +58,40 @@ export class PrismaLeadVisitasRepository implements LeadVisitasRepository {
   async listarPorLead(
     organizacionId: string,
     leadId: string,
-  ): Promise<VisitaLeadRow[]> {
+    page = 1,
+    pageSize = 20,
+  ): Promise<ResultadoPaginado<VisitaLeadRow>> {
     const filas = await this.prisma.leadVisita.findMany({
       where: { organizacionId, leadId },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: { inmueble: { select: INMUEBLE_SELECT } },
-      orderBy: { programadaEn: 'desc' },
+      orderBy: [{ programadaEn: 'desc' }, { id: 'desc' }],
     });
 
-    return filas.map((f) => ({
-      id: f.id,
-      programadaEn: f.programadaEn,
-      programadaFin: f.programadaFin,
-      duracionMinutos: f.duracionMinutos,
-      referenciaInmueble: f.referenciaInmueble,
-      inmuebleId: f.inmuebleId,
-      inmueble: mapInmueble(f.inmueble),
-      modalidad: f.modalidad,
-      estado: f.estado,
-      resultado: f.resultado,
-      nota: f.nota,
-      feedback: f.feedback,
-      fechaCreacion: f.fechaCreacion,
-    }));
+    const total = await this.prisma.leadVisita.count({
+      where: { organizacionId, leadId },
+    });
+    return construirResultadoPaginado(
+      filas.map((f) => ({
+        id: f.id,
+        programadaEn: f.programadaEn,
+        programadaFin: f.programadaFin,
+        duracionMinutos: f.duracionMinutos,
+        referenciaInmueble: f.referenciaInmueble,
+        inmuebleId: f.inmuebleId,
+        inmueble: mapInmueble(f.inmueble),
+        modalidad: f.modalidad,
+        estado: f.estado,
+        resultado: f.resultado,
+        nota: f.nota,
+        feedback: f.feedback,
+        fechaCreacion: f.fechaCreacion,
+      })),
+      total,
+      page,
+      pageSize,
+    );
   }
 
   async obtenerPorId(
