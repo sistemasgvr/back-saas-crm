@@ -45,7 +45,7 @@ export interface UsuariosAdminRepository {
     estado: 0 | 1,
     usuarioEdicion: string,
   ): Promise<Usuario>;
-  /** Crea o reactiva la membresía (upsert) — un usuario puede pertenecer a varias organizaciones. */
+  /** Crea o reactiva la membresía respetando cupo y cuenta de una sola empresa. */
   asignarAOrganizacion(
     usuarioId: string,
     organizacionId: string,

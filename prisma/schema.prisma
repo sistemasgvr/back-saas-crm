@@ -19,6 +19,7 @@ model Usuario {
   id                String    @id @default(uuid()) @db.Uuid
   email             String    @unique @db.VarChar(255)
   passwordHash      String    @map("password_hash") @db.VarChar(255)
+  debeCambiarPassword Int @default(0) @map("debe_cambiar_password") @db.SmallInt
   nombre            String    @db.VarChar(120)
   apellido          String?   @db.VarChar(120)
   telefono          String?   @db.VarChar(40)
@@ -33,6 +34,8 @@ model Usuario {
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacionUsuarios  OrganizacionUsuario[]
+  membresiaEventos OrganizacionUsuarioEvento[] @relation("MembresiaEventoUsuario")
+  membresiaEventosActor OrganizacionUsuarioEvento[] @relation("MembresiaEventoActor")
   tokensRefresco        TokenRefresco[]
   notificacionesUsuario NotificacionUsuario[]
   suscripcionesPush     SuscripcionPush[]
@@ -87,6 +90,7 @@ model TokenRefresco {
 }
 
 model Organizacion {
+  limiteUsuarios Int? @map("limite_usuarios")
   id               String  @id @default(uuid()) @db.Uuid
   nombre           String  @db.VarChar(200)
   slug             String  @unique @db.VarChar(120)
@@ -116,6 +120,7 @@ model Organizacion {
   fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
 
   organizacionUsuarios     OrganizacionUsuario[]
+  usuarioEventos OrganizacionUsuarioEvento[]
   organizacionModulos      OrganizacionModulo[]
   metaConexiones           MetaConexion[]
   metaPaginas              MetaPagina[]
@@ -801,6 +806,25 @@ model OrganizacionUsuario {
   @@index([rol])
   @@index([estado])
   @@map("organizacion_usuarios")
+}
+
+model OrganizacionUsuarioEvento {
+  id String @id @default(uuid()) @db.Uuid
+  organizacionId String @map("organizacion_id") @db.Uuid
+  usuarioId String @map("usuario_id") @db.Uuid
+  actorId String @map("actor_id") @db.Uuid
+  accion String @db.VarChar(40)
+  rolAnterior String? @map("rol_anterior") @db.VarChar(30)
+  rolNuevo String? @map("rol_nuevo") @db.VarChar(30)
+  estadoAnterior Int? @map("estado_anterior") @db.SmallInt
+  estadoNuevo Int? @map("estado_nuevo") @db.SmallInt
+  creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  usuario Usuario @relation("MembresiaEventoUsuario", fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  actor Usuario @relation("MembresiaEventoActor", fields: [actorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([organizacionId, creadoEn])
+  @@map("organizacion_usuario_eventos")
 }
 
 model Modulo {

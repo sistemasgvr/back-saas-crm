@@ -39,9 +39,15 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
 
     if (!cfg) return null;
 
+    const candidatos = resolverUsuarioIdsRoundRobin(cfg);
+    const activos = await this.prisma.organizacionUsuario.findMany({
+      where: { organizacionId, usuarioId: { in: candidatos }, estado: 1, usuario: { estado: 1 } },
+      select: { usuarioId: true },
+    });
+
     return {
       habilitado: configHabilitada(cfg),
-      usuarioIds: resolverUsuarioIdsRoundRobin(cfg),
+      usuarioIds: candidatos.filter(id => activos.some(m => m.usuarioId === id)),
       siguienteIndice: cfg.siguienteIndice,
       limitesDiarios: limitesDesdeJson(cfg.limitesDiarios),
       asignadosHoy: consumoDelDia(cfg.consumoDiario, fechaLima()).porUsuario,

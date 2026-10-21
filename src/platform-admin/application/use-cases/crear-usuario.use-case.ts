@@ -1,13 +1,8 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
-import { USUARIOS_ADMIN_REPOSITORY } from '../ports/usuarios-admin.repository.port';
-import type {
-  CrearUsuarioInput,
-  UsuariosAdminRepository,
-} from '../ports/usuarios-admin.repository.port';
-import { PASSWORD_HASHER } from '../../../auth/application/ports/password-hasher.port';
-import type { PasswordHasher } from '../../../auth/application/ports/password-hasher.port';
+import { Injectable } from '@nestjs/common';
+import type { CrearUsuarioInput } from '../ports/usuarios-admin.repository.port';
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
 import { toUsuarioAdminResponse } from '../usuario-admin-response.mapper';
+import { GestionMembresiasService } from '../../../organizations/application/gestion-membresias.service';
 
 export interface AsignacionInicial {
   organizacionId: string;
@@ -22,36 +17,14 @@ export interface CrearUsuarioUseCaseInput extends CrearUsuarioInput {
 @Injectable()
 export class CrearUsuarioUseCase {
   constructor(
-    @Inject(USUARIOS_ADMIN_REPOSITORY)
-    private readonly usuarios: UsuariosAdminRepository,
-    @Inject(PASSWORD_HASHER) private readonly hasher: PasswordHasher,
+    private readonly gestion: GestionMembresiasService,
   ) {}
 
   async execute(input: CrearUsuarioUseCaseInput, usuarioCreacion: string) {
-    const existente = await this.usuarios.buscarActivoPorEmail(input.email);
-    if (existente) {
-      throw new ConflictException(
-        `Ya existe un usuario activo con el email ${input.email}`,
-      );
-    }
-
-    const { password, asignacion, ...datosUsuario } = input;
-    const passwordHash = await this.hasher.hash(password);
-    const usuario = await this.usuarios.crear(
-      datosUsuario,
-      passwordHash,
+    const usuario = await this.gestion.crearCuentaPlataforma(
+      input,
       usuarioCreacion,
     );
-
-    if (asignacion) {
-      await this.usuarios.asignarAOrganizacion(
-        usuario.id,
-        asignacion.organizacionId,
-        asignacion.rol,
-        usuarioCreacion,
-      );
-    }
-
     return toUsuarioAdminResponse(usuario);
   }
 }

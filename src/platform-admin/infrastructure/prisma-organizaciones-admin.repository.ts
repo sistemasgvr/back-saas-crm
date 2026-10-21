@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { membresiaQueConsumeCupo } from '../../organizations/application/membresia-cupo';
 import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type {
   ActualizarOrganizacionAdminInput,
@@ -36,21 +37,39 @@ export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminR
       this.prisma.organizacion.count({ where }),
       this.prisma.organizacion.findMany({
         where,
+        include: {
+          _count: {
+            select: {
+              organizacionUsuarios: { where: membresiaQueConsumeCupo },
+            },
+          },
+        },
         orderBy: { fechaCreacion: 'desc' },
         skip: (filtro.page - 1) * filtro.pageSize,
         take: filtro.pageSize,
       }),
     ]);
     return construirResultadoPaginado(
-      organizaciones,
+      organizaciones.map((o) => ({
+        ...o,
+        usuariosActivos: o._count.organizacionUsuarios,
+      })),
       total,
       filtro.page,
       filtro.pageSize,
     );
   }
 
-  obtenerPorId(id: string) {
-    return this.prisma.organizacion.findUnique({ where: { id } });
+  async obtenerPorId(id: string) {
+    const o = await this.prisma.organizacion.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { organizacionUsuarios: { where: membresiaQueConsumeCupo } },
+        },
+      },
+    });
+    return o ? { ...o, usuariosActivos: o._count.organizacionUsuarios } : null;
   }
 
   crearConModulosPorDefecto(
@@ -87,9 +106,12 @@ export class PrismaOrganizacionesAdminRepository implements OrganizacionesAdminR
     data: ActualizarOrganizacionAdminInput,
     usuarioEdicion: string,
   ) {
-    return this.prisma.organizacion.update({
-      where: { id },
-      data: { ...data, usuarioEdicion },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`org-usuarios:${id.toLowerCase()}`}, 0))::text`;
+      return tx.organizacion.update({
+        where: { id },
+        data: { ...data, usuarioEdicion },
+      });
     });
   }
 

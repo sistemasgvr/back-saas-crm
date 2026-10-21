@@ -121,7 +121,7 @@ if (connection) testUrl(connection);
       cpSync(resolve('prisma/schema.prisma'), join(work, 'schema.prisma'));
       mkdirSync(join(work, 'migrations'));
       for (const item of readdirSync(resolve('prisma/migrations'))) {
-        if (item < migration || item === 'migration_lock.toml')
+        if (item < migration || item === '20261021200000_gestion_usuarios_empresa' || item === 'migration_lock.toml')
           cpSync(
             resolve('prisma/migrations', item),
             join(work, 'migrations', item),

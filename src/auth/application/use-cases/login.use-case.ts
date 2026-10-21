@@ -80,6 +80,7 @@ export class LoginUseCase {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
+        debeCambiarPassword: usuario.debeCambiarPassword === 1,
         esAdminPlataforma: usuario.esAdminPlataforma === 1,
       },
       organizacion: activa

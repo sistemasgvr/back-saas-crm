@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { GestionMembresiasService } from '../../organizations/application/gestion-membresias.service';
 import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type { RolOrganizacion } from '../../auth/domain/request-context.interface';
 import type {
@@ -12,7 +13,7 @@ import type {
 
 @Injectable()
 export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService, private readonly gestion: GestionMembresiasService) {}
 
   async listar(filtro: FiltroListadoUsuarios) {
     const q = filtro.q?.trim();
@@ -69,7 +70,7 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   }
 
   buscarActivoPorEmail(email: string) {
-    return this.prisma.usuario.findFirst({ where: { email, estado: 1 } });
+    return this.prisma.usuario.findFirst({ where: { email: { equals: email.trim(), mode: 'insensitive' }, estado: 1 } });
   }
 
   crear(
@@ -103,15 +104,6 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
     rol: RolOrganizacion,
     usuarioEdicion: string,
   ): Promise<void> {
-    await this.prisma.organizacionUsuario.upsert({
-      where: { organizacionId_usuarioId: { organizacionId, usuarioId } },
-      update: { rol, estado: 1, usuarioEdicion },
-      create: {
-        organizacionId,
-        usuarioId,
-        rol,
-        usuarioCreacion: usuarioEdicion,
-      },
-    });
+    await this.gestion.asignar(organizacionId, usuarioId, rol, { usuarioId: usuarioEdicion, esAdminPlataforma: true });
   }
 }

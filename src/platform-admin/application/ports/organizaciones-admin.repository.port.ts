@@ -20,6 +20,7 @@ export interface CrearOrganizacionInput {
 }
 
 export interface ActualizarOrganizacionAdminInput {
+  limiteUsuarios?: number | null;
   nombre?: string;
   slug?: string;
   razonSocial?: string;

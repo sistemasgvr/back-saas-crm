@@ -7,7 +7,7 @@ export class PrismaUsuariosRepository implements UsuariosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findActivoByEmail(email: string) {
-    return this.prisma.usuario.findFirst({ where: { email, estado: 1 } });
+    return this.prisma.usuario.findFirst({ where: { email: { equals: email.trim(), mode: 'insensitive' }, estado: 1 } });
   }
 
   findActivoById(id: string) {
@@ -43,7 +43,7 @@ export class PrismaUsuariosRepository implements UsuariosRepository {
   ): Promise<void> {
     await this.prisma.usuario.update({
       where: { id },
-      data: { passwordHash, usuarioEdicion },
+      data: { passwordHash, debeCambiarPassword: 0, usuarioEdicion },
     });
   }
 }

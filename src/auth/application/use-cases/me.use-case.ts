@@ -56,6 +56,7 @@ export class MeUseCase {
         id: usuario.id,
         email: usuario.email,
         nombre: usuario.nombre,
+        debeCambiarPassword: usuario.debeCambiarPassword === 1,
         apellido: usuario.apellido,
         telefono: usuario.telefono,
         esAdminPlataforma: usuario.esAdminPlataforma === 1,

@@ -33,6 +33,7 @@ function escenario(
     },
     organizacionUsuario: {
       findFirst: jest.fn().mockResolvedValue({ id: 'member' }),
+      findMany: jest.fn().mockResolvedValue(ids.map(usuarioId => ({ usuarioId }))),
     },
     leadAutoAsignacionQueue: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -53,6 +54,14 @@ function escenario(
 }
 
 describe('Asignación automática con cupos diarios', () => {
+  it('no muestra miembros desactivados en la configuración, incluso con referencias legacy', async () => {
+    const { repo, tx, cfg } = escenario(['u1', 'u2']);
+    tx.organizacionUsuario.findMany.mockResolvedValue([{ usuarioId: 'u2' }]);
+    expect((await repo.obtenerConfig('org'))?.usuarioIds).toEqual(['u2']);
+    cfg.usuarioIds = [];
+    tx.organizacionUsuario.findMany.mockResolvedValue([]);
+    expect((await repo.obtenerConfig('org'))?.usuarioIds).toEqual([]);
+  });
   beforeEach(() => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-10-01T17:00:00Z'));
