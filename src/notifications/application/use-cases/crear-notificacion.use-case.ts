@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { NOTIFICACIONES_REPOSITORY } from '../ports/notificaciones.repository.port';
 import type { NotificacionesRepository } from '../ports/notificaciones.repository.port';
 import { WS_EMITTER } from '../ports/ws-emitter.port';
@@ -26,6 +26,8 @@ export interface CrearNotificacionInput {
  */
 @Injectable()
 export class CrearNotificacionUseCase {
+  private readonly logger = new Logger(CrearNotificacionUseCase.name);
+
   constructor(
     @Inject(NOTIFICACIONES_REPOSITORY)
     private readonly repo: NotificacionesRepository,
@@ -62,17 +64,26 @@ export class CrearNotificacionUseCase {
 
     this.wsEmitter.emitirAUsuarios(usuarioIds, 'notificacion:nueva', evento);
 
-    void this.pushSender.enviarAUsuarios(
-      usuarioIds,
-      {
-        id: creada.id,
-        tipo: creada.tipo,
-        titulo: creada.titulo,
-        mensaje: creada.mensaje,
-        payload: creada.payload as Record<string, unknown> | null,
-      },
-      input.organizacionId,
-    );
+    // Sin await (el push reintenta con backoff y puede tardar), pero con
+    // catch: una promesa rechazada sin manejar puede tumbar el proceso.
+    void this.pushSender
+      .enviarAUsuarios(
+        usuarioIds,
+        {
+          id: creada.id,
+          tipo: creada.tipo,
+          titulo: creada.titulo,
+          mensaje: creada.mensaje,
+          payload: creada.payload as Record<string, unknown> | null,
+        },
+        input.organizacionId,
+      )
+      .catch((error: unknown) =>
+        this.logger.error(
+          `Web Push de la notificación ${creada.id} falló`,
+          error instanceof Error ? error.stack : error,
+        ),
+      );
 
     return { id: creada.id };
   }

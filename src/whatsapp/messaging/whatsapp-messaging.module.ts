@@ -33,6 +33,8 @@ import { BloquearContactoWhatsAppUseCase } from './application/use-cases/bloquea
 import { EliminarMensajeWhatsAppCrmUseCase } from './application/use-cases/eliminar-mensaje-whatsapp-crm.use-case';
 import { ReenviarMensajeWhatsAppUseCase } from './application/use-cases/reenviar-mensaje-whatsapp.use-case';
 import { RenombrarConversacionWhatsAppUseCase } from './application/use-cases/renombrar-conversacion-whatsapp.use-case';
+import { TiempoRealChatsService } from './application/tiempo-real-chats.service';
+import { MediaWebhookWhatsAppService } from './application/media-webhook-whatsapp.service';
 import { SincronizarContactoAppBusinessUseCase } from './application/use-cases/sincronizar-contacto-app-business.use-case';
 import { ProcesarPreferenciaMarketingWhatsAppUseCase } from './application/use-cases/procesar-preferencia-marketing-whatsapp.use-case';
 import { EnviarRecordatorioAgendaWhatsAppUseCase } from './application/use-cases/enviar-recordatorio-agenda-whatsapp.use-case';
@@ -81,6 +83,8 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarPreferenciaMarketingWhatsAppUseCase,
     EnviarRecordatorioAgendaWhatsAppUseCase,
     GuardarMediaWhatsAppService,
+    TiempoRealChatsService,
+    MediaWebhookWhatsAppService,
     {
       provide: WHATSAPP_CONVERSACIONES_REPOSITORY,
       useClass: PrismaWhatsappConversacionesRepository,
@@ -89,6 +93,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
   exports: [
     WHATSAPP_CONVERSACIONES_REPOSITORY,
     ControlAtencionService,
+    TiempoRealChatsService,
     ProcesarMensajeWhatsAppEntranteUseCase,
     ProcesarEcoMensajeWhatsAppUseCase,
     ProcesarEstadoWhatsAppUseCase,

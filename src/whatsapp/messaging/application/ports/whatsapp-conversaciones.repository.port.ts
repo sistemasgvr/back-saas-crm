@@ -348,11 +348,14 @@ export interface WhatsappConversacionesRepository {
     opciones?: { limpiarNoLeidos?: boolean },
   ): Promise<void>;
 
+  /** Devuelve el chat del mensaje solo si el estado cambió (para avisar en
+   * vivo sin eventos redundantes); null si no aplicó (orden fuera de secuencia,
+   * wamid ajeno). */
   actualizarEstadoMensaje(
     organizacionId: string,
     wamid: string,
     estado: string,
-  ): Promise<void>;
+  ): Promise<string | null>;
 
   /** Soft-delete en el CRM: estado eliminado + limpia texto/caption visibles.
    * La Cloud API de Meta no permite "borrar para todos" iniciando desde API. */
@@ -397,7 +400,7 @@ export interface WhatsappConversacionesRepository {
     organizacionId: string,
     wamidObjetivo: string,
     emoji: string | null,
-  ): Promise<void>;
+  ): Promise<string | null>;
 
   /** El contacto editó un mensaje que ya nos había mandado — se busca por
    * wamid, mismo motivo que la reacción. Pisa `texto`/`mediaCaption` con el
@@ -407,5 +410,16 @@ export interface WhatsappConversacionesRepository {
     wamidOriginal: string,
     cambios: { texto?: string; mediaCaption?: string },
     fechaEdicion: Date,
+  ): Promise<string | null>;
+
+  /** true si el mensaje trae archivo de Meta (mediaId) pero aún no tiene los
+   * bytes guardados en MinIO. */
+  tieneMediaPendiente(mensajeId: string): Promise<boolean>;
+
+  /** Vincula el archivo ya guardado a un mensaje existente (descarga diferida
+   * del webhook). Idempotente: si ya tenía archivo, no hace nada. */
+  adjuntarMedia(
+    mensajeId: string,
+    media: { mediaObjetoId: string; mimeType: string; tamanoBytes: number },
   ): Promise<void>;
 }

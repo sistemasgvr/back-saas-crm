@@ -20,6 +20,12 @@ export class ConfigIoAdapter extends IoAdapter {
     return super.createIOServer(port, {
       ...options,
       cors: { origin: config.getOrThrow<string>('FRONTEND_URL') },
+      // Detectar antes un socket muerto (wifi caído, laptop suspendida): por
+      // defecto socket.io tarda hasta 45 s (25 + 20); así el cliente se
+      // reconecta y se pone al día en ~25 s. Costo: un ping chico (~1 byte de
+      // payload) cada 15 s por pestaña abierta.
+      pingInterval: 15_000,
+      pingTimeout: 10_000,
     }) as Server;
   }
 }

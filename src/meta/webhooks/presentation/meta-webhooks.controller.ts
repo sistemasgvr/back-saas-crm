@@ -199,6 +199,7 @@ export class MetaWebhooksController {
       `Webhook Meta recibido: object=${payload.object}, campos=${[...new Set(campos)].join(',') || 'ninguno'}`,
     );
 
+    const inicio = Date.now();
     let huboFalloReintentable = false;
 
     if (payload.object === 'whatsapp_business_account') {
@@ -210,13 +211,16 @@ export class MetaWebhooksController {
       huboFalloReintentable = await this.procesarEventosLeadgen(eventos);
     }
 
+    // Métrica de latencia del lado del CRM (recepción → listo).
+    const duracionMs = Date.now() - inicio;
     if (huboFalloReintentable) {
       this.logger.warn(
-        'Webhook Meta: procesamiento incompleto, respuesta 503 para reintento',
+        `Webhook Meta: procesamiento incompleto en ${duracionMs} ms, respuesta 503 para reintento`,
       );
       res.status(503).send('Retry');
       return;
     }
+    this.logger.log(`Webhook Meta procesado en ${duracionMs} ms`);
     res.status(200).send('OK');
   }
 
@@ -227,8 +231,17 @@ export class MetaWebhooksController {
       extraerEventosWhatsApp(payload);
     let huboFalloReintentable = false;
 
+    // Cuánto tardó Meta en entregarnos el mensaje desde que el cliente lo
+    // mandó (timestamp de WhatsApp, resolución de segundos).
+    const ahora = Date.now();
+    const retrasoMetaS = mensajes
+      .filter((m) => !m.esHistorial)
+      .reduce(
+        (max, m) => Math.max(max, (ahora - m.timestamp.getTime()) / 1000),
+        0,
+      );
     this.logger.log(
-      `Webhook WhatsApp: mensajes=${mensajes.length}, ecos=${ecos.length}, estados=${estados.length}, reacciones=${reacciones.length}, ediciones=${ediciones.length}, llamadas=${llamadas.length}`,
+      `Webhook WhatsApp: mensajes=${mensajes.length}, ecos=${ecos.length}, estados=${estados.length}, reacciones=${reacciones.length}, ediciones=${ediciones.length}, llamadas=${llamadas.length}${retrasoMetaS > 0 ? `, retrasoMeta=${retrasoMetaS.toFixed(1)}s` : ''}`,
     );
 
     for (const evento of mensajes) {

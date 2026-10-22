@@ -465,11 +465,13 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     organizacionId: string,
     wamidObjetivo: string,
     emoji: string | null,
-  ): Promise<void> {
-    await this.prisma.whatsappMensaje.updateMany({
+  ): Promise<string | null> {
+    const filas = await this.prisma.whatsappMensaje.updateManyAndReturn({
       where: { organizacionId, wamid: wamidObjetivo },
       data: { reaccionCliente: emoji },
+      select: { whatsappConversacionId: true },
     });
+    return filas[0]?.whatsappConversacionId ?? null;
   }
 
   async actualizarMensajeEditado(
@@ -477,8 +479,8 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     wamidOriginal: string,
     cambios: { texto?: string; mediaCaption?: string },
     fechaEdicion: Date,
-  ): Promise<void> {
-    await this.prisma.whatsappMensaje.updateMany({
+  ): Promise<string | null> {
+    const filas = await this.prisma.whatsappMensaje.updateManyAndReturn({
       where: { organizacionId, wamid: wamidOriginal },
       data: {
         ...(cambios.texto !== undefined ? { texto: cambios.texto } : {}),
@@ -487,6 +489,48 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
           : {}),
         fechaEdicion,
       },
+      select: { whatsappConversacionId: true },
+    });
+    return filas[0]?.whatsappConversacionId ?? null;
+  }
+
+  async tieneMediaPendiente(mensajeId: string): Promise<boolean> {
+    const mensaje = await this.prisma.whatsappMensaje.findUnique({
+      where: { id: mensajeId },
+      select: { mediaId: true, media: { select: { mediaObjetoId: true } } },
+    });
+    return Boolean(mensaje?.mediaId) && !mensaje?.media?.mediaObjetoId;
+  }
+
+  async adjuntarMedia(
+    mensajeId: string,
+    media: { mediaObjetoId: string; mimeType: string; tamanoBytes: number },
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const vinculo = await tx.whatsappMensajeMedia.findUnique({
+        where: { whatsappMensajeId: mensajeId },
+        select: { mediaObjetoId: true },
+      });
+      if (vinculo?.mediaObjetoId) return;
+      await tx.whatsappMensajeMedia.upsert({
+        where: { whatsappMensajeId: mensajeId },
+        create: {
+          whatsappMensajeId: mensajeId,
+          mediaObjetoId: media.mediaObjetoId,
+        },
+        update: { mediaObjetoId: media.mediaObjetoId },
+      });
+      await tx.whatsappMediaObjeto.update({
+        where: { id: media.mediaObjetoId },
+        data: { usos: { increment: 1 } },
+      });
+      await tx.whatsappMensaje.update({
+        where: { id: mensajeId },
+        data: {
+          mediaMimeType: media.mimeType,
+          mediaTamanoBytes: media.tamanoBytes,
+        },
+      });
     });
   }
 
@@ -1078,13 +1122,16 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     organizacionId: string,
     wamid: string,
     estado: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     // Meta no garantiza el orden de los webhooks de estado — puede llegar
     // "read" antes que "delivered" (documentado por Meta). Sin esto, un
     // "delivered" tardío pisaría un "leido" ya guardado y el check volvería
     // a verse gris. "fallido"/"eliminado" son terminales y siempre se
     // aplican, sin importar el orden.
-    await this.prisma.$executeRaw`
+    // RETURNING: solo si el estado efectivamente cambió se avisa en vivo.
+    const filas = await this.prisma.$queryRaw<
+      { whatsapp_conversacion_id: string }[]
+    >`
       UPDATE whatsapp_mensajes
       SET estado_entrega = ${estado},
           texto = CASE WHEN ${estado} = 'eliminado' THEN NULL ELSE texto END,
@@ -1102,7 +1149,10 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
                0
              )
         )
+        AND estado_entrega IS DISTINCT FROM ${estado}
+      RETURNING whatsapp_conversacion_id
     `;
+    return filas[0]?.whatsapp_conversacion_id ?? null;
   }
 
   async marcarMensajeEliminadoEnCrm(

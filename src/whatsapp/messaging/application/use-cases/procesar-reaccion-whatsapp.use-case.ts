@@ -3,6 +3,7 @@ import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaciones.repository.port';
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
+import { TiempoRealChatsService } from '../tiempo-real-chats.service';
 import type { EventoReaccionWhatsApp } from '../../../../meta/webhooks/domain/whatsapp-webhook-payload.interface';
 
 /** El contacto reaccionó (o sacó su reacción) a un mensaje NUESTRO. Solo
@@ -14,6 +15,7 @@ export class ProcesarReaccionWhatsAppUseCase {
     private readonly conexiones: WhatsappConexionesRepository,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
+    private readonly tiempoReal: TiempoRealChatsService,
   ) {}
 
   async execute(evento: EventoReaccionWhatsApp): Promise<void> {
@@ -22,10 +24,17 @@ export class ProcesarReaccionWhatsAppUseCase {
     );
     if (!conexion) return;
 
-    await this.conversaciones.actualizarReaccionCliente(
+    const conversacionId = await this.conversaciones.actualizarReaccionCliente(
       conexion.organizacionId,
       evento.wamidObjetivo,
       evento.emoji || null,
     );
+    if (conversacionId) {
+      this.tiempoReal.notificar(
+        conexion.organizacionId,
+        conversacionId,
+        'reaccion',
+      );
+    }
   }
 }

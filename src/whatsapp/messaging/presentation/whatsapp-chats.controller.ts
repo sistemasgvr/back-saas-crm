@@ -3,6 +3,7 @@ import { ListarChatsQueryDto } from './dto/listar-chats.query.dto';
 import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
 import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.query.dto';
 import { ControlAtencionService } from '../application/control-atencion.service';
+import { AvisarCambioChatInterceptor } from './avisar-cambio-chat.interceptor';
 import {
   TomarControlDto,
   TransferirControlDto,
@@ -346,6 +347,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/crear-lead')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @ApiOperation({
     summary: 'Crear lead desde un chat de WhatsApp',
     description:
@@ -417,6 +419,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/messages')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Enviar un mensaje de texto o plantilla',
@@ -450,6 +453,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/messages/:mensajeId/reaction')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Reaccionar (o sacar la reacción) a un mensaje',
@@ -486,6 +490,7 @@ export class WhatsappChatsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseInterceptors(
     FileInterceptor('archivo', { limits: { fileSize: LIMITE_MULTER_BYTES } }),
+    AvisarCambioChatInterceptor,
   )
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -547,6 +552,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/location')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Enviar una ubicación (coordenadas)',
@@ -577,6 +583,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/contact')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Enviar una tarjeta de contacto (vCard)',
@@ -610,6 +617,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/interactive')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Enviar un mensaje interactivo',
@@ -643,6 +651,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/block')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Bloquear contacto en WhatsApp (block_users)' })
   @ApiResponse({ status: 204, description: 'Contacto bloqueado.' })
@@ -657,6 +666,7 @@ export class WhatsappChatsController {
   }
 
   @Patch(':id/nombre')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Renombrar contacto del chat',
@@ -684,6 +694,7 @@ export class WhatsappChatsController {
   }
 
   @Delete(':id/block')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Desbloquear contacto en WhatsApp' })
   @ApiResponse({ status: 204, description: 'Contacto desbloqueado.' })
@@ -698,6 +709,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/messages/forward')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Reenviar uno o varios mensajes a uno o varios chats',
@@ -729,6 +741,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/messages/:mensajeId/forward')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Reenviar un mensaje a otro chat',
@@ -752,6 +765,7 @@ export class WhatsappChatsController {
   }
 
   @Delete(':id/messages/:mensajeId')
+  @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Eliminar mensaje del CRM',

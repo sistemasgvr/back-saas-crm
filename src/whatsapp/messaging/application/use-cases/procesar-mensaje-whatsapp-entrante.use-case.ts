@@ -6,17 +6,13 @@ import { WHATSAPP_CONVERSACIONES_REPOSITORY } from '../ports/whatsapp-conversaci
 import type { WhatsappConversacionesRepository } from '../ports/whatsapp-conversaciones.repository.port';
 import type { EventoMensajeWhatsApp } from '../../../../meta/webhooks/domain/whatsapp-webhook-payload.interface';
 import { CrearNotificacionUseCase } from '../../../../notifications/application/use-cases/crear-notificacion.use-case';
-import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
-import type { MetaConexionesRepository } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
-import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
-import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
-import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
 import {
   previewUltimoMensajeWhatsApp,
   truncarConEllipsis,
 } from '../preview-ultimo-mensaje';
 import { AsegurarLeadParaConversacionWhatsAppUseCase } from './asegurar-lead-para-conversacion-whatsapp.use-case';
-import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
+import { MediaWebhookWhatsAppService } from '../media-webhook-whatsapp.service';
+import { TiempoRealChatsService } from '../tiempo-real-chats.service';
 
 export interface ResultadoProcesarMensajeWhatsApp {
   procesado: boolean;
@@ -29,12 +25,12 @@ export interface ResultadoProcesarMensajeWhatsApp {
  * autoasignación si hace falta, guarda el mensaje (idempotente por wamid) y
  * notifica al dueño del lead si hay uno.
  *
- * Si el mensaje trae un archivo, lo descarga de Meta y lo persiste en el
- * mismo paso: el media_id que manda el webhook solo dura 7 días — si
- * esperáramos a que alguien lo abra en el CRM, podría ya no estar
- * disponible. Si la descarga falla (archivo muy viejo, Meta caído), el
- * mensaje igual se guarda — con la referencia de Meta pero sin bytes, en
- * vez de perder el mensaje entero. */
+ * Orden pensado para latencia: guardar → aviso en vivo a la org → notificación
+ * (WS + Web Push) → recién entonces bajar el archivo de Meta, que puede tardar
+ * segundos en audio/video. El media_id del webhook dura 7 días: si la descarga
+ * falla por algo transitorio, MediaPendienteError hace que el webhook responda
+ * 503 y Meta lo reintente; en el reintento el mensaje ya existe y solo se
+ * completa el archivo (sin volver a notificar). */
 @Injectable()
 export class ProcesarMensajeWhatsAppEntranteUseCase {
   private readonly logger = new Logger(
@@ -46,14 +42,11 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     private readonly conexiones: WhatsappConexionesRepository,
     @Inject(WHATSAPP_CONVERSACIONES_REPOSITORY)
     private readonly conversaciones: WhatsappConversacionesRepository,
-    @Inject(META_CONEXIONES_REPOSITORY)
-    private readonly conexionesMeta: MetaConexionesRepository,
-    @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
-    private readonly tokenEncryption: TokenEncryptionService,
     private readonly crearNotificacion: CrearNotificacionUseCase,
     private readonly asegurarLead: AsegurarLeadParaConversacionWhatsAppUseCase,
-    private readonly guardarMedia: GuardarMediaWhatsAppService,
     private readonly control: ControlAtencionService,
+    private readonly media: MediaWebhookWhatsAppService,
+    private readonly tiempoReal: TiempoRealChatsService,
   ) {}
 
   async execute(
@@ -95,32 +88,6 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       }
     }
 
-    const media = evento.media
-      ? await this.descargarMediaSiPosible(
-          conexion.organizacionId,
-          evento.media.mediaId,
-        )
-      : undefined;
-
-    let mediaObjetoId: string | undefined;
-    if (media) {
-      try {
-        const objeto = await this.guardarMedia.asegurar(
-          conexion.organizacionId,
-          media.buffer,
-          media.mimeType ??
-            evento.media?.mimeType ??
-            'application/octet-stream',
-        );
-        mediaObjetoId = objeto.id;
-      } catch (error: unknown) {
-        this.logger.error(
-          `No se pudo guardar media MinIO para wamid ${evento.wamid}`,
-          error instanceof Error ? error.stack : error,
-        );
-      }
-    }
-
     // El webhook solo trae el wamid del mensaje citado — hace falta el id
     // propio para guardar la relación (self-relation por id, no por wamid).
     // Si no se encuentra (mensaje muy viejo, o cita un mensaje que no es
@@ -132,38 +99,47 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         )) ?? undefined)
       : undefined;
 
-    const { creado } = await this.conversaciones.registrarMensaje({
+    // Sin bytes todavía: el archivo se vincula después de notificar.
+    const { id: mensajeId, creado } =
+      await this.conversaciones.registrarMensaje({
+        organizacionId: conexion.organizacionId,
+        whatsappConversacionId: conversacionId,
+        wamid: evento.wamid,
+        direccion: 'entrante',
+        esHistorial: evento.esHistorial,
+        tipo: evento.tipo,
+        texto: evento.texto,
+        datosCrudos: evento.raw,
+        fechaMensaje: evento.timestamp,
+        mediaId: evento.media?.mediaId,
+        mediaMimeType: evento.media?.mimeType,
+        mediaNombreArchivo: evento.media?.nombreArchivo,
+        mediaCaption: evento.media?.caption,
+        mediaEsVoz: evento.media?.esVoz,
+        respondeAMensajeId,
+        ubicacionLatitud: evento.ubicacion?.latitud,
+        ubicacionLongitud: evento.ubicacion?.longitud,
+        ubicacionNombre: evento.ubicacion?.nombre,
+        ubicacionDireccion: evento.ubicacion?.direccion,
+        contactos: evento.contactos,
+      });
+
+    const resultado: ResultadoProcesarMensajeWhatsApp = {
+      procesado: true,
       organizacionId: conexion.organizacionId,
-      whatsappConversacionId: conversacionId,
-      wamid: evento.wamid,
-      direccion: 'entrante',
-      esHistorial: evento.esHistorial,
-      tipo: evento.tipo,
-      texto: evento.texto,
-      datosCrudos: evento.raw,
-      fechaMensaje: evento.timestamp,
-      mediaId: evento.media?.mediaId,
-      mediaMimeType: media?.mimeType ?? evento.media?.mimeType,
-      mediaNombreArchivo: evento.media?.nombreArchivo,
-      mediaCaption: evento.media?.caption,
-      mediaEsVoz: evento.media?.esVoz,
-      mediaTamanoBytes: media?.buffer.length,
-      mediaObjetoId,
-      respondeAMensajeId,
-      ubicacionLatitud: evento.ubicacion?.latitud,
-      ubicacionLongitud: evento.ubicacion?.longitud,
-      ubicacionNombre: evento.ubicacion?.nombre,
-      ubicacionDireccion: evento.ubicacion?.direccion,
-      contactos: evento.contactos,
-    });
+      conversacionId,
+    };
 
     if (!creado) {
-      // Meta reintentó un webhook ya procesado — no volver a incrementar no_leidos/notificar.
-      return {
-        procesado: true,
-        organizacionId: conexion.organizacionId,
+      // Meta reintentó un webhook ya procesado — no volver a incrementar
+      // no_leidos ni notificar; solo completar el archivo si quedó pendiente.
+      await this.completarMedia(
+        evento,
+        conexion.organizacionId,
         conversacionId,
-      };
+        mensajeId,
+      );
+      return resultado;
     }
 
     const esHistorial = evento.esHistorial === true;
@@ -175,23 +151,39 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
         extenderVentana: !esHistorial,
       },
     );
-
-    if (esHistorial) {
-      return {
-        procesado: true,
-        organizacionId: conexion.organizacionId,
-        conversacionId,
-      };
-    }
-
-    if (esNueva) {
-      await this.control.aplicarModoInicial(
-        conexion.organizacionId,
-        conversacionId,
-      );
-    }
-    const conversacion = await this.conversaciones.findPorId(
+    // Cualquier pantalla abierta de la org refresca el chat al instante.
+    this.tiempoReal.notificar(
       conexion.organizacionId,
+      conversacionId,
+      'mensaje',
+    );
+
+    if (!esHistorial) {
+      if (esNueva) {
+        await this.control.aplicarModoInicial(
+          conexion.organizacionId,
+          conversacionId,
+        );
+      }
+      await this.notificar(evento, conexion.organizacionId, conversacionId);
+    }
+
+    await this.completarMedia(
+      evento,
+      conexion.organizacionId,
+      conversacionId,
+      mensajeId,
+    );
+    return resultado;
+  }
+
+  private async notificar(
+    evento: EventoMensajeWhatsApp,
+    organizacionId: string,
+    conversacionId: string,
+  ): Promise<void> {
+    const conversacion = await this.conversaciones.findPorId(
+      organizacionId,
       conversacionId,
     );
 
@@ -215,9 +207,11 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
       (evento.waId ? `+${evento.waId}` : null) ??
       'WhatsApp';
 
+    // Sin await: guardar + socket + push corren en paralelo a la descarga del
+    // archivo. Un fallo se registra (antes se descartaba en silencio).
     void this.crearNotificacion
       .execute({
-        organizacionId: conexion.organizacionId,
+        organizacionId,
         tipo: 'WHATSAPP_MENSAJE',
         titulo,
         mensaje: truncarConEllipsis(preview, 120),
@@ -235,33 +229,28 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
           ? [conversacion.lead.asignadoUsuarioId]
           : undefined,
       })
-      .catch(() => undefined);
-
-    return {
-      procesado: true,
-      organizacionId: conexion.organizacionId,
-      conversacionId,
-    };
+      .catch((error: unknown) =>
+        this.logger.error(
+          `No se pudo crear la notificación del mensaje ${evento.wamid}`,
+          error instanceof Error ? error.stack : error,
+        ),
+      );
   }
 
-  private async descargarMediaSiPosible(
+  private async completarMedia(
+    evento: EventoMensajeWhatsApp,
     organizacionId: string,
-    mediaId: string,
-  ): Promise<{ buffer: Buffer; mimeType: string } | undefined> {
-    try {
-      const conexionMeta =
-        await this.conexionesMeta.findActivaPorOrganizacion(organizacionId);
-      if (!conexionMeta?.tokenCifrado) return undefined;
-      const accessToken = this.tokenEncryption.decrypt(
-        conexionMeta.tokenCifrado,
-      );
-      return await this.graph.descargarMediaWhatsApp(mediaId, accessToken);
-    } catch (error) {
-      this.logger.error(
-        `No se pudo descargar el media ${mediaId} de un mensaje entrante`,
-        error instanceof Error ? error.stack : error,
-      );
-      return undefined;
-    }
+    conversacionId: string,
+    mensajeId: string,
+  ): Promise<void> {
+    if (!evento.media?.mediaId) return;
+    await this.media.completar({
+      organizacionId,
+      conversacionId,
+      mensajeId,
+      wamid: evento.wamid,
+      mediaId: evento.media.mediaId,
+      mimeTypeWebhook: evento.media.mimeType,
+    });
   }
 }
