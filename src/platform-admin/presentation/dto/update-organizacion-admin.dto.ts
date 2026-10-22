@@ -13,8 +13,14 @@ import {
 import { RUBROS_SOPORTADOS } from '../../../shared/domain/rubros-organizacion';
 
 export class UpdateOrganizacionAdminDto {
-  @ApiPropertyOptional({ description: 'Usuarios activos permitidos; null = sin límite', nullable: true, minimum: 1 })
-  @IsOptional() @IsInt() @Min(1)
+  @ApiPropertyOptional({
+    description: 'Usuarios activos permitidos; null = sin límite',
+    nullable: true,
+    minimum: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
   limiteUsuarios?: number | null;
   @ApiPropertyOptional({ example: 'Domaria Inmobiliaria', maxLength: 200 })
   @IsOptional()

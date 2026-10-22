@@ -4,7 +4,7 @@ export function resolverUsuarioIdsRoundRobin(cfg: {
   usuarioSegundoId: string;
   usuarioIds: unknown;
 }): string[] {
-  const desdeJson = cfg.usuarioIds as unknown as string[] | null;
+  const desdeJson = cfg.usuarioIds as string[] | null;
   const jsonValidos = Array.isArray(desdeJson)
     ? desdeJson.filter((id) => typeof id === 'string' && id.length > 0)
     : [];

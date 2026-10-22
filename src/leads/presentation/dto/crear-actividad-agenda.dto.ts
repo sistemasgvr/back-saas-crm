@@ -23,7 +23,9 @@ export class CrearActividadAgendaDto {
   @IsIn(['VISITA', 'LLAMADA', 'REUNION', 'SEGUIMIENTO', 'OTRO'])
   tipo: string;
 
-  @ApiPropertyOptional({ description: 'Título (si se omite, se genera según el tipo)' })
+  @ApiPropertyOptional({
+    description: 'Título (si se omite, se genera según el tipo)',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)

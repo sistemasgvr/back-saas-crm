@@ -1,4 +1,9 @@
-import { ForbiddenException, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Inject,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import type { RolOrganizacion } from '../../domain/request-context.interface';
 import { USUARIOS_REPOSITORY } from '../ports/usuarios.repository.port';
 import type { UsuariosRepository } from '../ports/usuarios.repository.port';
@@ -52,7 +57,11 @@ export class RefreshUseCase {
     if (!usuario) {
       throw new UnauthorizedException('Usuario inactivo');
     }
-    if (usuario.debeCambiarPassword === 1) throw new ForbiddenException({ message: 'Debes cambiar tu contraseña temporal para continuar', code: 'DEBE_CAMBIAR_PASSWORD' });
+    if (usuario.debeCambiarPassword === 1)
+      throw new ForbiddenException({
+        message: 'Debes cambiar tu contraseña temporal para continuar',
+        code: 'DEBE_CAMBIAR_PASSWORD',
+      });
 
     let organizacionId: string | undefined;
     let rol: RolOrganizacion | undefined;

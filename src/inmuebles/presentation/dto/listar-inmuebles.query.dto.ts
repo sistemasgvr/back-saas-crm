@@ -32,7 +32,10 @@ export class ListarInmueblesQueryDto extends PaginacionQueryDto {
   @IsIn([...ESTADOS_INMUEBLE])
   estadoInmueble?: string;
 
-  @ApiPropertyOptional({ description: 'Filtra por zona (contiene)', maxLength: 120 })
+  @ApiPropertyOptional({
+    description: 'Filtra por zona (contiene)',
+    maxLength: 120,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(120)

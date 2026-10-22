@@ -79,7 +79,9 @@ export class ActualizarVisitaAgendaUseCase {
       visita.asignadoUsuarioId &&
       visita.asignadoUsuarioId !== ctx.usuarioId
     ) {
-      throw new ForbiddenException('No puedes modificar visitas de otro asesor');
+      throw new ForbiddenException(
+        'No puedes modificar visitas de otro asesor',
+      );
     }
 
     const cambios: Parameters<LeadVisitasRepository['actualizar']>[2] = {};
@@ -108,7 +110,10 @@ export class ActualizarVisitaAgendaUseCase {
       const duracionMinutos = normalizarDuracionMinutos(
         input.duracionMinutos ?? visita.duracionMinutos,
       );
-      const programadaFin = calcularProgramadaFin(programadaEn, duracionMinutos);
+      const programadaFin = calcularProgramadaFin(
+        programadaEn,
+        duracionMinutos,
+      );
 
       if (esVisitaEnPasado(programadaEn)) {
         throw new BadRequestException(mensajeVisitaPasado());
@@ -207,10 +212,7 @@ export class ActualizarVisitaAgendaUseCase {
       cambios,
     );
 
-    if (
-      nuevoAsignadoId &&
-      nuevoAsignadoId !== ctx.usuarioId
-    ) {
+    if (nuevoAsignadoId && nuevoAsignadoId !== ctx.usuarioId) {
       const programadaEn = cambios.programadaEn ?? visita.programadaEn;
       const cuandoIso = programadaEn.toISOString();
       const leadNombre = actualizada.leadNombre?.trim() || 'Lead';

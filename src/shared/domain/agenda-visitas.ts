@@ -3,7 +3,8 @@
 export const DURACION_VISITA_DEFAULT_MIN = 60;
 export const DURACIONES_VISITA_PERMITIDAS = [30, 60, 90, 120, 180] as const;
 
-export type DuracionVisitaMinutos = (typeof DURACIONES_VISITA_PERMITIDAS)[number];
+export type DuracionVisitaMinutos =
+  (typeof DURACIONES_VISITA_PERMITIDAS)[number];
 
 export interface IntervaloVisita {
   inicio: Date;
@@ -15,7 +16,9 @@ export function intervalosSeSolapan(
   a: IntervaloVisita,
   b: IntervaloVisita,
 ): boolean {
-  return a.inicio.getTime() < b.fin.getTime() && b.inicio.getTime() < a.fin.getTime();
+  return (
+    a.inicio.getTime() < b.fin.getTime() && b.inicio.getTime() < a.fin.getTime()
+  );
 }
 
 export function calcularProgramadaFin(
@@ -28,7 +31,8 @@ export function calcularProgramadaFin(
 export function normalizarDuracionMinutos(
   raw: string | number | null | undefined,
 ): DuracionVisitaMinutos {
-  const n = typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? ''), 10);
+  const n =
+    typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? ''), 10);
   if ((DURACIONES_VISITA_PERMITIDAS as readonly number[]).includes(n)) {
     return n as DuracionVisitaMinutos;
   }
@@ -76,7 +80,9 @@ export function estaEnHorarioLaboral(
   const minutosFin = b.hour * 60 + b.minute;
   const desde = 8 * 60;
   const hasta = 20 * 60;
-  return minutosInicio >= desde && minutosFin <= hasta && minutosFin > minutosInicio;
+  return (
+    minutosInicio >= desde && minutosFin <= hasta && minutosFin > minutosInicio
+  );
 }
 
 /** Gracia de 5 minutos respecto a "ahora" para no rechazar el instante actual. */

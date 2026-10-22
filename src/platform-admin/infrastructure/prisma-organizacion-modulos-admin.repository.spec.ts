@@ -7,16 +7,14 @@ function fixture(codigo: string, habilitado = 1) {
     $queryRaw: jest.fn().mockResolvedValue([]),
     organizacion: { findUnique: jest.fn().mockResolvedValue({ id: 'org-a' }) },
     organizacionModulo: {
-      findMany: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            moduloId: 'modulo',
-            habilitado,
-            estado: 1,
-            fechaActivacion: new Date(),
-          },
-        ]),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          moduloId: 'modulo',
+          habilitado,
+          estado: 1,
+          fechaActivacion: new Date(),
+        },
+      ]),
       findUnique: jest.fn().mockResolvedValue({
         habilitado,
         estado: 1,
@@ -25,17 +23,15 @@ function fixture(codigo: string, habilitado = 1) {
       upsert: jest.fn().mockResolvedValue({}),
     },
     modulo: {
-      findMany: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 'modulo',
-            codigo,
-            requiere: [],
-            estado: 1,
-            grupo: { estado: 1 },
-          },
-        ]),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'modulo',
+          codigo,
+          requiere: [],
+          estado: 1,
+          grupo: { estado: 1 },
+        },
+      ]),
     },
     whatsappBotConfiguracion: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),

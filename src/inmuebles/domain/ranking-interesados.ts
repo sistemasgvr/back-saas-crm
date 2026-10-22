@@ -68,7 +68,10 @@ const SCORE_TIPO_COMPATIBLE = 18;
 const SCORE_RECENCIA_MAX = 20;
 
 function diasDesde(fecha: Date, ahora: Date): number {
-  return Math.max(0, (ahora.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(
+    0,
+    (ahora.getTime() - fecha.getTime()) / (1000 * 60 * 60 * 24),
+  );
 }
 
 function scoreRecencia(fecha: Date | null, ahora: Date): number {
@@ -81,13 +84,13 @@ function scoreRecencia(fecha: Date | null, ahora: Date): number {
   return 1;
 }
 
-function ultimaActividad(
-  lead: LeadRankingInput,
-): Date | null {
+function ultimaActividad(lead: LeadRankingInput): Date | null {
   let max: Date | null = lead.estadoGestionEn;
   for (const v of lead.visitas) {
     const cand =
-      v.estado === 'REALIZADA' || v.estado === 'NO_SHOW' || v.estado === 'CANCELADA'
+      v.estado === 'REALIZADA' ||
+      v.estado === 'NO_SHOW' ||
+      v.estado === 'CANCELADA'
         ? v.fechaModificacion
         : v.programadaEn;
     if (!max || cand.getTime() > max.getTime()) max = cand;
@@ -137,8 +140,12 @@ export function puntuarLeadInteresado(
     motivos.push('Interés explícito en este inmueble');
   }
 
-  const realizadas = lead.visitas.filter((v) => v.estado === 'REALIZADA').length;
-  const programadas = lead.visitas.filter((v) => v.estado === 'PROGRAMADA').length;
+  const realizadas = lead.visitas.filter(
+    (v) => v.estado === 'REALIZADA',
+  ).length;
+  const programadas = lead.visitas.filter(
+    (v) => v.estado === 'PROGRAMADA',
+  ).length;
   const boostRealizadas =
     Math.min(realizadas, CAP_VISITAS) * SCORE_VISITA_REALIZADA;
   const boostProgramadas =
@@ -212,11 +219,9 @@ export function rankearInteresados(
 
   rankeados.sort((a, b) => {
     const aTerm =
-      a.estadoGestion === 'CERRADO_PERDIDO' ||
-      a.estadoGestion === 'DESCARTADO';
+      a.estadoGestion === 'CERRADO_PERDIDO' || a.estadoGestion === 'DESCARTADO';
     const bTerm =
-      b.estadoGestion === 'CERRADO_PERDIDO' ||
-      b.estadoGestion === 'DESCARTADO';
+      b.estadoGestion === 'CERRADO_PERDIDO' || b.estadoGestion === 'DESCARTADO';
     if (aTerm !== bTerm) return aTerm ? 1 : -1;
     if (b.score !== a.score) return b.score - a.score;
     return a.nombre.localeCompare(b.nombre, 'es');

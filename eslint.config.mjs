@@ -29,6 +29,17 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'warn',
       '@typescript-eslint/no-unsafe-argument': 'warn',
+      // Convención del proyecto: prefijo _ = parámetro/variable sin usar a
+      // propósito (firmas de interfaz, rest para omitir campos).
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          ignoreRestSiblings: true,
+        },
+      ],
       "prettier/prettier": ["error", { endOfLine: "auto" }],
     },
   },

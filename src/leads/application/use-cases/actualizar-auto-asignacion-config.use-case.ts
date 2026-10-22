@@ -77,7 +77,9 @@ export class ActualizarAutoAsignacionConfigUseCase {
       organizacionId,
       habilitado: input.habilitado,
       usuarioIds: input.usuarioIds,
-      ...(input.limitesDiarios !== undefined ? { limitesDiarios: input.limitesDiarios } : {}),
+      ...(input.limitesDiarios !== undefined
+        ? { limitesDiarios: input.limitesDiarios }
+        : {}),
     });
   }
 }

@@ -52,15 +52,12 @@ export class PreAcceptLlamadaUseCase {
       if (existente.asignadoUsuarioId === usuarioId) {
         // Ya reclamada por el mismo usuario — reintentar pre_accept
       } else {
-        throw new ConflictException(
-          'Otro agente ya tomó esta llamada',
-        );
+        throw new ConflictException('Otro agente ya tomó esta llamada');
       }
     }
 
     const llamada =
-      reclamada ??
-      (await this.llamadas.findPorCallId(organizacionId, callId))!;
+      reclamada ?? (await this.llamadas.findPorCallId(organizacionId, callId))!;
 
     const conexionWa = await this.conexionesWa.findPorId(
       organizacionId,

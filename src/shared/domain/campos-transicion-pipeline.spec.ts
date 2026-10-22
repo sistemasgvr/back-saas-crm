@@ -18,9 +18,9 @@ describe('campos-transicion-pipeline', () => {
 
     it('exige resultado y nota al marcar visita realizada', () => {
       const campos = camposAlEntrarEstado('COMPRA', 'VISITA_REALIZADA');
-      expect(campos.find((c) => c.codigo === 'resultadoVisita')?.requerido).toBe(
-        true,
-      );
+      expect(
+        campos.find((c) => c.codigo === 'resultadoVisita')?.requerido,
+      ).toBe(true);
       expect(campos.find((c) => c.codigo === 'notaTransicion')?.requerido).toBe(
         true,
       );

@@ -1,20 +1,12 @@
 export const INMUEBLES_REPOSITORY = Symbol('INMUEBLES_REPOSITORY');
 
 export type TipoInmueble =
-  | 'DEPARTAMENTO'
-  | 'CASA'
-  | 'TERRENO'
-  | 'LOCAL'
-  | 'OFICINA'
-  | 'OTRO';
+  'DEPARTAMENTO' | 'CASA' | 'TERRENO' | 'LOCAL' | 'OFICINA' | 'OTRO';
 
 export type OperacionInmueble = 'VENTA' | 'ALQUILER';
 
 export type EstadoInmuebleCatalogo =
-  | 'DISPONIBLE'
-  | 'RESERVADO'
-  | 'VENDIDO'
-  | 'INACTIVO';
+  'DISPONIBLE' | 'RESERVADO' | 'VENDIDO' | 'INACTIVO';
 
 export interface InmuebleRow {
   id: string;
@@ -112,10 +104,7 @@ export interface InmueblesRepository {
 
   listarFiltro(organizacionId: string): Promise<InmuebleFiltroOption[]>;
 
-  obtenerPorId(
-    organizacionId: string,
-    id: string,
-  ): Promise<InmuebleRow | null>;
+  obtenerPorId(organizacionId: string, id: string): Promise<InmuebleRow | null>;
 
   /**
    * Leads con interés explícito en el inmueble y/o visitas a ese inmueble.

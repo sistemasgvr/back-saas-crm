@@ -167,7 +167,10 @@ export class ObtenerEmbudoKpisUseCase {
       const etiqTipo = t.tipoLead
         ? (ETIQUETA_TIPO[t.tipoLead] ?? t.tipoLead)
         : 'Sin clasificar';
-      const colsTipo = estadosColumnasTablero(t.tipoLead ?? undefined, override);
+      const colsTipo = estadosColumnasTablero(
+        t.tipoLead ?? undefined,
+        override,
+      );
       const etiqEstados = etiquetasColumnasTablero(
         t.tipoLead ?? undefined,
         override,

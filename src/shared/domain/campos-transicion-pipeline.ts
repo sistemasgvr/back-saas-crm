@@ -309,7 +309,18 @@ function valorCampo(
     const trimmed = raw.trim();
     return trimmed || undefined;
   }
-  return String(raw);
+  return textoDeValor(raw);
+}
+
+/** Igual que String(valor) salvo objetos planos, que van como JSON en vez de
+ * "[object Object]". */
+function textoDeValor(valor: unknown): string {
+  if (Array.isArray(valor))
+    return valor
+      .map((v) => (v === null || v === undefined ? '' : textoDeValor(v)))
+      .join(',');
+  if (typeof valor === 'object' && valor !== null) return JSON.stringify(valor);
+  return String(valor);
 }
 
 function esDatetimeValido(valor: string): boolean {
@@ -317,10 +328,7 @@ function esDatetimeValido(valor: string): boolean {
   return !Number.isNaN(ms);
 }
 
-function opcionValida(
-  campo: CampoTransicionDef,
-  valor: string,
-): boolean {
+function opcionValida(campo: CampoTransicionDef, valor: string): boolean {
   if (!campo.opciones?.length) return true;
   return campo.opciones.some((o) => o.codigo === valor);
 }
@@ -429,12 +437,9 @@ export const ETIQUETAS_METADATA: Record<string, string> = {
   montoReferencia: 'Monto',
 };
 
-export function etiquetaValorMetadata(
-  codigo: string,
-  valor: unknown,
-): string {
+export function etiquetaValorMetadata(codigo: string, valor: unknown): string {
   if (valor === null || valor === undefined) return '';
-  const str = String(valor);
+  const str = textoDeValor(valor);
 
   const opciones: Record<string, readonly OpcionCampoTransicion[]> = {
     canalContacto: OPCIONES_CANAL_CONTACTO,

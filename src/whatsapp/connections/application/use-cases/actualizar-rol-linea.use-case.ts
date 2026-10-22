@@ -4,10 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import {
-  ROL_LINEA_WHATSAPP,
-  type RolLineaWhatsapp,
-} from '../../domain/rol-linea-whatsapp';
+import { ROL_LINEA_WHATSAPP } from '../../domain/rol-linea-whatsapp';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../ports/whatsapp-conexiones.repository.port';
 
@@ -35,7 +32,7 @@ export class ActualizarRolLineaUseCase {
     const actualizada = await this.conexiones.actualizarRolLinea(
       organizacionId,
       conexionId,
-      rolLinea as RolLineaWhatsapp,
+      rolLinea,
       usuarioEdicion,
     );
     if (!actualizada) {

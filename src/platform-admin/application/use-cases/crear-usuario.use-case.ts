@@ -16,9 +16,7 @@ export interface CrearUsuarioUseCaseInput extends CrearUsuarioInput {
 
 @Injectable()
 export class CrearUsuarioUseCase {
-  constructor(
-    private readonly gestion: GestionMembresiasService,
-  ) {}
+  constructor(private readonly gestion: GestionMembresiasService) {}
 
   async execute(input: CrearUsuarioUseCaseInput, usuarioCreacion: string) {
     const usuario = await this.gestion.crearCuentaPlataforma(

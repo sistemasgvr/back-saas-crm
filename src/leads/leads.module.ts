@@ -32,9 +32,7 @@ import { LEAD_VISITAS_REPOSITORY } from './application/ports/lead-visitas.reposi
 import { PrismaLeadVisitasRepository } from './infrastructure/prisma-lead-visitas.repository';
 import { LEAD_ACTIVIDADES_REPOSITORY } from './application/ports/lead-actividades.repository.port';
 import { PrismaLeadActividadesRepository } from './infrastructure/prisma-lead-actividades.repository';
-import {
-  LEAD_AUTO_ASIGNACION_REPOSITORY,
-} from './application/ports/lead-auto-asignacion.repository.port';
+import { LEAD_AUTO_ASIGNACION_REPOSITORY } from './application/ports/lead-auto-asignacion.repository.port';
 import { PrismaLeadAutoAsignacionRepository } from './infrastructure/prisma-lead-auto-asignacion.repository';
 
 @Module({

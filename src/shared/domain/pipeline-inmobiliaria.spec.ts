@@ -203,7 +203,9 @@ describe('cambioTipoReiniciaEmbudo', () => {
 
 describe('debeClasificarTipoDesdeNuevo', () => {
   it('exige tipo al salir de NUEVO sin clasificar', () => {
-    expect(debeClasificarTipoDesdeNuevo('NUEVO', 'CONTACTADO', null)).toBe(true);
+    expect(debeClasificarTipoDesdeNuevo('NUEVO', 'CONTACTADO', null)).toBe(
+      true,
+    );
     expect(debeClasificarTipoDesdeNuevo('NUEVO', 'CONTACTADO', 'COMPRA')).toBe(
       false,
     );
@@ -243,9 +245,9 @@ describe('pipeline_config override', () => {
 
   it('pipelineConfigPorDefecto coincide con las matrices de código', () => {
     expect(defaults.COMPRA.estados).toEqual([...ESTADOS_COMPRA]);
-    expect(esTransicionValida('COMPRA', 'CALIFICADO', 'VISITA_AGENDADA', defaults)).toBe(
-      true,
-    );
+    expect(
+      esTransicionValida('COMPRA', 'CALIFICADO', 'VISITA_AGENDADA', defaults),
+    ).toBe(true);
   });
 
   it('validarPipelineConfig acepta el snapshot por defecto', () => {
@@ -261,9 +263,9 @@ describe('pipeline_config override', () => {
   it('usa transiciones del override cuando se pasa', () => {
     const override = structuredClone(defaults);
     override.COMPRA.transiciones.CALIFICADO = ['DESCARTADO'];
-    expect(
-      transicionesPermitidas('COMPRA', 'CALIFICADO', override),
-    ).toEqual(['DESCARTADO']);
+    expect(transicionesPermitidas('COMPRA', 'CALIFICADO', override)).toEqual([
+      'DESCARTADO',
+    ]);
     expect(
       esTransicionValida('COMPRA', 'CALIFICADO', 'VISITA_AGENDADA', override),
     ).toBe(false);

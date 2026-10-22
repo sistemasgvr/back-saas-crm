@@ -50,17 +50,13 @@ export class AgendaRecordatoriosCronController {
     return { ok: true, enviados };
   }
 
-  private assertSecret(
-    authorization?: string,
-    cronHeader?: string,
-  ): void {
+  private assertSecret(authorization?: string, cronHeader?: string): void {
     const secret = this.config.get<string>('CRON_SECRET')?.trim();
     if (!secret) {
       throw new UnauthorizedException('CRON_SECRET no configurado');
     }
     const bearerOk =
-      typeof authorization === 'string' &&
-      authorization === `Bearer ${secret}`;
+      typeof authorization === 'string' && authorization === `Bearer ${secret}`;
     const headerOk = typeof cronHeader === 'string' && cronHeader === secret;
     if (!bearerOk && !headerOk) {
       throw new UnauthorizedException('Cron no autorizado');

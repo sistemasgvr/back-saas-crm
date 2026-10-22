@@ -1,10 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import type {
-  LeadAutoAsignacionRepository,
-} from '../ports/lead-auto-asignacion.repository.port';
-import {
-  LEAD_AUTO_ASIGNACION_REPOSITORY,
-} from '../ports/lead-auto-asignacion.repository.port';
+import type { LeadAutoAsignacionRepository } from '../ports/lead-auto-asignacion.repository.port';
+import { LEAD_AUTO_ASIGNACION_REPOSITORY } from '../ports/lead-auto-asignacion.repository.port';
 
 export interface AutoAsignarLeadResultado {
   asignadoUsuarioId: string | null;
@@ -34,7 +30,10 @@ export class AutoAsignarLeadUseCase {
 
     // Si alguien ya lo asignó (tomar/asignar manual), no hacemos nada.
     if (lead.asignadoUsuarioId) {
-      return { asignadoUsuarioId: lead.asignadoUsuarioId, fueAutoAsignado: false };
+      return {
+        asignadoUsuarioId: lead.asignadoUsuarioId,
+        fueAutoAsignado: false,
+      };
     }
 
     const cfg = await this.repo.obtenerConfig(organizacionId);
@@ -59,7 +58,10 @@ export class AutoAsignarLeadUseCase {
     });
 
     // Asignación directa del lead (no depende de drenar items viejos de la cola).
-    const destino = await this.repo.asignarLeadPendiente(organizacionId, leadId);
+    const destino = await this.repo.asignarLeadPendiente(
+      organizacionId,
+      leadId,
+    );
 
     // Drenar restos (otros leads encolados) sin bloquear el resultado de este.
     try {
@@ -87,6 +89,9 @@ export class AutoAsignarLeadUseCase {
       return { asignadoUsuarioId: null, fueAutoAsignado: false };
     }
 
-    return { asignadoUsuarioId: despues.asignadoUsuarioId, fueAutoAsignado: true };
+    return {
+      asignadoUsuarioId: despues.asignadoUsuarioId,
+      fueAutoAsignado: true,
+    };
   }
 }

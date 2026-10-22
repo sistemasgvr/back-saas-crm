@@ -287,9 +287,7 @@ function etiquetasCodigo(
   return ETIQUETAS_OTRO;
 }
 
-function estadosCodigo(
-  tipoLead: string | null | undefined,
-): readonly string[] {
+function estadosCodigo(tipoLead: string | null | undefined): readonly string[] {
   const tipo = normalizarTipo(tipoLead);
   if (tipo === 'COMPRA') return ESTADOS_COMPRA;
   if (tipo === 'VENTA') return ESTADOS_VENTA;
@@ -496,8 +494,7 @@ export function etiquetasPorTipo(
   if (!embudo) return base;
   const map: Record<string, string> = {};
   for (const codigo of embudo.estados) {
-    map[codigo] =
-      embudo.etiquetas?.[codigo] ?? base[codigo] ?? codigo;
+    map[codigo] = embudo.etiquetas?.[codigo] ?? base[codigo] ?? codigo;
   }
   return map;
 }

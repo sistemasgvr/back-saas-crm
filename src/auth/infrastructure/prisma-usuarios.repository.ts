@@ -7,7 +7,12 @@ export class PrismaUsuariosRepository implements UsuariosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findActivoByEmail(email: string) {
-    return this.prisma.usuario.findFirst({ where: { email: { equals: email.trim(), mode: 'insensitive' }, estado: 1 } });
+    return this.prisma.usuario.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: 'insensitive' },
+        estado: 1,
+      },
+    });
   }
 
   findActivoById(id: string) {

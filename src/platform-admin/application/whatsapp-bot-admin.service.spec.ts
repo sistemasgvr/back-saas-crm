@@ -69,7 +69,7 @@ function fixture() {
         ),
     },
     whatsappBotConfiguracionEvento: {
-      count: jest.fn(async () => 0),
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn().mockResolvedValue({}),
       findMany: jest.fn().mockResolvedValue([]),
     },

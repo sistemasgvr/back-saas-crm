@@ -17,10 +17,11 @@ import { TODOS_LOS_MOTIVOS } from '../../../shared/domain/pipeline-inmobiliaria'
 export class ActualizarGestionLeadDto {
   @ApiPropertyOptional({
     maxLength: 200,
-    description: 'Nombre visible del lead en el CRM (y en chats WhatsApp vinculados).',
+    description:
+      'Nombre visible del lead en el CRM (y en chats WhatsApp vinculados).',
   })
   @IsOptional()
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()

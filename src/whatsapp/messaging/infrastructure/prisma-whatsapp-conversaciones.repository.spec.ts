@@ -41,7 +41,8 @@ describe('Paginación de conversaciones', () => {
         borradores: '00000000-0000-4000-8000-000000000001',
       },
     );
-    const countWhere = prisma.whatsappConversacion.count.mock.calls[0][0].where;
+    const [{ where: countWhere }] = prisma.whatsappConversacion.count.mock
+      .calls[0] as [{ where: Record<string, unknown> }];
     expect(countWhere).toMatchObject({
       organizacionId: 'org',
       estado: 1,

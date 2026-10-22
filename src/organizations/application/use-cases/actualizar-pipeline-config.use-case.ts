@@ -26,7 +26,7 @@ export class ActualizarPipelineConfigUseCase {
     organizacionId: string,
     usuarioEdicion: string,
     /** Null restaura defaults (borra el override). */
-    config: unknown | null,
+    config: unknown,
   ): Promise<PipelineConfigResponse> {
     const org = await this.organizaciones.findActivaById(organizacionId);
     if (!org) {

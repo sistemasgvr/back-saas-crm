@@ -19,7 +19,9 @@ describe('Paginación del tablero', () => {
       pageSize: 100,
       q: 'Ana',
     });
-    const where = prisma.lead.count.mock.calls[0][0].where;
+    const [{ where }] = prisma.lead.count.mock.calls[0] as [
+      { where: Record<string, unknown> & { AND: unknown[] } },
+    ];
     expect(where).toMatchObject({
       organizacionId: 'org',
       estado: 1,

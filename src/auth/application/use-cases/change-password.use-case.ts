@@ -31,7 +31,8 @@ export class ChangePasswordUseCase {
       throw new BadRequestException('La contraseña actual no es correcta');
     }
 
-    if (passwordActual === passwordNueva) throw new BadRequestException('La nueva contraseña debe ser diferente');
+    if (passwordActual === passwordNueva)
+      throw new BadRequestException('La nueva contraseña debe ser diferente');
     const hash = await this.hasher.hash(passwordNueva);
     await this.usuarios.actualizarPasswordHash(usuarioId, hash, usuarioId);
   }

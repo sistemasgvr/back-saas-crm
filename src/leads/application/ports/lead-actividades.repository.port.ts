@@ -1,4 +1,6 @@
-export const LEAD_ACTIVIDADES_REPOSITORY = Symbol('LEAD_ACTIVIDADES_REPOSITORY');
+export const LEAD_ACTIVIDADES_REPOSITORY = Symbol(
+  'LEAD_ACTIVIDADES_REPOSITORY',
+);
 
 export interface ActividadAgendaRow {
   id: string;

@@ -117,7 +117,8 @@ export class ActualizarActividadAgendaUseCase {
       cambios.nota = input.nota.trim() || null;
     }
 
-    const tipoEfectivo = (cambios.tipo ?? actividad.tipo) as TipoActividadAgenda;
+    const tipoEfectivo = (cambios.tipo ??
+      actividad.tipo) as TipoActividadAgenda;
     const reagenda =
       input.programadaEn !== undefined || input.duracionMinutos !== undefined;
 
@@ -131,7 +132,10 @@ export class ActualizarActividadAgendaUseCase {
       const duracionMinutos = normalizarDuracionMinutos(
         input.duracionMinutos ?? actividad.duracionMinutos,
       );
-      const programadaFin = calcularProgramadaFin(programadaEn, duracionMinutos);
+      const programadaFin = calcularProgramadaFin(
+        programadaEn,
+        duracionMinutos,
+      );
 
       if (esVisitaEnPasado(programadaEn)) {
         throw new BadRequestException(mensajeVisitaPasado());
@@ -203,7 +207,8 @@ export class ActualizarActividadAgendaUseCase {
     }
 
     if (input.titulo !== undefined) {
-      cambios.titulo = input.titulo.trim() || tituloDefaultActividad(tipoEfectivo);
+      cambios.titulo =
+        input.titulo.trim() || tituloDefaultActividad(tipoEfectivo);
     } else if (cambios.referenciaInmueble && tipoEfectivo === 'VISITA') {
       cambios.titulo = tituloDefaultActividad(
         'VISITA',

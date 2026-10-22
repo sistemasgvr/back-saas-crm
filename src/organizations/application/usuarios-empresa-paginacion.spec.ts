@@ -34,10 +34,12 @@ describe('Listado paginado de usuarios de empresa', () => {
         usuarioId: 'actor',
         organizacionId: 'org',
         esAdminPlataforma: true,
-      } as never,
+      },
       { page: 6, pageSize: 20, rol: 'USUARIO', estado: 'activo', q: 'Ana' },
     );
-    const where = tx.organizacionUsuario.count.mock.calls[0][0].where;
+    const [{ where }] = tx.organizacionUsuario.count.mock.calls[0] as [
+      { where: Record<string, unknown> },
+    ];
     expect(where).toMatchObject({
       organizacionId: 'org',
       rol: 'USUARIO',

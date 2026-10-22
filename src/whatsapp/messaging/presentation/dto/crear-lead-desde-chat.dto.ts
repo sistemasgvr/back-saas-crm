@@ -1,9 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class CrearLeadDesdeChatDto {
   @ApiPropertyOptional({
-    description: 'Nombre del lead (por defecto el nombre de contacto de WhatsApp)',
+    description:
+      'Nombre del lead (por defecto el nombre de contacto de WhatsApp)',
     maxLength: 200,
   })
   @IsOptional()

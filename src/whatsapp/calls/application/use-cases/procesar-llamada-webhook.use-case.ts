@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../shared/infrastructure/prisma.service';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
@@ -52,10 +48,7 @@ export class ProcesarLlamadaWebhookUseCase {
       ? evento.waId.replace(/\D/g, '') || evento.waId
       : null;
     const { conversacionId, leadId, asignadoLeadId } =
-      await this.resolverConversacionYLead(
-        conexion.organizacionId,
-        waId,
-      );
+      await this.resolverConversacionYLead(conexion.organizacionId, waId);
 
     const esEntrante =
       evento.direction === 'USER_INITIATED' ||
@@ -189,7 +182,11 @@ export class ProcesarLlamadaWebhookUseCase {
       inicioEn: llamada.inicioEn,
     });
 
-    this.programarAutoReject(conexion.organizacionId, evento.callId, llamada.id);
+    this.programarAutoReject(
+      conexion.organizacionId,
+      evento.callId,
+      llamada.id,
+    );
   }
 
   private async manejarTerminate(
@@ -217,7 +214,9 @@ export class ProcesarLlamadaWebhookUseCase {
       } else if (existente.contestadaEn) {
         duracionSeg = Math.max(
           0,
-          Math.round((finEn.getTime() - existente.contestadaEn.getTime()) / 1000),
+          Math.round(
+            (finEn.getTime() - existente.contestadaEn.getTime()) / 1000,
+          ),
         );
       }
 

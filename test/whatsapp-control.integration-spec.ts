@@ -13,6 +13,7 @@ import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import { hash } from 'bcrypt';
 import request from 'supertest';
+import type { App } from 'supertest/types';
 import { OBJECT_STORAGE } from '../src/shared/application/ports/object-storage.port';
 import { ControlAtencionService } from '../src/whatsapp/messaging/application/control-atencion.service';
 import { PrismaService } from '../src/shared/infrastructure/prisma.service';
@@ -22,6 +23,13 @@ type WorkerMessage = {
   result?: { modoAtencion: string };
   message?: string;
 };
+
+/** Cuerpos de respuesta tipados (supertest los entrega como any). */
+interface TokensSesion {
+  accessToken: string;
+  refreshToken: string;
+}
+const tokens = (res: { body: unknown }) => res.body as TokensSesion;
 
 const connection = process.env.WHATSAPP_CONTROL_TEST_DATABASE_URL;
 // Nunca usar DATABASE_URL del proyecto: solo una base local explícita de test.
@@ -121,7 +129,11 @@ if (connection) testUrl(connection);
       cpSync(resolve('prisma/schema.prisma'), join(work, 'schema.prisma'));
       mkdirSync(join(work, 'migrations'));
       for (const item of readdirSync(resolve('prisma/migrations'))) {
-        if (item < migration || item === '20261021200000_gestion_usuarios_empresa' || item === 'migration_lock.toml')
+        if (
+          item < migration ||
+          item === '20261021200000_gestion_usuarios_empresa' ||
+          item === 'migration_lock.toml'
+        )
           cpSync(
             resolve('prisma/migrations', item),
             join(work, 'migrations', item),
@@ -616,7 +628,7 @@ if (connection) testUrl(connection);
           new ValidationPipe({ whitelist: true, transform: true }),
         );
         await app.init();
-        const http = request(app.getHttpServer());
+        const http = request(app.getHttpServer() as App);
         await http.get('/health').expect(200);
         await http.get('/me').expect(401);
         await http
@@ -627,10 +639,14 @@ if (connection) testUrl(connection);
           .post('/auth/login')
           .send({ email: actor.email, password })
           .expect(201);
-        const auth = `Bearer ${login.body.accessToken}`;
+        const auth = `Bearer ${tokens(login).accessToken}`;
         const me = await http.get('/me').set('Authorization', auth).expect(200);
-        expect(me.body.usuario.id).toBe(actor.id);
-        expect(me.body.organizacion.id).toBe(org);
+        const perfil = me.body as {
+          usuario: { id: string };
+          organizacion: { id: string };
+        };
+        expect(perfil.usuario.id).toBe(actor.id);
+        expect(perfil.organizacion.id).toBe(org);
         const preferencias = await http
           .get('/whatsapp/bot/preferencias')
           .set('Authorization', auth)
@@ -644,7 +660,9 @@ if (connection) testUrl(connection);
           .set('Authorization', auth)
           .send({
             modoInicial: 'BOT',
-            preferenciasVersion: preferencias.body.preferenciasVersion,
+            preferenciasVersion: (
+              preferencias.body as { preferenciasVersion: number }
+            ).preferenciasVersion,
           })
           .expect(403);
         await http.get('/leads').set('Authorization', auth).expect(200);
@@ -666,12 +684,12 @@ if (connection) testUrl(connection);
           [0, 1].map(() =>
             http
               .post('/auth/refresh')
-              .send({ refreshToken: login.body.refreshToken })
+              .send({ refreshToken: tokens(login).refreshToken })
               .expect(201),
           ),
         );
-        expect(rotations[0].body.refreshToken).not.toBe(
-          rotations[1].body.refreshToken,
+        expect(tokens(rotations[0]).refreshToken).not.toBe(
+          tokens(rotations[1]).refreshToken,
         );
         const otherSession = await http
           .post('/auth/login')
@@ -679,17 +697,17 @@ if (connection) testUrl(connection);
           .expect(201);
         await http
           .post('/auth/logout')
-          .send({ refreshToken: login.body.refreshToken })
+          .send({ refreshToken: tokens(login).refreshToken })
           .expect(204);
         for (const refreshToken of [
-          login.body.refreshToken,
-          ...rotations.map((r) => r.body.refreshToken),
+          tokens(login).refreshToken,
+          ...rotations.map((r) => tokens(r).refreshToken),
         ]) {
           await http.post('/auth/refresh').send({ refreshToken }).expect(401);
         }
         await http
           .post('/auth/refresh')
-          .send({ refreshToken: otherSession.body.refreshToken })
+          .send({ refreshToken: tokens(otherSession).refreshToken })
           .expect(201);
         const legacyToken = new JwtService().sign(
           { sub: actor.id, organizacionId: org },
@@ -712,7 +730,7 @@ if (connection) testUrl(connection);
           .expect(204);
         await http
           .post('/auth/refresh')
-          .send({ refreshToken: migrated.body.refreshToken })
+          .send({ refreshToken: tokens(migrated).refreshToken })
           .expect(401);
         const racing = await http
           .post('/auth/login')
@@ -721,17 +739,17 @@ if (connection) testUrl(connection);
         const [rotation, closed] = await Promise.all([
           http
             .post('/auth/refresh')
-            .send({ refreshToken: racing.body.refreshToken }),
+            .send({ refreshToken: tokens(racing).refreshToken }),
           http
             .post('/auth/logout')
-            .send({ refreshToken: racing.body.refreshToken }),
+            .send({ refreshToken: tokens(racing).refreshToken }),
         ]);
         expect(closed.status).toBe(204);
         expect([201, 401]).toContain(rotation.status);
         if (rotation.status === 201)
           await http
             .post('/auth/refresh')
-            .send({ refreshToken: rotation.body.refreshToken })
+            .send({ refreshToken: tokens(rotation).refreshToken })
             .expect(401);
       } finally {
         await app?.close();

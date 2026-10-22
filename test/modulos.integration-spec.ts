@@ -2,12 +2,14 @@ import 'reflect-metadata';
 import { randomUUID } from 'node:crypto';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { Test } from '@nestjs/testing';
+import type { ExecutionContext } from '@nestjs/common';
 import {
   GUARDS_METADATA,
   PARAMTYPES_METADATA,
   SELF_DECLARED_DEPS_METADATA,
 } from '@nestjs/common/constants';
 import request from 'supertest';
+import type { App } from 'supertest/types';
 import { PrismaService } from '../src/shared/infrastructure/prisma.service';
 import { PrismaOrganizacionModulosAdminRepository } from '../src/platform-admin/infrastructure/prisma-organizacion-modulos-admin.repository';
 import { PrismaModulosCatalogoRepository } from '../src/modules/infrastructure/prisma-modulos-catalogo.repository';
@@ -67,8 +69,10 @@ if (connection) {
                 if (p === '$transaction')
                   return (fn: (t: Prisma.TransactionClient) => unknown) =>
                     fn(tx);
-                const v = Reflect.get(t, p);
-                return typeof v === 'function' ? v.bind(tx) : v;
+                const v: unknown = Reflect.get(t, p);
+                return typeof v === 'function'
+                  ? ((v as (...args: unknown[]) => unknown).bind(tx) as unknown)
+                  : v;
               },
             }) as unknown as PrismaService;
             const repo = new PrismaOrganizacionModulosAdminRepository(client);
@@ -126,10 +130,10 @@ if (connection) {
         ).rejects.toMatchObject({
           status: 409,
           response: {
-            dependientes: expect.arrayContaining([
+            dependientes: expect.arrayContaining<string>([
               'WHATSAPP',
               'AUTOMATIZACIONES',
-            ]),
+            ]) as unknown,
           },
         });
         expect(
@@ -256,14 +260,14 @@ if (connection) {
             ModuleGuard,
             ...dependencias.map((provide) => ({
               provide: provide as never,
-              useValue: { execute: async () => [] },
+              useValue: { execute: () => Promise.resolve([]) },
             })),
           ],
         })
           .overrideGuard(JwtAuthGuard)
           .useValue({
-            canActivate: (ctx: any) => {
-              ctx.switchToHttp().getRequest().user = {
+            canActivate: (ctx: ExecutionContext) => {
+              ctx.switchToHttp().getRequest<{ user?: unknown }>().user = {
                 usuarioId: f.actor,
                 organizacionId: f.org,
                 rol: 'PROPIETARIO',
@@ -279,14 +283,20 @@ if (connection) {
         const app = module.createNestApplication();
         await app.init();
         try {
-          await request(app.getHttpServer()).get('/leads').expect(403);
+          await request(app.getHttpServer() as App)
+            .get('/leads')
+            .expect(403);
           await f.repo.toggle(f.org, f.ids.LEADS, true, f.actor);
-          await request(app.getHttpServer()).get('/leads').expect(200);
+          await request(app.getHttpServer() as App)
+            .get('/leads')
+            .expect(200);
           await f.tx.moduloGrupo.update({
             where: { id: f.grupos.CRM },
             data: { estado: 0 },
           });
-          await request(app.getHttpServer()).get('/leads').expect(403);
+          await request(app.getHttpServer() as App)
+            .get('/leads')
+            .expect(403);
         } finally {
           await app.close();
         }

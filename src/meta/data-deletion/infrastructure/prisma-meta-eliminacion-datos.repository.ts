@@ -7,9 +7,7 @@ import type {
 } from '../application/ports/meta-eliminacion-datos.repository.port';
 
 @Injectable()
-export class PrismaMetaEliminacionDatosRepository
-  implements MetaEliminacionDatosRepository
-{
+export class PrismaMetaEliminacionDatosRepository implements MetaEliminacionDatosRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   async crear(

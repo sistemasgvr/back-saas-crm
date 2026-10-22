@@ -33,17 +33,25 @@ export class CrearOrganizacionUseCase {
     const { primerUsuario, ...datosOrganizacion } = input;
 
     if (primerUsuario) {
-      const existente = await this.usuarios.buscarActivoPorEmail(primerUsuario.email);
+      const existente = await this.usuarios.buscarActivoPorEmail(
+        primerUsuario.email,
+      );
       if (existente) {
-        throw new ConflictException('Este email no está disponible. Contacta a soporte.');
+        throw new ConflictException(
+          'Este email no está disponible. Contacta a soporte.',
+        );
       }
     }
     const org = await this.organizaciones.crearConModulosPorDefecto(
-      datosOrganizacion, usuarioCreacion,
+      datosOrganizacion,
+      usuarioCreacion,
     );
     if (!primerUsuario) return { organizacion: org, propietario: null };
     const usuario = await this.gestion.crearCuentaPlataforma(
-      { ...primerUsuario, asignacion: { organizacionId: org.id, rol: 'PROPIETARIO' } },
+      {
+        ...primerUsuario,
+        asignacion: { organizacionId: org.id, rol: 'PROPIETARIO' },
+      },
       usuarioCreacion,
     );
 

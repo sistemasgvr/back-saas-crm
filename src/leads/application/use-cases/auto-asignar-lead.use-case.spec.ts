@@ -1,8 +1,9 @@
 import { AutoAsignarLeadUseCase } from './auto-asignar-lead.use-case';
+import type { LeadAutoAsignacionRepository } from '../ports/lead-auto-asignacion.repository.port';
 
 describe('AutoAsignarLeadUseCase', () => {
   it('retorna null si el lead no existe', async () => {
-    const repo: any = {
+    const repo = {
       obtenerLeadParaAutoAsignacion: jest.fn().mockResolvedValue(null),
       obtenerConfig: jest.fn(),
       encolarLead: jest.fn(),
@@ -10,7 +11,9 @@ describe('AutoAsignarLeadUseCase', () => {
       procesarCola: jest.fn(),
     };
 
-    const useCase = new AutoAsignarLeadUseCase(repo);
+    const useCase = new AutoAsignarLeadUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+    );
     const res = await useCase.execute('org1', 'lead1');
 
     expect(res).toEqual({ asignadoUsuarioId: null, fueAutoAsignado: false });
@@ -19,17 +22,20 @@ describe('AutoAsignarLeadUseCase', () => {
   });
 
   it('no hace nada si el lead ya tiene asignadoUsuarioId', async () => {
-    const repo: any = {
-      obtenerLeadParaAutoAsignacion: jest
-        .fn()
-        .mockResolvedValueOnce({ asignadoUsuarioId: 'u1', fechaLeadEfectiva: new Date() }),
+    const repo = {
+      obtenerLeadParaAutoAsignacion: jest.fn().mockResolvedValueOnce({
+        asignadoUsuarioId: 'u1',
+        fechaLeadEfectiva: new Date(),
+      }),
       obtenerConfig: jest.fn(),
       encolarLead: jest.fn(),
       asignarLeadPendiente: jest.fn(),
       procesarCola: jest.fn(),
     };
 
-    const useCase = new AutoAsignarLeadUseCase(repo);
+    const useCase = new AutoAsignarLeadUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+    );
     const res = await useCase.execute('org1', 'lead1');
 
     expect(res).toEqual({ asignadoUsuarioId: 'u1', fueAutoAsignado: false });
@@ -38,7 +44,7 @@ describe('AutoAsignarLeadUseCase', () => {
   });
 
   it('no auto-asigna si la config está deshabilitada', async () => {
-    const repo: any = {
+    const repo = {
       obtenerLeadParaAutoAsignacion: jest.fn().mockResolvedValueOnce({
         asignadoUsuarioId: null,
         fechaLeadEfectiva: new Date('2026-01-01T00:00:00.000Z'),
@@ -53,7 +59,9 @@ describe('AutoAsignarLeadUseCase', () => {
       procesarCola: jest.fn(),
     };
 
-    const useCase = new AutoAsignarLeadUseCase(repo);
+    const useCase = new AutoAsignarLeadUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+    );
     const res = await useCase.execute('org1', 'lead1');
 
     expect(res).toEqual({ asignadoUsuarioId: null, fueAutoAsignado: false });
@@ -63,7 +71,7 @@ describe('AutoAsignarLeadUseCase', () => {
 
   it('auto-asigna en camino feliz vía asignarLeadPendiente', async () => {
     const fechaLead = new Date('2026-01-01T00:00:00.000Z');
-    const repo: any = {
+    const repo = {
       obtenerLeadParaAutoAsignacion: jest.fn().mockResolvedValueOnce({
         asignadoUsuarioId: null,
         fechaLeadEfectiva: fechaLead,
@@ -78,7 +86,9 @@ describe('AutoAsignarLeadUseCase', () => {
       procesarCola: jest.fn().mockResolvedValue(undefined),
     };
 
-    const useCase = new AutoAsignarLeadUseCase(repo);
+    const useCase = new AutoAsignarLeadUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+    );
     const res = await useCase.execute('org1', 'lead1');
 
     expect(repo.encolarLead).toHaveBeenCalledWith({

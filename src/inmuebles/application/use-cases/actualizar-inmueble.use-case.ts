@@ -51,16 +51,10 @@ export class ActualizarInmuebleUseCase {
       ...(input.codigo !== undefined
         ? { codigo: input.codigo.trim().toUpperCase() }
         : {}),
-      ...(input.titulo !== undefined
-        ? { titulo: input.titulo.trim() }
-        : {}),
+      ...(input.titulo !== undefined ? { titulo: input.titulo.trim() } : {}),
       ...(input.tipo !== undefined ? { tipo: input.tipo } : {}),
-      ...(input.operacion !== undefined
-        ? { operacion: input.operacion }
-        : {}),
-      ...(input.zona !== undefined
-        ? { zona: input.zona?.trim() || null }
-        : {}),
+      ...(input.operacion !== undefined ? { operacion: input.operacion } : {}),
+      ...(input.zona !== undefined ? { zona: input.zona?.trim() || null } : {}),
       ...(input.direccion !== undefined
         ? { direccion: input.direccion?.trim() || null }
         : {}),

@@ -12,21 +12,32 @@ import {
 
 describe('agenda-visitas', () => {
   describe('intervalosSeSolapan', () => {
-    const slot = (h1: number, m1: number, h2: number, m2: number): IntervaloVisita => ({
+    const slot = (
+      h1: number,
+      m1: number,
+      h2: number,
+      m2: number,
+    ): IntervaloVisita => ({
       inicio: new Date(Date.UTC(2026, 8, 3, h1, m1)),
       fin: new Date(Date.UTC(2026, 8, 3, h2, m2)),
     });
 
     it('detecta solape parcial', () => {
-      expect(intervalosSeSolapan(slot(10, 0, 11, 0), slot(10, 30, 11, 30))).toBe(true);
+      expect(
+        intervalosSeSolapan(slot(10, 0, 11, 0), slot(10, 30, 11, 30)),
+      ).toBe(true);
     });
 
     it('no solapa si son contiguos', () => {
-      expect(intervalosSeSolapan(slot(10, 0, 11, 0), slot(11, 0, 12, 0))).toBe(false);
+      expect(intervalosSeSolapan(slot(10, 0, 11, 0), slot(11, 0, 12, 0))).toBe(
+        false,
+      );
     });
 
     it('no solapa si están separados', () => {
-      expect(intervalosSeSolapan(slot(10, 0, 11, 0), slot(12, 0, 13, 0))).toBe(false);
+      expect(intervalosSeSolapan(slot(10, 0, 11, 0), slot(12, 0, 13, 0))).toBe(
+        false,
+      );
     });
   });
 

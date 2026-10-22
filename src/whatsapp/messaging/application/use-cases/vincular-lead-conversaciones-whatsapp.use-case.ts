@@ -9,7 +9,9 @@ import type { WhatsappConversacionesRepository } from '../ports/whatsapp-convers
  * escribió primero y después llenó el formulario. */
 @Injectable()
 export class VincularLeadConversacionesWhatsAppUseCase {
-  private readonly logger = new Logger(VincularLeadConversacionesWhatsAppUseCase.name);
+  private readonly logger = new Logger(
+    VincularLeadConversacionesWhatsAppUseCase.name,
+  );
 
   constructor(
     @Inject(LEADS_LECTURA_REPOSITORY)

@@ -227,9 +227,7 @@ export class PrismaInmueblesRepository implements InmueblesRepository {
         ...(input.precio !== undefined
           ? {
               precio:
-                input.precio === null
-                  ? null
-                  : new Prisma.Decimal(input.precio),
+                input.precio === null ? null : new Prisma.Decimal(input.precio),
             }
           : {}),
         ...(input.moneda !== undefined ? { moneda: input.moneda } : {}),

@@ -5,7 +5,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import type { Request } from 'express';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
+import type { RequestContext } from '../../domain/request-context.interface';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt-access') {
@@ -14,7 +16,9 @@ export class JwtAuthGuard extends AuthGuard('jwt-access') {
   }
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (!(await super.canActivate(context))) return false;
-    const req = context.switchToHttp().getRequest();
+    const req = context
+      .switchToHttp()
+      .getRequest<Request & { user: RequestContext }>();
     const usuario = await this.prisma.usuario.findUnique({
       where: { id: req.user.usuarioId },
       select: {

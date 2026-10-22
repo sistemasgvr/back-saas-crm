@@ -41,13 +41,20 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
 
     const candidatos = resolverUsuarioIdsRoundRobin(cfg);
     const activos = await this.prisma.organizacionUsuario.findMany({
-      where: { organizacionId, usuarioId: { in: candidatos }, estado: 1, usuario: { estado: 1 } },
+      where: {
+        organizacionId,
+        usuarioId: { in: candidatos },
+        estado: 1,
+        usuario: { estado: 1 },
+      },
       select: { usuarioId: true },
     });
 
     return {
       habilitado: configHabilitada(cfg),
-      usuarioIds: candidatos.filter(id => activos.some(m => m.usuarioId === id)),
+      usuarioIds: candidatos.filter((id) =>
+        activos.some((m) => m.usuarioId === id),
+      ),
       siguienteIndice: cfg.siguienteIndice,
       limitesDiarios: limitesDesdeJson(cfg.limitesDiarios),
       asignadosHoy: consumoDelDia(cfg.consumoDiario, fechaLima()).porUsuario,
@@ -78,7 +85,7 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
         habilitado: input.habilitado ? 1 : 0,
         usuarioPrimeroId,
         usuarioSegundoId,
-        usuarioIds: input.usuarioIds as object,
+        usuarioIds: input.usuarioIds,
         limitesDiarios: input.limitesDiarios ?? {},
         siguienteIndice: 0,
       },
@@ -86,7 +93,7 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
         habilitado: input.habilitado ? 1 : 0,
         usuarioPrimeroId,
         usuarioSegundoId,
-        usuarioIds: input.usuarioIds as object,
+        usuarioIds: input.usuarioIds,
         ...(input.limitesDiarios !== undefined
           ? { limitesDiarios: input.limitesDiarios }
           : {}),

@@ -81,7 +81,9 @@ export class NotificationsController {
 
   @Post('push/subscribe')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Registrar suscripción Web Push de este dispositivo' })
+  @ApiOperation({
+    summary: 'Registrar suscripción Web Push de este dispositivo',
+  })
   async subscribePush(
     @CurrentUser() ctx: RequestContext,
     @Body() body: SuscripcionPushDto,
@@ -99,7 +101,9 @@ export class NotificationsController {
 
   @Delete('push/subscribe')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Desactivar suscripción Web Push de este dispositivo' })
+  @ApiOperation({
+    summary: 'Desactivar suscripción Web Push de este dispositivo',
+  })
   async unsubscribePush(
     @CurrentUser() ctx: RequestContext,
     @Body() body: EliminarSuscripcionPushDto,
@@ -136,7 +140,7 @@ export class NotificationsController {
         mensaje: 'Si ves esto, Web Push funciona',
         payload: { url: '/' },
       },
-      ctx.organizacionId!,
+      ctx.organizacionId,
     );
     return { enabled: true, ...result };
   }

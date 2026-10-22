@@ -72,7 +72,9 @@ function textoNfmReply(
       const parsed = JSON.parse(nfm.response_json) as Record<string, unknown>;
       for (const [k, v] of Object.entries(parsed)) {
         if (v == null || v === '') continue;
-        partes.push(`${k}: ${String(v)}`);
+        // Respuestas de Flow pueden traer objetos/arrays: JSON, no "[object Object]".
+        const valor = typeof v === 'string' ? v : JSON.stringify(v);
+        partes.push(`${k}: ${valor}`);
       }
     } catch {
       partes.push(nfm.response_json.trim().slice(0, 200));
@@ -92,14 +94,7 @@ function textoOrder(order: MensajeMetaParaTexto['order']): string | null {
 
 function textoUnsupported(mensaje: MensajeMetaParaTexto): string {
   const sub = mensaje.unsupported?.type?.trim();
-  const err = mensaje.errors?.[0] as
-    | {
-        code?: number;
-        message?: string;
-        title?: string;
-        error_data?: { details?: string };
-      }
-    | undefined;
+  const err = mensaje.errors?.[0];
   const code = err?.code;
   // 131060 — Meta no entrega el cuerpo (coexistencia / 1.er mensaje CTWA).
   // https://developers.facebook.com/documentation/business-messaging/whatsapp/webhooks/reference/messages/unsupported
@@ -128,9 +123,7 @@ function textoUnsupported(mensaje: MensajeMetaParaTexto): string {
 
 function textoReferral(ref: MensajeMetaParaTexto['referral']): string | null {
   if (!ref) return null;
-  const partes = [ref.headline, ref.body]
-    .map((p) => p?.trim())
-    .filter(Boolean);
+  const partes = [ref.headline, ref.body].map((p) => p?.trim()).filter(Boolean);
   if (partes.length > 0) return partes.join(' — ');
   if (ref.source_type) return `Origen: ${ref.source_type}`;
   return null;
@@ -176,9 +169,7 @@ export function extraerContenidoMensajeMeta(
     return {
       tipo: 'button',
       texto:
-        mensaje.button?.text?.trim() ||
-        mensaje.button?.payload?.trim() ||
-        null,
+        mensaje.button?.text?.trim() || mensaje.button?.payload?.trim() || null,
     };
   }
 
@@ -267,6 +258,5 @@ export function recuperarTextoDesdeDatosCrudos(
   datosCrudos: unknown,
 ): string | null {
   if (!datosCrudos || typeof datosCrudos !== 'object') return null;
-  return extraerContenidoMensajeMeta(datosCrudos as MensajeMetaParaTexto)
-    .texto;
+  return extraerContenidoMensajeMeta(datosCrudos).texto;
 }

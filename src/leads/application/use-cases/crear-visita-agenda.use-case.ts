@@ -68,7 +68,10 @@ export class CrearVisitaAgendaUseCase {
     },
     ctx: { usuarioId: string; rol: RolOrganizacion },
   ) {
-    const lead = await this.leads.buscarParaGestion(organizacionId, input.leadId);
+    const lead = await this.leads.buscarParaGestion(
+      organizacionId,
+      input.leadId,
+    );
     if (!lead) {
       throw new NotFoundException('Lead no encontrado');
     }
@@ -79,14 +82,19 @@ export class CrearVisitaAgendaUseCase {
       lead.asignadoUsuarioId &&
       lead.asignadoUsuarioId !== ctx.usuarioId
     ) {
-      throw new ForbiddenException('No puedes agendar visitas de leads de otro asesor');
+      throw new ForbiddenException(
+        'No puedes agendar visitas de leads de otro asesor',
+      );
     }
 
     let asignadoUsuarioId: string | null =
       input.asignadoUsuarioId ?? lead.asignadoUsuarioId ?? ctx.usuarioId;
 
     if (!esAdmin) {
-      if (input.asignadoUsuarioId && input.asignadoUsuarioId !== ctx.usuarioId) {
+      if (
+        input.asignadoUsuarioId &&
+        input.asignadoUsuarioId !== ctx.usuarioId
+      ) {
         throw new ForbiddenException('Solo puedes agendar visitas a tu nombre');
       }
       asignadoUsuarioId = ctx.usuarioId;

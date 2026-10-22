@@ -22,10 +22,7 @@ import { RegistrarSuscripcionPushUseCase } from './application/use-cases/registr
 import { EliminarSuscripcionPushUseCase } from './application/use-cases/eliminar-suscripcion-push.use-case';
 
 @Module({
-  imports: [
-    JwtModule.register({}),
-    forwardRef(() => WhatsappMessagingModule),
-  ],
+  imports: [JwtModule.register({}), forwardRef(() => WhatsappMessagingModule)],
   controllers: [NotificationsController, AgendaRecordatoriosCronController],
   providers: [
     CrearNotificacionUseCase,

@@ -197,10 +197,8 @@ describe('Webhook WhatsApp: aislamiento de mensajes y llamadas', () => {
       llamada.execute.mock.invocationCallOrder[0],
     );
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(Logger.prototype.log).toHaveBeenCalledWith(
-      expect.stringContaining('mensajes=1'),
-    );
     const logs = JSON.stringify((Logger.prototype.log as jest.Mock).mock.calls);
+    expect(logs).toContain('mensajes=1');
     expect(logs).not.toContain('url-token');
     expect(logs).not.toContain('Prueba');
   });

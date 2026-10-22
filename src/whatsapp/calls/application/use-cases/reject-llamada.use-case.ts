@@ -1,8 +1,4 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
@@ -33,11 +29,7 @@ export class RejectLlamadaUseCase {
     @Inject(WS_EMITTER) private readonly wsEmitter: WsEmitter,
   ) {}
 
-  async execute(
-    organizacionId: string,
-    callId: string,
-    usuarioId: string,
-  ) {
+  async execute(organizacionId: string, callId: string, usuarioId: string) {
     const llamada = await this.llamadas.findPorCallId(organizacionId, callId);
     if (!llamada) {
       throw new NotFoundException('Llamada no encontrada');

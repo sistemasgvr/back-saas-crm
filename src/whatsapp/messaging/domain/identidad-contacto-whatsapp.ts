@@ -19,7 +19,9 @@ export interface IdentidadContactoWhatsApp {
 }
 
 /** True si el string parece teléfono (solo dígitos, longitud típica). */
-export function pareceTelefonoWhatsApp(valor: string | null | undefined): boolean {
+export function pareceTelefonoWhatsApp(
+  valor: string | null | undefined,
+): boolean {
   if (!valor) return false;
   const digitos = valor.replace(/\D/g, '');
   return digitos.length >= 8 && digitos.length <= 15 && /^\d+$/.test(digitos);

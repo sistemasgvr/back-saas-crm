@@ -12,11 +12,7 @@ export class EliminarInmuebleUseCase {
   ) {}
 
   async execute(organizacionId: string, id: string, usuarioId: string) {
-    const ok = await this.inmuebles.softDelete(
-      organizacionId,
-      id,
-      usuarioId,
-    );
+    const ok = await this.inmuebles.softDelete(organizacionId, id, usuarioId);
     if (!ok) {
       throw new NotFoundException('Inmueble no encontrado');
     }

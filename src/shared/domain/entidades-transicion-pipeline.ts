@@ -87,7 +87,8 @@ export function construirVisitaDesdeMetadata(
     notaTransicion?: string | null;
   },
 ): CrearVisitaTransicionInput | null {
-  if (!metadata?.visitaProgramadaEn || !metadata.referenciaInmueble) return null;
+  if (!metadata?.visitaProgramadaEn || !metadata.referenciaInmueble)
+    return null;
   const programadaEn = new Date(metadata.visitaProgramadaEn);
   if (Number.isNaN(programadaEn.getTime())) return null;
 

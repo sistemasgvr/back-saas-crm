@@ -86,8 +86,8 @@ if (connection) {
       service = new GestionMembresiasService(
         db as PrismaService,
         {
-          hash: async () => 'hash-sintetico',
-          verify: async () => true,
+          hash: () => Promise.resolve('hash-sintetico'),
+          verify: () => Promise.resolve(true),
         } as never,
         control,
         { execute: jest.fn().mockResolvedValue(undefined) } as never,

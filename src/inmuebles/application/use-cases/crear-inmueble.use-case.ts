@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Inject,
-  Injectable,
-} from '@nestjs/common';
+import { ConflictException, Inject, Injectable } from '@nestjs/common';
 import {
   INMUEBLES_REPOSITORY,
   type InmueblesRepository,

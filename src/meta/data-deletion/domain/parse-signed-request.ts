@@ -8,7 +8,8 @@ export interface SignedRequestPayload {
 
 function base64UrlDecode(input: string): Buffer {
   const padded = input.replace(/-/g, '+').replace(/_/g, '/');
-  const pad = padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
+  const pad =
+    padded.length % 4 === 0 ? '' : '='.repeat(4 - (padded.length % 4));
   return Buffer.from(padded + pad, 'base64');
 }
 
@@ -28,7 +29,9 @@ export function parseSignedRequest(
   let data: SignedRequestPayload;
   try {
     sig = base64UrlDecode(encodedSig);
-    data = JSON.parse(base64UrlDecode(payload).toString('utf8')) as SignedRequestPayload;
+    data = JSON.parse(
+      base64UrlDecode(payload).toString('utf8'),
+    ) as SignedRequestPayload;
   } catch {
     return null;
   }

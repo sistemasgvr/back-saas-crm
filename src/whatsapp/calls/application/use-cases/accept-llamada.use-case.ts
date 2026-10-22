@@ -42,10 +42,7 @@ export class AcceptLlamadaUseCase {
       throw new NotFoundException('Llamada no encontrada');
     }
 
-    if (
-      llamada.asignadoUsuarioId &&
-      llamada.asignadoUsuarioId !== usuarioId
-    ) {
+    if (llamada.asignadoUsuarioId && llamada.asignadoUsuarioId !== usuarioId) {
       throw new ConflictException('Otro agente ya tomó esta llamada');
     }
 

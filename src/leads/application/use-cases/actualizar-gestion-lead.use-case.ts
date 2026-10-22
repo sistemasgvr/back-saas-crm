@@ -201,7 +201,7 @@ export class ActualizarGestionLeadUseCase {
     // 2) Cambio explícito de estadoGestion — valida transición o reapertura.
     if (input.estadoGestion !== undefined) {
       const estadosValidos = estadosPorTipo(tipoLeadEfectivo, override);
-      if (!(estadosValidos as readonly string[]).includes(input.estadoGestion)) {
+      if (!estadosValidos.includes(input.estadoGestion)) {
         throw new BadRequestException(
           `estadoGestion inválido para este tipo de lead: ${input.estadoGestion}`,
         );
@@ -349,7 +349,12 @@ export class ActualizarGestionLeadUseCase {
       if (esVisitaEnPasado(crearVisita.programadaEn)) {
         throw new BadRequestException(mensajeVisitaPasado());
       }
-      if (!estaEnHorarioLaboral(crearVisita.programadaEn, crearVisita.programadaFin)) {
+      if (
+        !estaEnHorarioLaboral(
+          crearVisita.programadaEn,
+          crearVisita.programadaFin,
+        )
+      ) {
         throw new BadRequestException(mensajeHorarioLaboral());
       }
       if (crearVisita.asignadoUsuarioId) {

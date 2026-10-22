@@ -5,11 +5,7 @@ import { LlamadaPresenciaService } from '../../infrastructure/llamada-presencia.
 export class SetPresenciaLlamadasUseCase {
   constructor(private readonly presencia: LlamadaPresenciaService) {}
 
-  execute(
-    organizacionId: string,
-    usuarioId: string,
-    disponible: boolean,
-  ) {
+  execute(organizacionId: string, usuarioId: string, disponible: boolean) {
     this.presencia.setDisponible(organizacionId, usuarioId, disponible);
     return {
       disponible: this.presencia.isDisponible(organizacionId, usuarioId),

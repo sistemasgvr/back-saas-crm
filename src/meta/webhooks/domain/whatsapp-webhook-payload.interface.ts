@@ -71,7 +71,8 @@ export interface LlamadaMetaCruda {
   from?: string;
   to?: string;
   event?: string;
-  direction?: 'USER_INITIATED' | 'BUSINESS_INITIATED' | string;
+  /** USER_INITIATED | BUSINESS_INITIATED (string abierto: Meta puede sumar valores). */
+  direction?: string;
   status?: string;
   timestamp?: string;
   session?: { sdp_type?: string; sdp?: string };

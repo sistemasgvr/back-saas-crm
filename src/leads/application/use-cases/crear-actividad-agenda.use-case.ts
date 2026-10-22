@@ -20,7 +20,6 @@ import {
 import {
   esTipoActividadAgenda,
   tituloDefaultActividad,
-  type TipoActividadAgenda,
 } from '../../../shared/domain/agenda-actividades';
 import { CrearNotificacionUseCase } from '../../../notifications/application/use-cases/crear-notificacion.use-case';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
@@ -73,9 +72,12 @@ export class CrearActividadAgendaUseCase {
     if (!esTipoActividadAgenda(input.tipo)) {
       throw new BadRequestException('Tipo de actividad inválido');
     }
-    const tipo = input.tipo as TipoActividadAgenda;
+    const tipo = input.tipo;
 
-    const lead = await this.leads.buscarParaGestion(organizacionId, input.leadId);
+    const lead = await this.leads.buscarParaGestion(
+      organizacionId,
+      input.leadId,
+    );
     if (!lead) throw new NotFoundException('Lead no encontrado');
 
     const esAdmin = ROLES_ADMIN.includes(ctx.rol);
@@ -92,8 +94,13 @@ export class CrearActividadAgendaUseCase {
     let asignadoUsuarioId: string | null =
       input.asignadoUsuarioId ?? lead.asignadoUsuarioId ?? ctx.usuarioId;
     if (!esAdmin) {
-      if (input.asignadoUsuarioId && input.asignadoUsuarioId !== ctx.usuarioId) {
-        throw new ForbiddenException('Solo puedes agendar actividades a tu nombre');
+      if (
+        input.asignadoUsuarioId &&
+        input.asignadoUsuarioId !== ctx.usuarioId
+      ) {
+        throw new ForbiddenException(
+          'Solo puedes agendar actividades a tu nombre',
+        );
       }
       asignadoUsuarioId = ctx.usuarioId;
     }
@@ -118,14 +125,15 @@ export class CrearActividadAgendaUseCase {
     if (tipo === 'VISITA') {
       referenciaInmueble = input.referenciaInmueble?.trim() || null;
       if (!referenciaInmueble) {
-        throw new BadRequestException('Indica el inmueble o proyecto de la visita');
+        throw new BadRequestException(
+          'Indica el inmueble o proyecto de la visita',
+        );
       }
       modalidad = input.modalidad === 'VIRTUAL' ? 'VIRTUAL' : 'PRESENCIAL';
     }
 
     const titulo =
-      input.titulo?.trim() ||
-      tituloDefaultActividad(tipo, referenciaInmueble);
+      input.titulo?.trim() || tituloDefaultActividad(tipo, referenciaInmueble);
 
     if (asignadoUsuarioId) {
       const solapaVisita = await this.visitas.existeSolape(

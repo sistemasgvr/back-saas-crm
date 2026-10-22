@@ -46,7 +46,9 @@ export class ListarAgendaVisitasUseCase {
       throw new BadRequestException('Rango de fechas inválido');
     }
     if (desde.getTime() > hasta.getTime()) {
-      throw new BadRequestException('El rango de fechas es inválido (desde > hasta)');
+      throw new BadRequestException(
+        'El rango de fechas es inválido (desde > hasta)',
+      );
     }
 
     const esAdmin = ['PROPIETARIO', 'ADMINISTRADOR'].includes(ctx.rol);
@@ -109,9 +111,7 @@ export class ListarAgendaVisitasUseCase {
       })),
     ];
 
-    items.sort(
-      (a, b) => a.programadaEn.getTime() - b.programadaEn.getTime(),
-    );
+    items.sort((a, b) => a.programadaEn.getTime() - b.programadaEn.getTime());
     return items;
   }
 }

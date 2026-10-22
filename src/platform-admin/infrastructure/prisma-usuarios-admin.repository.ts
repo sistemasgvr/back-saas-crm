@@ -13,7 +13,10 @@ import type {
 
 @Injectable()
 export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
-  constructor(private readonly prisma: PrismaService, private readonly gestion: GestionMembresiasService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gestion: GestionMembresiasService,
+  ) {}
 
   async listar(filtro: FiltroListadoUsuarios) {
     const q = filtro.q?.trim();
@@ -70,7 +73,12 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   }
 
   buscarActivoPorEmail(email: string) {
-    return this.prisma.usuario.findFirst({ where: { email: { equals: email.trim(), mode: 'insensitive' }, estado: 1 } });
+    return this.prisma.usuario.findFirst({
+      where: {
+        email: { equals: email.trim(), mode: 'insensitive' },
+        estado: 1,
+      },
+    });
   }
 
   crear(
@@ -104,6 +112,9 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
     rol: RolOrganizacion,
     usuarioEdicion: string,
   ): Promise<void> {
-    await this.gestion.asignar(organizacionId, usuarioId, rol, { usuarioId: usuarioEdicion, esAdminPlataforma: true });
+    await this.gestion.asignar(organizacionId, usuarioId, rol, {
+      usuarioId: usuarioEdicion,
+      esAdminPlataforma: true,
+    });
   }
 }

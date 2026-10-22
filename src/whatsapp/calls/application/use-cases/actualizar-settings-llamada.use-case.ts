@@ -31,10 +31,7 @@ export class ActualizarSettingsLlamadaUseCase {
     private readonly tokenEncryption: TokenEncryptionService,
   ) {}
 
-  async execute(
-    organizacionId: string,
-    input: ActualizarSettingsLlamadaInput,
-  ) {
+  async execute(organizacionId: string, input: ActualizarSettingsLlamadaInput) {
     if (!input.conexionId) {
       throw new BadRequestException('conexionId es obligatorio');
     }

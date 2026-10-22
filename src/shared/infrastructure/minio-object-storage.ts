@@ -25,7 +25,9 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   constructor(private readonly config: ConfigService) {
     const endpoint = this.config.getOrThrow<string>('MINIO_SERVER_URL');
     const accessKeyId = this.config.getOrThrow<string>('MINIO_ROOT_USER');
-    const secretAccessKey = this.config.getOrThrow<string>('MINIO_ROOT_PASSWORD');
+    const secretAccessKey = this.config.getOrThrow<string>(
+      'MINIO_ROOT_PASSWORD',
+    );
     this.bucket = this.config.getOrThrow<string>('MINIO_BUCKET');
 
     this.client = new S3Client({
@@ -93,7 +95,7 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   async getBuffer(key: string): Promise<Buffer> {
     const stream = await this.getStream(key);
     const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
+    for await (const chunk of stream as AsyncIterable<Buffer | string>) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     }
     return Buffer.concat(chunks);

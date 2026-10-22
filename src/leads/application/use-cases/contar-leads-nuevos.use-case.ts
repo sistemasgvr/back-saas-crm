@@ -15,9 +15,10 @@ export class ContarLeadsNuevosUseCase {
     private readonly leads: LeadsLecturaRepository,
   ) {}
 
-  private resolverAsignacion(
-    ctx: { usuarioId: string; rol: RolOrganizacion },
-  ): FiltroAsignacion {
+  private resolverAsignacion(ctx: {
+    usuarioId: string;
+    rol: RolOrganizacion;
+  }): FiltroAsignacion {
     const esAdmin = ROLES_ADMIN.includes(ctx.rol);
     return esAdmin
       ? { modo: 'todos' }

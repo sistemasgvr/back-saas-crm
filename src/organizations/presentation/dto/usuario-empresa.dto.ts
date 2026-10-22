@@ -14,7 +14,9 @@ import type { RolOrganizacion } from '../../../auth/domain/request-context.inter
 
 export class EditarUsuarioEmpresaDto {
   @ValidateIf((_obj, value) => value !== undefined)
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(1)
   @MaxLength(120)
@@ -32,13 +34,15 @@ export class EditarUsuarioEmpresaDto {
   rol?: RolOrganizacion;
 }
 export class CrearUsuarioEmpresaDto {
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
   @IsEmail()
   @MaxLength(255)
   email!: string;
-  @Transform(({ value }) => typeof value === 'string' ? value.trim() : value)
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
   @IsString()
   @MinLength(1)
   @MaxLength(120)

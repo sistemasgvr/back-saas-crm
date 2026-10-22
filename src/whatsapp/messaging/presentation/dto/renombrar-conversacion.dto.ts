@@ -6,9 +6,10 @@ export class RenombrarConversacionDto {
   @ApiProperty({
     example: 'María Pérez',
     maxLength: 200,
-    description: 'Nombre visible del contacto en el CRM (y del lead vinculado).',
+    description:
+      'Nombre visible del contacto en el CRM (y del lead vinculado).',
   })
-  @Transform(({ value }) =>
+  @Transform(({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value,
   )
   @IsString()

@@ -12,7 +12,24 @@ describe('Reglas de gestión de membresías', () => {
     {} as never,
     {} as never,
   );
-  const reglas = service as any;
+  /** Reglas privadas del servicio que el spec prueba directo. */
+  interface ReglasMembresia {
+    proteger(
+      m: { rol: string; usuarioId: string } | null,
+      rol: string | undefined,
+      estado: number | undefined,
+      contexto: typeof ctx,
+      plataforma: boolean,
+    ): void;
+    cupo(tx: unknown, org: string): Promise<void>;
+    ultimoPropietario(
+      tx: unknown,
+      m: { rol: string; estado: number },
+      rol?: string,
+      estado?: number,
+    ): Promise<void>;
+  }
+  const reglas = service as unknown as ReglasMembresia;
   it.each(['PROPIETARIO', 'ADMINISTRADOR'])(
     'una cuenta de empresa %s no promueve propietarios',
     () => {

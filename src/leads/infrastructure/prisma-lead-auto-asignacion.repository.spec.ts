@@ -33,7 +33,9 @@ function escenario(
     },
     organizacionUsuario: {
       findFirst: jest.fn().mockResolvedValue({ id: 'member' }),
-      findMany: jest.fn().mockResolvedValue(ids.map(usuarioId => ({ usuarioId }))),
+      findMany: jest
+        .fn()
+        .mockResolvedValue(ids.map((usuarioId) => ({ usuarioId }))),
     },
     leadAutoAsignacionQueue: {
       deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -42,7 +44,9 @@ function escenario(
   };
   const prisma = {
     ...tx,
-    $transaction: jest.fn().mockImplementation((fn) => fn(tx)),
+    $transaction: jest
+      .fn()
+      .mockImplementation((fn: (cliente: typeof tx) => unknown) => fn(tx)),
   };
   return {
     repo: new PrismaLeadAutoAsignacionRepository(

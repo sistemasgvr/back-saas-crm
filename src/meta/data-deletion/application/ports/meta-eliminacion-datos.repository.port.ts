@@ -4,9 +4,7 @@ export const META_ELIMINACION_DATOS_REPOSITORY = Symbol(
 
 export type TipoSolicitudEliminacion = 'DATA_DELETION' | 'DEAUTHORIZE';
 export type EstadoSolicitudEliminacion =
-  | 'PENDIENTE'
-  | 'PROCESADA'
-  | 'NO_ENCONTRADA';
+  'PENDIENTE' | 'PROCESADA' | 'NO_ENCONTRADA';
 
 export interface MetaSolicitudEliminacionRow {
   id: string;

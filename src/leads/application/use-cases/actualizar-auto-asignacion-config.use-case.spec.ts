@@ -1,11 +1,16 @@
 import { BadRequestException } from '@nestjs/common';
 import { ActualizarAutoAsignacionConfigUseCase } from './actualizar-auto-asignacion-config.use-case';
+import type { LeadAutoAsignacionRepository } from '../ports/lead-auto-asignacion.repository.port';
+import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
 
 describe('ActualizarAutoAsignacionConfigUseCase', () => {
   it('falla si hay usuarios duplicados', async () => {
-    const repo: any = { actualizarConfig: jest.fn() };
-    const leads: any = { esMiembroActivo: jest.fn() };
-    const useCase = new ActualizarAutoAsignacionConfigUseCase(repo, leads);
+    const repo = { actualizarConfig: jest.fn() };
+    const leads = { esMiembroActivo: jest.fn() };
+    const useCase = new ActualizarAutoAsignacionConfigUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+      leads as unknown as LeadsGestionRepository,
+    );
 
     await expect(
       useCase.execute('org1', {
@@ -18,11 +23,17 @@ describe('ActualizarAutoAsignacionConfigUseCase', () => {
   });
 
   it('falla si habilitado=true y alguno no es miembro activo', async () => {
-    const repo: any = { actualizarConfig: jest.fn() };
-    const leads: any = {
-      esMiembroActivo: jest.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false),
+    const repo = { actualizarConfig: jest.fn() };
+    const leads = {
+      esMiembroActivo: jest
+        .fn()
+        .mockResolvedValueOnce(true)
+        .mockResolvedValueOnce(false),
     };
-    const useCase = new ActualizarAutoAsignacionConfigUseCase(repo, leads);
+    const useCase = new ActualizarAutoAsignacionConfigUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+      leads as unknown as LeadsGestionRepository,
+    );
 
     await expect(
       useCase.execute('org1', {
@@ -35,9 +46,14 @@ describe('ActualizarAutoAsignacionConfigUseCase', () => {
   });
 
   it('actualiza config si habilitado=false (sin validar membresías)', async () => {
-    const repo: any = { actualizarConfig: jest.fn().mockResolvedValue(undefined) };
-    const leads: any = { esMiembroActivo: jest.fn() };
-    const useCase = new ActualizarAutoAsignacionConfigUseCase(repo, leads);
+    const repo = {
+      actualizarConfig: jest.fn().mockResolvedValue(undefined),
+    };
+    const leads = { esMiembroActivo: jest.fn() };
+    const useCase = new ActualizarAutoAsignacionConfigUseCase(
+      repo as unknown as LeadAutoAsignacionRepository,
+      leads as unknown as LeadsGestionRepository,
+    );
 
     await useCase.execute('org1', {
       habilitado: false,
@@ -52,4 +68,3 @@ describe('ActualizarAutoAsignacionConfigUseCase', () => {
     });
   });
 });
-

@@ -16,5 +16,5 @@ export class ActualizarPipelineConfigDto {
       'null restaura los defaults de código.',
   })
   @Allow()
-  config: unknown | null;
+  config: unknown;
 }
