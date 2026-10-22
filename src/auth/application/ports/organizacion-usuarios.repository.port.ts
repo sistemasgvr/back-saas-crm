@@ -8,6 +8,7 @@ export interface MembresiaActiva {
   organizacionId: string;
   organizacionNombre: string;
   organizacionSlug: string;
+  organizacionLogoUrl?: string | null;
   rol: RolOrganizacion;
 }
 

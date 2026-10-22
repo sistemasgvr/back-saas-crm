@@ -8,7 +8,7 @@ export interface ActualizarOrganizacionInput {
   documentoFiscal?: string;
   emailContacto?: string;
   telefonoContacto?: string;
-  logoUrl?: string;
+  logoUrl?: string | null;
   pais?: string;
   zonaHoraria?: string;
 }

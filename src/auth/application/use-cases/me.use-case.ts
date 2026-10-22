@@ -1,4 +1,5 @@
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { logoOrganizacionUrl } from '../../../shared/domain/logo-organizacion';
 import type {
   RequestContext,
   RolOrganizacion,
@@ -28,8 +29,12 @@ export class MeUseCase {
       throw new UnauthorizedException('Usuario inactivo');
     }
 
-    let organizacion: { id: string; nombre: string; slug: string } | null =
-      null;
+    let organizacion: {
+      id: string;
+      nombre: string;
+      slug: string;
+      logoUrl: string | null;
+    } | null = null;
     let rol: RolOrganizacion | null = null;
     let modulosOrg: ModuloOrganizacion[] = [];
 
@@ -43,6 +48,10 @@ export class MeUseCase {
           id: membresia.organizacionId,
           nombre: membresia.organizacionNombre,
           slug: membresia.organizacionSlug,
+          logoUrl: logoOrganizacionUrl(
+            membresia.organizacionId,
+            membresia.organizacionLogoUrl,
+          ),
         };
         rol = membresia.rol;
         modulosOrg = await this.modulos.findModulosPorOrganizacion(

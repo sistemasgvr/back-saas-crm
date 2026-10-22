@@ -21,6 +21,7 @@ export class PrismaOrganizacionUsuariosRepository implements OrganizacionUsuario
       organizacionId: fila.organizacionId,
       organizacionNombre: fila.organizacion.nombre,
       organizacionSlug: fila.organizacion.slug,
+      organizacionLogoUrl: fila.organizacion.logoUrl,
       rol: fila.rol as RolOrganizacion,
     }));
   }
@@ -45,6 +46,7 @@ export class PrismaOrganizacionUsuariosRepository implements OrganizacionUsuario
       organizacionId: fila.organizacionId,
       organizacionNombre: fila.organizacion.nombre,
       organizacionSlug: fila.organizacion.slug,
+      organizacionLogoUrl: fila.organizacion.logoUrl,
       rol: fila.rol as RolOrganizacion,
     };
   }

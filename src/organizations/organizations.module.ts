@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { LogoOrganizacionService } from './application/logo-organizacion.service';
+import { OrganizationLogoController } from './presentation/organization-logo.controller';
 import { OrganizationsController } from './presentation/organizations.controller';
 import { GetOrganizacionActualUseCase } from './application/use-cases/get-organizacion-actual.use-case';
 import { ActualizarOrganizacionActualUseCase } from './application/use-cases/actualizar-organizacion-actual.use-case';
@@ -8,8 +10,9 @@ import { ORGANIZACIONES_REPOSITORY } from './application/ports/organizaciones.re
 import { PrismaOrganizacionesRepository } from './infrastructure/prisma-organizaciones.repository';
 
 @Module({
-  controllers: [OrganizationsController],
+  controllers: [OrganizationsController, OrganizationLogoController],
   providers: [
+    LogoOrganizacionService,
     GetOrganizacionActualUseCase,
     ActualizarOrganizacionActualUseCase,
     ObtenerPipelineConfigUseCase,
