@@ -35,7 +35,7 @@ export class ActualizarPipelineConfigUseCase {
 
     if (config === undefined) {
       throw new BadRequestException(
-        'Debes enviar config (objeto) o null para restaurar defaults',
+        'Debes enviar config (objeto) o null para restaurar los valores por defecto',
       );
     }
 

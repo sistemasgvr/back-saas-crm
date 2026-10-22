@@ -80,13 +80,18 @@ export class ListarTableroLeadsUseCase {
     });
 
     const etiquetas = etiquetasColumnasTablero(tipoFiltro, override);
-    const columnas = estadosColumnasTablero(tipoFiltro, override).map(
-      (codigo) => ({
-        codigo,
-        etiqueta: etiquetas[codigo] ?? codigo,
-        leads: resultado.data.filter((f) => f.estadoGestion === codigo),
-      }),
-    );
+    const estados = [...estadosColumnasTablero(tipoFiltro, override)];
+    // Una configuración nueva puede quitar etapas que aún tienen leads.
+    // Conservarlos visibles sin habilitar transiciones fuera del catálogo.
+    for (const lead of resultado.data) {
+      if (!estados.includes(lead.estadoGestion))
+        estados.push(lead.estadoGestion);
+    }
+    const columnas = estados.map((codigo) => ({
+      codigo,
+      etiqueta: etiquetas[codigo] ?? codigo,
+      leads: resultado.data.filter((f) => f.estadoGestion === codigo),
+    }));
 
     const { data: _data, ...metadata } = resultado;
     return { columnas, ...metadata };

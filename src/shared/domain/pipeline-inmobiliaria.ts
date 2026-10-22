@@ -553,7 +553,10 @@ function estadosTableroUnificado(
       resultado.push(codigo);
     }
   }
-  return resultado;
+  return [
+    ...resultado.filter((codigo) => !esEstadoTerminal(codigo)),
+    ...resultado.filter((codigo) => esEstadoTerminal(codigo)),
+  ];
 }
 
 /** `tipoLead` undefined = tablero unificado (todos los tipos). */
