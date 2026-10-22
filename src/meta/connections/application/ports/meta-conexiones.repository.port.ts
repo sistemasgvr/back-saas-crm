@@ -45,6 +45,9 @@ export interface MetaConexionesRepository {
     featuresDeseadas: string[],
     usuarioEdicion: string,
   ): Promise<void>;
+  /** Códigos de módulo habilitados y vigentes de la org (mismo criterio que
+   * ModuleGuard) — decide qué features de la matriz de permisos aplican. */
+  listarModulosActivos(organizacionId: string): Promise<string[]>;
   /** Dataset de Conversions API para Conversion Leads — null desactiva el
    * envío de eventos (PLAN-PIPELINE-INMOBILIARIA.md §20.5). */
   actualizarCapiDatasetId(

@@ -43,7 +43,7 @@ export class TogglearFeaturePermisoUseCase {
     }
     if (feature.tipo === 'nucleo') {
       throw new BadRequestException(
-        'Esta feature es núcleo de Lead Ads y no se puede desactivar',
+        'Este permiso lo requiere una funcionalidad del CRM y no se puede desactivar',
       );
     }
 
@@ -55,7 +55,10 @@ export class TogglearFeaturePermisoUseCase {
       );
     }
 
-    const actuales = new Set(featuresDeseadasDe(conexion.featuresDeseadas));
+    // Solo se persisten opt-in: los módulos activos no influyen en ese subconjunto.
+    const actuales = new Set(
+      featuresDeseadasDe(conexion.featuresDeseadas, new Set()),
+    );
     if (input.deseada) {
       actuales.add(input.featureId);
     } else {

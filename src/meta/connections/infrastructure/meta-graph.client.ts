@@ -671,36 +671,40 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   async listarNumerosWhatsApp(
     accessToken: string,
   ): Promise<MetaNumeroWhatsAppGraph[]> {
-    const data = await this.get<{
-      data: {
-        id: string;
-        name: string;
-        owned_whatsapp_business_accounts?: {
-          data: {
-            id: string;
-            name: string;
-            phone_numbers?: {
-              data: {
-                id: string;
-                display_phone_number: string;
-                verified_name: string;
-                code_verification_status?: string;
-                quality_rating?: string;
-              }[];
-            };
-          }[];
-        };
-      }[];
+    interface WabaGraph {
+      id: string;
+      name: string;
+      phone_numbers?: {
+        data: {
+          id: string;
+          display_phone_number: string;
+          verified_name: string;
+          code_verification_status?: string;
+          quality_rating?: string;
+        }[];
+      };
+    }
+    // GET /me/businesses exige business_management (por eso es núcleo en la
+    // matriz). No se piden client_whatsapp_business_accounts: Meta exige ahí
+    // token de system user admin y un #200 tumbaría todo el listado.
+    const { data: negocios } = await this.getAllPages<{
+      id: string;
+      name: string;
+      owned_whatsapp_business_accounts?: { data: WabaGraph[] };
     }>('/me/businesses', {
       fields:
         'name,owned_whatsapp_business_accounts{id,name,phone_numbers{id,display_phone_number,verified_name,code_verification_status,quality_rating}}',
       access_token: accessToken,
+      limit: '50',
     });
 
     const numeros: MetaNumeroWhatsAppGraph[] = [];
-    for (const negocio of data.data) {
+    const vistos = new Set<string>();
+    for (const negocio of negocios) {
       for (const waba of negocio.owned_whatsapp_business_accounts?.data ?? []) {
         for (const numero of waba.phone_numbers?.data ?? []) {
+          if (vistos.has(numero.id)) continue;
+          vistos.add(numero.id);
           numeros.push({
             wabaId: waba.id,
             wabaNombre: waba.name,
@@ -1000,6 +1004,9 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     // action_source: 'system_generated' — el evento lo dispara un cambio de
     // estado en el CRM, sin sesión de navegador de por medio (a diferencia
     // del evento inicial "Lead", que sí viene con sesión/pixel).
+    // Payload Specification de Conversion Leads: event_source='crm' y
+    // lead_event_source van DENTRO de custom_data — sin eso Meta no reconoce
+    // el evento para la optimización por calidad de lead.
     await this.postJson(
       `/${datasetId}/events`,
       {
@@ -1009,8 +1016,11 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
             event_time: Math.floor(evento.fechaEvento.getTime() / 1000),
             event_id: evento.eventoId,
             action_source: 'system_generated',
-            lead_event_source: 'SAAS CRM',
             user_data: { lead_id: evento.leadIdMeta },
+            custom_data: {
+              event_source: 'crm',
+              lead_event_source: 'SAAS CRM',
+            },
           },
         ],
       },
@@ -1293,13 +1303,18 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     );
   }
 
+  // Calling API (docs v26): GET/POST /{phone-number-id}/settings, con la
+  // configuración de llamadas dentro del objeto `calling` (el mismo edge
+  // devuelve otras features del número fuera de `calling`).
   async obtenerSettingsLlamadaWhatsApp(
     phoneNumberId: string,
     accessToken: string,
   ): Promise<MetaCallSettingsGraph> {
-    return this.get<MetaCallSettingsGraph>(`/${phoneNumberId}/call_settings`, {
-      access_token: accessToken,
-    });
+    const data = await this.get<{ calling?: MetaCallSettingsGraph }>(
+      `/${phoneNumberId}/settings`,
+      { access_token: accessToken },
+    );
+    return data.calling ?? {};
   }
 
   async actualizarSettingsLlamadaWhatsApp(
@@ -1307,7 +1322,11 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
     accessToken: string,
     body: Record<string, unknown>,
   ): Promise<void> {
-    await this.postJson(`/${phoneNumberId}/call_settings`, body, accessToken);
+    await this.postJson(
+      `/${phoneNumberId}/settings`,
+      { calling: body },
+      accessToken,
+    );
   }
 
   async accionLlamadaWhatsApp(

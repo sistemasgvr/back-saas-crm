@@ -52,7 +52,9 @@ export interface NotificacionesRepository {
     usuarioId: string,
     conversacionId: string,
   ): Promise<number>;
+  /** Con `roles`, solo los miembros con ese rol en la org (ej. PROPIETARIO). */
   findUsuarioIdsActivosDeOrganizacion(
     organizacionId: string,
+    roles?: string[],
   ): Promise<string[]>;
 }

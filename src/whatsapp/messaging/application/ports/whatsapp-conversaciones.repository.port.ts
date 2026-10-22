@@ -320,6 +320,25 @@ export interface WhatsappConversacionesRepository {
     nombre: string,
   ): Promise<void>;
 
+  /** Chat ya existente de la línea por wa_id (exacto o por sufijo) o BSUID —
+   * a diferencia de findOCrearConversacion, nunca crea. */
+  buscarIdPorContacto(input: {
+    organizacionId: string;
+    whatsappConexionId: string;
+    waId?: string | null;
+    bsuid?: string | null;
+  }): Promise<string | null>;
+
+  /** Coexistencia (smb_app_state_sync): el nombre con que el negocio guardó
+   * al contacto en la app Business pasa a ser el nombre del chat. Solo chats
+   * existentes; el lead vinculado se completa únicamente si no tiene nombre. */
+  actualizarNombreDesdeContactoApp(input: {
+    organizacionId: string;
+    whatsappConexionId: string;
+    waId: string;
+    nombre: string;
+  }): Promise<boolean>;
+
   /** Mensaje saliente (CRM o eco desde la app Business) — actualiza orden
    * del chat sin incrementar noLeidos ni extender la ventana de 24h.
    * Solo avanza `ultimoMensajeEn` si `fechaMensaje` es más reciente. */

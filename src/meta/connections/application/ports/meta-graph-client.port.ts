@@ -99,7 +99,11 @@ export interface SaludNumeroWhatsAppGraph {
     can_send_message?: string;
     entities?: {
       can_send_message?: string;
-      errors?: { error_code?: number; error_description?: string; possible_solution?: string }[];
+      errors?: {
+        error_code?: number;
+        error_description?: string;
+        possible_solution?: string;
+      }[];
     }[];
   };
 }
@@ -398,8 +402,14 @@ export interface MetaGraphClient {
     wabaId: string,
     accessToken: string,
   ): Promise<AppSuscritaGraph[]>;
-  obtenerSaludNumeroWhatsApp(phoneNumberId: string, accessToken: string): Promise<SaludNumeroWhatsAppGraph>;
-  obtenerSuscripcionAppWhatsApp(appId: string, appSecret: string): Promise<{ activa: boolean; campos: string[] } | null>;
+  obtenerSaludNumeroWhatsApp(
+    phoneNumberId: string,
+    accessToken: string,
+  ): Promise<SaludNumeroWhatsAppGraph>;
+  obtenerSuscripcionAppWhatsApp(
+    appId: string,
+    appSecret: string,
+  ): Promise<{ activa: boolean; campos: string[] } | null>;
   listarPlantillasWhatsApp(
     wabaId: string,
     accessToken: string,
@@ -565,12 +575,12 @@ export interface MetaGraphClient {
   ): Promise<void>;
 
   // --- WhatsApp Cloud API Calling ---
-  /** GET /{phone-number-id}/call_settings */
+  /** GET /{phone-number-id}/settings → objeto `calling` */
   obtenerSettingsLlamadaWhatsApp(
     phoneNumberId: string,
     accessToken: string,
   ): Promise<MetaCallSettingsGraph>;
-  /** POST /{phone-number-id}/call_settings */
+  /** POST /{phone-number-id}/settings con body `{ calling: ... }` */
   actualizarSettingsLlamadaWhatsApp(
     phoneNumberId: string,
     accessToken: string,

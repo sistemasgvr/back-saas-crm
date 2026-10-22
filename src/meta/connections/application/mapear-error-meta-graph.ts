@@ -54,7 +54,7 @@ function mensajePermisoFaltante(scopes: string[], mensajeMeta: string): string {
   if (scopes.length === 0) {
     return (
       'Meta rechazó la operación por falta de permisos. ' +
-      'Revisa Permisos Meta en Conexión, activa lo necesario y pulsa «Otorgar en Meta».'
+      'Ve a Configuración → Meta → Conexión y pulsa «Solicitar permisos» aceptando todo en el diálogo de Meta.'
     );
   }
 
@@ -62,7 +62,7 @@ function mensajePermisoFaltante(scopes: string[], mensajeMeta: string): string {
 
   return (
     `Falta el permiso ${detalle}. ` +
-    `Actívalo en Configuración → Meta → Conexión (Permisos Meta) y pulsa «Otorgar en Meta». ` +
+    `Ve a Configuración → Meta → Conexión y pulsa «Solicitar permisos» aceptando todo en el diálogo de Meta. ` +
     `(Detalle Meta: ${mensajeMeta})`
   );
 }

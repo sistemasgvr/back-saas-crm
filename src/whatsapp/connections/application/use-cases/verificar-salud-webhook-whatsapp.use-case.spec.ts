@@ -7,52 +7,45 @@ import { Logger } from '@nestjs/common';
 
 function fixture() {
   const meta = {
-    findActivaPorOrganizacion: jest
-      .fn()
-      .mockResolvedValue({
-        appId: 'app',
-        tokenCifrado: 'token',
-        appSecretCifrado: 'secret',
-      }),
+    findActivaPorOrganizacion: jest.fn().mockResolvedValue({
+      appId: 'app',
+      tokenCifrado: 'token',
+      appSecretCifrado: 'secret',
+    }),
   };
   const wa = {
-    findPorId: jest
-      .fn()
-      .mockResolvedValue({
-        id: 'line',
-        wabaId: 'waba',
-        phoneNumberId: 'phone',
-        rolLinea: 'MENSAJES',
-        callingHabilitado: false,
-      }),
+    findPorId: jest.fn().mockResolvedValue({
+      id: 'line',
+      wabaId: 'waba',
+      phoneNumberId: 'phone',
+      rolLinea: 'MENSAJES',
+      callingHabilitado: false,
+    }),
     obtenerUltimoMensajeEntrante: jest
       .fn()
       .mockResolvedValue(new Date('2026-09-23T15:27:09Z')),
     marcarWebhookCheck: jest.fn().mockResolvedValue(undefined),
+    actualizarDatosMeta: jest.fn().mockResolvedValue(undefined),
   };
   const graph = {
     obtenerAppsSuscritasWaba: jest
       .fn()
       .mockResolvedValue([{ id: 'app', camposSuscritos: [] }]),
-    obtenerSaludNumeroWhatsApp: jest
-      .fn()
-      .mockResolvedValue({
-        status: 'CONNECTED',
-        platform_type: 'CLOUD_API',
-        is_on_biz_app: true,
-        health_status: { can_send_message: 'AVAILABLE' },
-      }),
-    obtenerSuscripcionAppWhatsApp: jest
-      .fn()
-      .mockResolvedValue({
-        activa: true,
-        campos: [
-          'messages',
-          'history',
-          'smb_message_echoes',
-          'smb_app_state_sync',
-        ],
-      }),
+    obtenerSaludNumeroWhatsApp: jest.fn().mockResolvedValue({
+      status: 'CONNECTED',
+      platform_type: 'CLOUD_API',
+      is_on_biz_app: true,
+      health_status: { can_send_message: 'AVAILABLE' },
+    }),
+    obtenerSuscripcionAppWhatsApp: jest.fn().mockResolvedValue({
+      activa: true,
+      campos: [
+        'messages',
+        'history',
+        'smb_message_echoes',
+        'smb_app_state_sync',
+      ],
+    }),
   };
   const encryption = {
     decrypt: jest.fn().mockImplementation((value: string) => value),
@@ -156,6 +149,25 @@ describe('Salud WhatsApp: suscripción, número y entrega', () => {
     expect(
       (await useCase.execute('org', 'line', 'user')).camposFaltantes,
     ).toEqual([]);
+  });
+
+  it('en coexistencia exige account_update y sugiere los recomendados aparte', async () => {
+    const { useCase } = fixture();
+    const result = await useCase.execute('org', 'line', 'user');
+    expect(result.camposFaltantes).toEqual(['account_update']);
+    expect(result.camposRecomendadosFaltantes).toContain(
+      'message_template_status_update',
+    );
+    expect(result.webhookUltimoError).toContain('account_update');
+    expect(result.webhookUltimoError).not.toContain('user_preferences');
+  });
+
+  it('guarda el estado vivo del número para corregir el último aviso del webhook', async () => {
+    const { useCase, wa } = fixture();
+    await useCase.execute('org', 'line', 'user');
+    expect(wa.actualizarDatosMeta).toHaveBeenCalledWith('line', {
+      estadoNumero: 'CONNECTED',
+    });
   });
 
   it('rechaza una conexión de otra organización antes de consultar Meta', async () => {

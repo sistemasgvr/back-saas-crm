@@ -4,7 +4,10 @@ import type { MetaConexionesRepository } from '../../../../meta/connections/appl
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../../meta/connections/application/ports/meta-graph-client.port';
 import { TokenEncryptionService } from '../../../../shared/infrastructure/token-encryption.service';
-import { CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA } from '../../domain/campos-webhook-whatsapp';
+import {
+  CAMPOS_WEBHOOK_WHATSAPP_COEXISTENCIA,
+  CAMPOS_WEBHOOK_WHATSAPP_RECOMENDADOS,
+} from '../../domain/campos-webhook-whatsapp';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../ports/whatsapp-conexiones.repository.port';
 import type { WhatsappConexionesRepository } from '../ports/whatsapp-conexiones.repository.port';
 
@@ -29,6 +32,8 @@ export interface ResultadoSaludWebhookWhatsapp {
   ultimoMensajeEntranteEn: string | null;
   camposSuscritos: string[];
   camposFaltantes: string[];
+  /** Opcionales que el CRM ya procesa (alertas, plantillas, preferencias…). */
+  camposRecomendadosFaltantes: string[];
   webhookUltimoError: string | null;
 }
 
@@ -129,6 +134,11 @@ export class VerificarSaludWebhookWhatsappUseCase {
     const camposFaltantes = camposVerificados
       ? requeridos.filter((field) => !camposSuscritos.includes(field))
       : [];
+    const camposRecomendadosFaltantes = camposVerificados
+      ? CAMPOS_WEBHOOK_WHATSAPP_RECOMENDADOS.filter(
+          (field) => !camposSuscritos.includes(field),
+        )
+      : [];
     const suscripcionAppActiva =
       sub === undefined ? null : (sub?.activa ?? false);
     if (!secret)
@@ -157,6 +167,12 @@ export class VerificarSaludWebhookWhatsappUseCase {
         suscrito,
         problemasWebhook.join(' ') || null,
       );
+    // El estado vivo de Meta corrige lo último que avisó el webhook
+    // (p. ej. DISCONNECTED por account_update y luego reconectado).
+    if (numero?.status && numero.status !== conexionWa.estadoNumero)
+      await this.whatsappConexiones.actualizarDatosMeta(conexionWa.id, {
+        estadoNumero: numero.status,
+      });
     const erroresEnvio = (numero?.health_status?.entities ?? [])
       .filter(
         (entity) =>
@@ -175,6 +191,7 @@ export class VerificarSaludWebhookWhatsappUseCase {
       suscripcionAppActiva,
       camposSuscritos,
       camposFaltantes,
+      camposRecomendadosFaltantes,
       camposVerificados,
       webhookUltimoError: error,
       erroresVerificacion,

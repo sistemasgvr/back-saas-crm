@@ -977,6 +977,81 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     });
   }
 
+  async buscarIdPorContacto(input: {
+    organizacionId: string;
+    whatsappConexionId: string;
+    waId?: string | null;
+    bsuid?: string | null;
+  }): Promise<string | null> {
+    const waId = input.waId?.replace(/\D/g, '') || null;
+    const bsuid = input.bsuid?.trim() || null;
+    const base = {
+      organizacionId: input.organizacionId,
+      whatsappConexionId: input.whatsappConexionId,
+      estado: 1,
+    };
+    const orderBy = {
+      ultimoMensajeEn: { sort: 'desc', nulls: 'last' },
+    } as const;
+
+    if (waId) {
+      // Mismo criterio que findOCrearConversacion: exacto y luego por sufijo.
+      const exacto = await this.prisma.whatsappConversacion.findFirst({
+        where: { ...base, waId },
+        select: { id: true },
+      });
+      if (exacto) return exacto.id;
+      const sufijo = ultimosDigitos(waId);
+      if (sufijo) {
+        const porSufijo = await this.prisma.whatsappConversacion.findFirst({
+          where: { ...base, waId: { endsWith: sufijo } },
+          orderBy,
+          select: { id: true },
+        });
+        if (porSufijo) return porSufijo.id;
+      }
+    }
+    if (bsuid) {
+      const porBsuid = await this.prisma.whatsappConversacion.findFirst({
+        where: { ...base, bsuid },
+        orderBy,
+        select: { id: true },
+      });
+      if (porBsuid) return porBsuid.id;
+    }
+    return null;
+  }
+
+  async actualizarNombreDesdeContactoApp(input: {
+    organizacionId: string;
+    whatsappConexionId: string;
+    waId: string;
+    nombre: string;
+  }): Promise<boolean> {
+    const id = await this.buscarIdPorContacto(input);
+    if (!id) return false;
+    await this.prisma.$transaction(async (tx) => {
+      const conversacion = await tx.whatsappConversacion.update({
+        where: { id },
+        data: { nombreContacto: input.nombre },
+        select: { leadId: true },
+      });
+      if (conversacion.leadId) {
+        // No pisa el nombre que el CRM ya tenga en el lead.
+        await tx.lead.updateMany({
+          where: {
+            id: conversacion.leadId,
+            organizacionId: input.organizacionId,
+            estado: 1,
+            OR: [{ nombre: null }, { nombre: '' }],
+          },
+          data: { nombre: input.nombre },
+        });
+      }
+    });
+    return true;
+  }
+
   async actualizarTrasSaliente(
     conversacionId: string,
     fechaMensaje: Date,

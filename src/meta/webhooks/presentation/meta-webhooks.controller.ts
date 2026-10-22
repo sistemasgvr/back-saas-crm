@@ -29,6 +29,10 @@ import { ProcesarEstadoWhatsAppUseCase } from '../../../whatsapp/messaging/appli
 import { ProcesarReaccionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-reaccion-whatsapp.use-case';
 import { ProcesarEdicionWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-edicion-whatsapp.use-case';
 import { ProcesarLlamadaWebhookUseCase } from '../../../whatsapp/calls/application/use-cases/procesar-llamada-webhook.use-case';
+import { SincronizarContactoAppBusinessUseCase } from '../../../whatsapp/messaging/application/use-cases/sincronizar-contacto-app-business.use-case';
+import { ProcesarPreferenciaMarketingWhatsAppUseCase } from '../../../whatsapp/messaging/application/use-cases/procesar-preferencia-marketing-whatsapp.use-case';
+import { extraerEventosCuentaWhatsApp } from '../domain/whatsapp-webhook-cuenta';
+import { ProcesarEventoCuentaWhatsAppUseCase } from '../application/use-cases/procesar-evento-cuenta-whatsapp.use-case';
 
 function esErrorReintentable(error: unknown): boolean {
   if (error instanceof PageSinConexionError) return false;
@@ -62,6 +66,9 @@ export class MetaWebhooksController {
     private readonly procesarReaccionWhatsApp: ProcesarReaccionWhatsAppUseCase,
     private readonly procesarEdicionWhatsApp: ProcesarEdicionWhatsAppUseCase,
     private readonly procesarLlamadaWhatsApp: ProcesarLlamadaWebhookUseCase,
+    private readonly procesarEventoCuentaWhatsApp: ProcesarEventoCuentaWhatsAppUseCase,
+    private readonly sincronizarContactoApp: SincronizarContactoAppBusinessUseCase,
+    private readonly procesarPreferenciaMarketing: ProcesarPreferenciaMarketingWhatsAppUseCase,
   ) {}
 
   @Get()
@@ -290,6 +297,60 @@ export class MetaWebhooksController {
       } catch (error) {
         this.logger.error(
           `Error procesando llamada WhatsApp ${evento.callId} (phone_number_id ${evento.phoneNumberId})`,
+          error instanceof Error ? error.stack : error,
+        );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
+      }
+    }
+
+    // Resto de campos del WABA: cuenta/plantillas/alertas, contactos de la app
+    // Business (coexistencia) y preferencias de marketing.
+    const { cuenta, contactos, preferencias } =
+      extraerEventosCuentaWhatsApp(payload);
+    if (cuenta.length + contactos.length + preferencias.length > 0) {
+      this.logger.log(
+        `Webhook WhatsApp cuenta: eventos=${cuenta.length}, contactos=${contactos.length}, preferencias=${preferencias.length}`,
+      );
+    }
+
+    for (const evento of cuenta) {
+      try {
+        await this.procesarEventoCuentaWhatsApp.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando evento de cuenta WhatsApp ${evento.campo}/${evento.evento ?? '-'} (WABA ${evento.wabaId ?? '-'})`,
+          error instanceof Error ? error.stack : error,
+        );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
+      }
+    }
+
+    let contactosActualizados = 0;
+    for (const evento of contactos) {
+      try {
+        if (await this.sincronizarContactoApp.execute(evento)) {
+          contactosActualizados += 1;
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error sincronizando contacto de la app Business (phone_number_id ${evento.phoneNumberId})`,
+          error instanceof Error ? error.stack : error,
+        );
+        if (esErrorReintentable(error)) huboFalloReintentable = true;
+      }
+    }
+    if (contactos.length > 0) {
+      this.logger.log(
+        `Contactos de la app Business: ${contactosActualizados}/${contactos.length} chats renombrados`,
+      );
+    }
+
+    for (const evento of preferencias) {
+      try {
+        await this.procesarPreferenciaMarketing.execute(evento);
+      } catch (error) {
+        this.logger.error(
+          `Error procesando preferencia de marketing (phone_number_id ${evento.phoneNumberId})`,
           error instanceof Error ? error.stack : error,
         );
         if (esErrorReintentable(error)) huboFalloReintentable = true;

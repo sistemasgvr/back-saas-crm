@@ -1,164 +1,249 @@
+export type GrupoPermisoMeta =
+  'paginas_leads' | 'publicidad' | 'negocio' | 'whatsapp' | 'opcional';
+
 export interface FeaturePermisoMeta {
   id: string;
   label: string;
+  /** Qué funcionalidad del CRM deja de andar si falta (se muestra en la UI). */
+  descripcion: string;
+  grupo: GrupoPermisoMeta;
   scopesRequeridos: string[];
-  /** núcleo = siempre solicitado en OAuth, no desactivable; optin = el usuario decide. */
+  /** nucleo = requerido por una funcionalidad que YA existe en el CRM: siempre
+   * se pide en OAuth y no se puede desactivar. optin = catálogo sin uso actual,
+   * el usuario decide si lo pide. */
   tipo: 'nucleo' | 'optin';
+  /** Código de módulo (organizacion_modulos) sin el cual la feature no aplica:
+   * no se pide en OAuth ni cuenta como faltante si la org no lo tiene activo.
+   * Pedir scopes de un producto que la Meta App de la org no tiene agregado
+   * hace que el diálogo de Meta falle con "Invalid Scopes" para sus admins. */
+  moduloRequerido?: string;
 }
 
-/** Catálogo de scopes Graph relevantes al dominio de este CRM (Pages, Lead Ads,
- * Marketing API, Instagram, Business Manager) — PLAN.md Fase 16
- * §5/§16.4: "la matriz tenga todos los scopes disponibles" para que el usuario
- * pueda activar/desactivar y solicitar lo que necesite, sin limitarse a los ya
- * usados por features construidas hoy. Quedan fuera deliberadamente los scopes
- * de WhatsApp/CAPI (§11: oleadas C/D) y los de Facebook Login personal
- * (email, public_profile, etc. — sin relación con este dominio B2B). */
+/**
+ * Matriz única de permisos (scopes) de Meta Graph API v26 que usa el CRM.
+ * El botón «Solicitar permisos» (Configuración → Meta → Conexión) y
+ * «Conectar con Meta» piden TODOS los `nucleo` aplicables a la org en un solo
+ * diálogo OAuth, más los `optin` que la org haya marcado.
+ *
+ * ── Al agregar una funcionalidad nueva que llame a otro endpoint de Graph ──
+ * 1. Revisar en https://developers.facebook.com/docs/permissions qué permiso
+ *    exige el endpoint (y sus dependencias).
+ * 2. Si el scope ya está acá, actualizar `descripcion` para mencionarla.
+ *    Si no, agregar una entrada `tipo: 'nucleo'` en el grupo que corresponda
+ *    (o pasar a `nucleo` la entrada `optin` existente, conservando su `id`:
+ *    está persistido en meta_conexiones.features_deseadas).
+ * 3. Si la funcionalidad pertenece a un módulo contratable, poner
+ *    `moduloRequerido` con su código.
+ * 4. Agregar el permiso en App Review / Advanced Access de la Meta App
+ *    (sin eso, solo lo otorgan usuarios con rol en la app).
+ * No hace falta tocar el frontend: el panel de permisos se arma desde acá.
+ */
 export const MATRIZ_PERMISOS_META: FeaturePermisoMeta[] = [
-  // Núcleo — Lead Ads mínimo, siempre solicitado, no desactivable.
+  // ── Páginas y Lead Ads ──
   {
     id: 'pages_list',
-    label: 'Listar / vincular páginas',
+    label: 'Listar y vincular páginas',
+    descripcion: 'Páginas disponibles, token de página para webhook y leads.',
+    grupo: 'paginas_leads',
     scopesRequeridos: ['pages_show_list'],
     tipo: 'nucleo',
   },
   {
     id: 'pages_webhook',
-    label: 'Suscribir webhook leadgen',
+    label: 'Webhook de leads de la página',
+    descripcion:
+      'Suscribir/verificar el webhook leadgen (leads nuevos en tiempo real).',
+    grupo: 'paginas_leads',
     scopesRequeridos: ['pages_manage_metadata'],
     tipo: 'nucleo',
   },
   {
-    id: 'leads',
-    label: 'Leer leads / backfill',
-    scopesRequeridos: ['leads_retrieval'],
-    tipo: 'nucleo',
-  },
-  {
-    id: 'ads_insights',
-    label: 'Cuentas publicitarias e Insights (lectura)',
-    // Núcleo: sin esto, la resolución de nombre de campaña/conjunto/anuncio
-    // de cada lead falla en silencio (queda como "errores" en el backfill) —
-    // es parte del flujo mínimo de Lead Ads según la doc de Meta, no un
-    // add-on opcional. Confirmado por el incidente real de Domaria (2026-08-20).
-    scopesRequeridos: ['ads_read'],
-    tipo: 'nucleo',
-  },
-
-  // Opt-in — Business Manager y Marketing API.
-  {
-    id: 'pages_business',
-    label: 'Páginas en Business Manager / Suite',
-    scopesRequeridos: ['business_management'],
-    tipo: 'optin',
-  },
-  {
-    id: 'catalog_management',
-    label: 'Gestionar catálogos de productos',
-    scopesRequeridos: ['catalog_management'],
-    tipo: 'optin',
-  },
-
-  {
-    id: 'pages_ads',
-    label: 'Formularios Lead Ads y anuncios de la página',
-    // Núcleo: GET /{page-id}/leadgen_forms lo exige — sin esto, "Sincronizar
-    // formularios" falla con (#200) para TODA página, no es opcional para
-    // el flujo de Lead Ads (incidente real de Domaria, 2026-08-20).
-    scopesRequeridos: ['pages_manage_ads'],
-    tipo: 'nucleo',
-  },
-  {
     id: 'pages_engagement',
-    label: 'Leer contenido y engagement de la página',
-    // Núcleo: Meta Retrieving Leads lista pages_read_engagement para campos
-    // a nivel de anuncio en leadgen — sin esto, la recuperación completa de
-    // leads+ad falla o queda incompleta (alineado con doc Meta / incidente
-    // Domaria 2026-08-20).
+    label: 'Leer datos de la página',
+    // Dependencia de leads_retrieval, ads_management y business_management
+    // según la doc de permisos de Meta (incidente Domaria 2026-08-20).
+    descripcion:
+      'Datos de la página; dependencia obligatoria de leads y publicidad.',
+    grupo: 'paginas_leads',
     scopesRequeridos: ['pages_read_engagement'],
     tipo: 'nucleo',
   },
   {
+    id: 'pages_ads',
+    label: 'Formularios Lead Ads de la página',
+    // GET /{page-id}/leadgen_forms lo exige — sin esto «Sincronizar
+    // formularios» falla con (#200) para toda página.
+    descripcion: 'Sincronizar formularios y contar leads por formulario.',
+    grupo: 'paginas_leads',
+    scopesRequeridos: ['pages_manage_ads'],
+    tipo: 'nucleo',
+  },
+  {
+    id: 'leads',
+    label: 'Leer leads',
+    descripcion:
+      'Recibir leads del webhook y reimportar (backfill) por formulario.',
+    grupo: 'paginas_leads',
+    scopesRequeridos: ['leads_retrieval'],
+    tipo: 'nucleo',
+  },
+
+  // ── Publicidad y estadísticas ──
+  {
+    id: 'ads_insights',
+    label: 'Cuentas publicitarias y estadísticas',
+    // Sin esto la resolución de nombre de campaña/conjunto/anuncio de cada
+    // lead falla en silencio (incidente Domaria 2026-08-20). Según la doc de
+    // permisos también cubre el envío server-side (Conversions API).
+    descripcion:
+      'Listar cuentas, sincronizar campañas/conjuntos/anuncios, refrescar Insights (gasto, CPL) y enviar eventos de Conversions API.',
+    grupo: 'publicidad',
+    scopesRequeridos: ['ads_read'],
+    tipo: 'nucleo',
+  },
+  {
     id: 'ads_management',
-    label: 'Campos de anuncio en leads y gestión de campañas',
-    // Núcleo: Meta Retrieving Leads lista ads_management para recuperación
-    // completa lead+ad; también cubre gestión de campañas. No es un add-on
-    // opcional del flujo mínimo Lead Ads (doc Meta / incidente Domaria
-    // 2026-08-20).
+    label: 'Datos de anuncio en leads',
+    // Meta lo lista como dependencia de leads_retrieval para recuperar los
+    // campos de anuncio (ad_id/adset_id/campaign_id) del lead.
+    descripcion:
+      'Campaña, conjunto y anuncio de origen de cada lead; dependencia de leads.',
+    grupo: 'publicidad',
     scopesRequeridos: ['ads_management'],
     tipo: 'nucleo',
   },
 
-  // Opt-in — contenido y mensajería de la página.
+  // ── Portafolio comercial (Business Manager) ──
+  {
+    // id histórico: era opt-in "Páginas en Business Manager / Suite".
+    id: 'pages_business',
+    label: 'Portafolio comercial (Business Manager)',
+    // Dependencia de leads_retrieval en la doc de Meta, y GET /me/businesses
+    // (listar las cuentas de WhatsApp del portafolio) lo exige.
+    descripcion:
+      'Páginas, cuentas y números de WhatsApp del portafolio; dependencia de leads.',
+    grupo: 'negocio',
+    scopesRequeridos: ['business_management'],
+    tipo: 'nucleo',
+  },
+
+  // ── WhatsApp Business Platform (solo orgs con el módulo WHATSAPP) ──
+  {
+    id: 'whatsapp_management',
+    label: 'Administrar WhatsApp Business',
+    descripcion:
+      'Vincular números, webhook del WABA, estado del número, plantillas y configuración de llamadas.',
+    grupo: 'whatsapp',
+    scopesRequeridos: ['whatsapp_business_management'],
+    tipo: 'nucleo',
+    moduloRequerido: 'WHATSAPP',
+  },
+  {
+    id: 'whatsapp_messaging',
+    label: 'Mensajes y llamadas de WhatsApp',
+    descripcion:
+      'Enviar mensajes, plantillas, multimedia y reacciones, bloquear contactos y llamadas.',
+    grupo: 'whatsapp',
+    scopesRequeridos: ['whatsapp_business_messaging'],
+    tipo: 'nucleo',
+    moduloRequerido: 'WHATSAPP',
+  },
+
+  // ── Opcionales: catálogo sin funcionalidad en el CRM todavía (Fase 16) ──
+  // Cuando se construya una funcionalidad que use uno de estos, pasarlo a
+  // `nucleo` (ver instrucciones arriba).
+  {
+    id: 'catalog_management',
+    label: 'Gestionar catálogos de productos',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
+    scopesRequeridos: ['catalog_management'],
+    tipo: 'optin',
+  },
   {
     id: 'pages_posts',
     label: 'Publicar y editar publicaciones de la página',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['pages_manage_posts'],
     tipo: 'optin',
   },
   {
     id: 'pages_comments',
     label: 'Gestionar comentarios y reacciones de la página',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['pages_manage_engagement'],
     tipo: 'optin',
   },
   {
     id: 'pages_messaging',
     label: 'Mensajería de Messenger de la página',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['pages_messaging'],
     tipo: 'optin',
   },
-
-  // Opt-in — Instagram (vinculado a la página / Business Manager).
   {
     id: 'instagram_basic',
     label: 'Leer perfil y contenido de Instagram',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['instagram_basic'],
     tipo: 'optin',
   },
   {
     id: 'instagram_insights',
     label: 'Métricas de Instagram',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['instagram_manage_insights'],
     tipo: 'optin',
   },
   {
     id: 'instagram_comments',
     label: 'Gestionar comentarios de Instagram',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['instagram_manage_comments'],
     tipo: 'optin',
   },
   {
     id: 'instagram_publish',
     label: 'Publicar contenido en Instagram',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['instagram_content_publish'],
     tipo: 'optin',
   },
   {
     id: 'instagram_messaging',
     label: 'Mensajes directos de Instagram',
+    descripcion: 'Sin funcionalidad en el CRM todavía.',
+    grupo: 'opcional',
     scopesRequeridos: ['instagram_manage_messages'],
-    tipo: 'optin',
-  },
-
-  // Opt-in — WhatsApp Business Platform (Fase G3, PLAN-GESTION-LEADS-WHATSAPP.md).
-  // Solo lo piden las orgs que activan el módulo WHATSAPP — no toda org lo necesita.
-  {
-    id: 'whatsapp_management',
-    label: 'Vincular número de WhatsApp y ver plantillas',
-    scopesRequeridos: ['whatsapp_business_management'],
-    tipo: 'optin',
-  },
-  {
-    id: 'whatsapp_messaging',
-    label: 'Enviar y recibir mensajes de WhatsApp',
-    scopesRequeridos: ['whatsapp_business_messaging'],
     tipo: 'optin',
   },
 ];
 
-export const FEATURES_NUCLEO_IDS = MATRIZ_PERMISOS_META.filter(
-  (f) => f.tipo === 'nucleo',
-).map((f) => f.id);
+/** La feature aplica a la org: sin módulo exigido, o con ese módulo activo. */
+export function featureAplica(
+  feature: FeaturePermisoMeta,
+  modulosActivos: ReadonlySet<string>,
+): boolean {
+  return (
+    !feature.moduloRequerido || modulosActivos.has(feature.moduloRequerido)
+  );
+}
+
+/** Features que la org usa hoy (núcleo aplicables) — lo que pide «Solicitar permisos». */
+export function featuresRequeridasPara(
+  modulosActivos: ReadonlySet<string>,
+): FeaturePermisoMeta[] {
+  return MATRIZ_PERMISOS_META.filter(
+    (f) => f.tipo === 'nucleo' && featureAplica(f, modulosActivos),
+  );
+}
 
 export function scopesDeFeatures(featureIds: string[]): string[] {
   const ids = new Set(featureIds);
@@ -177,13 +262,23 @@ export function buscarFeature(
   return MATRIZ_PERMISOS_META.find((f) => f.id === featureId);
 }
 
-/** Lee las features deseadas persistidas (JSON) y siempre incluye las núcleo,
- * incluso si la columna aún es NULL (conexiones creadas antes de Fase 16.4). */
-export function featuresDeseadasDe(featuresDeseadas: unknown): string[] {
+/** Features a pedir para la org: todas las núcleo aplicables + las opt-in
+ * persistidas (JSON). Ignora ids desconocidos y núcleo de módulos inactivos;
+ * tolera la columna NULL (conexiones creadas antes de Fase 16.4). */
+export function featuresDeseadasDe(
+  featuresDeseadas: unknown,
+  modulosActivos: ReadonlySet<string>,
+): string[] {
   const persistidas =
     Array.isArray(featuresDeseadas) &&
     featuresDeseadas.every((x) => typeof x === 'string')
       ? featuresDeseadas
       : [];
-  return [...new Set([...FEATURES_NUCLEO_IDS, ...persistidas])];
+  const optin = persistidas.filter((id) => buscarFeature(id)?.tipo === 'optin');
+  return [
+    ...new Set([
+      ...featuresRequeridasPara(modulosActivos).map((f) => f.id),
+      ...optin,
+    ]),
+  ];
 }

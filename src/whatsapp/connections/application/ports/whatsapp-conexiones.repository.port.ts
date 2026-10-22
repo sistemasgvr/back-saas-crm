@@ -51,6 +51,14 @@ export interface WhatsappConexionesRepository {
   ): Promise<WhatsappConexionRow | null>;
   /** Misma resolución sin sesión: entry.id del webhook WhatsApp es el WABA. */
   findPorWabaId(wabaId: string): Promise<WhatsappConexionRow | null>;
+  /** Todas las líneas activas de un WABA (cualquier org) — eventos de cuenta
+   * del webhook que no traen phone_number_id. */
+  listarPorWabaId(wabaId: string): Promise<WhatsappConexionRow[]>;
+  /** Datos que Meta informa por webhook (account_update, nombre aprobado). */
+  actualizarDatosMeta(
+    id: string,
+    datos: { estadoNumero?: string; nombreVerificado?: string },
+  ): Promise<void>;
   /** Crea o reactiva (si estaba soft-deleted) — evita duplicar la vinculación. */
   vincular(input: VincularNumeroInput): Promise<WhatsappConexionRow>;
   desvincular(

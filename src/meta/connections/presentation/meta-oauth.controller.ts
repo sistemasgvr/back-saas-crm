@@ -86,8 +86,15 @@ export class MetaOAuthController {
     @Query('code') code: string,
     @Query('state') state: string,
     @Res() res: Response,
+    @Query('error') error?: string,
   ): Promise<void> {
     const frontendUrl = this.config.getOrThrow<string>('FRONTEND_URL');
+    // Meta vuelve con error=access_denied (sin code) si el usuario cancela el
+    // diálogo — no es una falla técnica; la conexión previa sigue intacta.
+    if (error === 'access_denied') {
+      res.redirect(`${frontendUrl}/settings/meta?meta=denied`);
+      return;
+    }
     try {
       if (!code || !state) {
         throw new Error('Faltan parámetros code/state');

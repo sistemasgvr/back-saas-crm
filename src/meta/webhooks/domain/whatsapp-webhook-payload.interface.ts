@@ -739,7 +739,7 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
           const waCrudo =
             direction === 'BUSINESS_INITIATED'
               ? call.to
-              : call.from ?? call.to;
+              : (call.from ?? call.to);
           out.llamadas.push({
             phoneNumberId,
             callId: call.id,
@@ -757,25 +757,8 @@ export function extraerEventosWhatsApp(payload: WhatsappWebhookPayload): {
         continue;
       }
 
-      if (field === 'smb_app_state_sync') {
-        logger.log(
-          'Ignorando campo webhook WhatsApp smb_app_state_sync (sync de contactos; no procesamos mensajes)',
-        );
-        continue;
-      }
-
-      if (field === 'account_settings_update') {
-        logger.log(
-          'Ignorando campo webhook WhatsApp account_settings_update (settings Calling; se consultan vía Graph)',
-        );
-        continue;
-      }
-
-      if (field) {
-        logger.warn(
-          `Campo webhook WhatsApp desconocido ignorado: ${field}`,
-        );
-      }
+      // El resto de campos (cuenta, plantillas, contactos de la app Business,
+      // preferencias, desconocidos) los procesa extraerEventosCuentaWhatsApp.
     }
   }
 

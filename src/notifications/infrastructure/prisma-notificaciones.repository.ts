@@ -133,12 +133,14 @@ export class PrismaNotificacionesRepository implements NotificacionesRepository 
 
   async findUsuarioIdsActivosDeOrganizacion(
     organizacionId: string,
+    roles?: string[],
   ): Promise<string[]> {
     const filas = await this.prisma.organizacionUsuario.findMany({
       where: {
         organizacionId,
         estado: 1,
         usuario: { estado: 1 },
+        ...(roles?.length ? { rol: { in: roles } } : {}),
       },
       select: { usuarioId: true },
     });

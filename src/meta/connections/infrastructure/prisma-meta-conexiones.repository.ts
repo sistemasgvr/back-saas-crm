@@ -126,6 +126,19 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     });
   }
 
+  async listarModulosActivos(organizacionId: string): Promise<string[]> {
+    const filas = await this.prisma.organizacionModulo.findMany({
+      where: {
+        organizacionId,
+        habilitado: 1,
+        estado: 1,
+        modulo: { estado: 1, grupo: { estado: 1 } },
+      },
+      select: { modulo: { select: { codigo: true } } },
+    });
+    return filas.map((fila) => fila.modulo.codigo);
+  }
+
   async actualizarCapiDatasetId(
     organizacionId: string,
     capiDatasetId: string | null,

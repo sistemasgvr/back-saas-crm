@@ -8,6 +8,7 @@ import { WhatsappMessagingModule } from '../../whatsapp/messaging/whatsapp-messa
 import { WhatsappConnectionsModule } from '../../whatsapp/connections/whatsapp-connections.module';
 import { WhatsappCallsModule } from '../../whatsapp/calls/whatsapp-calls.module';
 import { VerificarWebhookMetaUseCase } from './application/use-cases/verificar-webhook-meta.use-case';
+import { ProcesarEventoCuentaWhatsAppUseCase } from './application/use-cases/procesar-evento-cuenta-whatsapp.use-case';
 import { MetaWebhooksController } from './presentation/meta-webhooks.controller';
 import { LeadsModule } from '../../leads/leads.module';
 
@@ -24,6 +25,6 @@ import { LeadsModule } from '../../leads/leads.module';
     WhatsappCallsModule,
   ],
   controllers: [MetaWebhooksController],
-  providers: [VerificarWebhookMetaUseCase],
+  providers: [VerificarWebhookMetaUseCase, ProcesarEventoCuentaWhatsAppUseCase],
 })
 export class MetaWebhooksModule {}

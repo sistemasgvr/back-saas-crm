@@ -14,6 +14,9 @@ export interface CrearNotificacionInput {
   payload?: Record<string, unknown>;
   /** Si se omite, se resuelven todos los miembros activos de la organización. */
   usuarioIds?: string[];
+  /** Sin `usuarioIds`: limita los destinatarios a estos roles (ej. alertas
+   * operativas solo para PROPIETARIO/ADMINISTRADOR). */
+  roles?: string[];
 }
 
 /**
@@ -35,6 +38,7 @@ export class CrearNotificacionUseCase {
       input.usuarioIds ??
       (await this.repo.findUsuarioIdsActivosDeOrganizacion(
         input.organizacionId,
+        input.roles,
       ));
     if (usuarioIds.length === 0) return;
 

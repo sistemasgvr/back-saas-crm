@@ -97,6 +97,30 @@ export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRep
     return fila ? toRow(fila) : null;
   }
 
+  async listarPorWabaId(wabaId: string): Promise<WhatsappConexionRow[]> {
+    const filas = await this.prisma.whatsappConexion.findMany({
+      where: { wabaId, estado: 1 },
+      orderBy: { fechaCreacion: 'asc' },
+    });
+    return filas.map(toRow);
+  }
+
+  async actualizarDatosMeta(
+    id: string,
+    datos: { estadoNumero?: string; nombreVerificado?: string },
+  ): Promise<void> {
+    if (!datos.estadoNumero && !datos.nombreVerificado) return;
+    await this.prisma.whatsappConexion.update({
+      where: { id },
+      data: {
+        ...(datos.estadoNumero ? { estadoNumero: datos.estadoNumero } : {}),
+        ...(datos.nombreVerificado
+          ? { nombreVerificado: datos.nombreVerificado }
+          : {}),
+      },
+    });
+  }
+
   async vincular(input: VincularNumeroInput): Promise<WhatsappConexionRow> {
     const existente = await this.prisma.whatsappConexion.findFirst({
       where: {

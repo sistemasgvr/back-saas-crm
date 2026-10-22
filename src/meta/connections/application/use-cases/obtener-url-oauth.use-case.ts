@@ -33,14 +33,17 @@ export class ObtenerUrlOAuthUseCase {
 
     const state = this.oauthState.firmar({ organizacionId, usuarioId });
 
-    // Con `features` explícito (botón "Otorgar en Meta" de una fila puntual):
-    // se pide exactamente esa unión de scopes. Sin `features` (Conectar/Reconectar
-    // general): núcleo + lo que la org ya tiene marcado como deseado
-    // (PLAN.md Fase 16).
-    const scope =
-      features && features.length > 0
-        ? scopesDeFeatures(features)
-        : scopesDeFeatures(featuresDeseadasDe(conexion.featuresDeseadas));
+    // Siempre se piden juntos todos los permisos que usa el CRM hoy (núcleo
+    // aplicables a los módulos de la org) + los opt-in marcados: «Conectar»,
+    // «Solicitar permisos» y «Otorgar en Meta» resuelven todo en un solo
+    // diálogo. `features` agrega opt-in puntuales (PLAN.md Fase 16).
+    const modulosActivos = new Set(
+      await this.conexiones.listarModulosActivos(organizacionId),
+    );
+    const scope = scopesDeFeatures([
+      ...featuresDeseadasDe(conexion.featuresDeseadas, modulosActivos),
+      ...(features ?? []),
+    ]);
 
     const params = new URLSearchParams({
       client_id: conexion.appId,
@@ -49,8 +52,9 @@ export class ObtenerUrlOAuthUseCase {
       scope: scope.join(','),
       response_type: 'code',
     });
-    // Fuerza que Meta vuelva a mostrar el diálogo de permisos que el usuario
-    // haya denegado antes (PLAN.md Fase 16).
+    // Fuerza que Meta vuelva a mostrar los permisos que el usuario haya
+    // denegado antes — sin esto, un permiso rechazado una vez no se vuelve a
+    // preguntar (PLAN.md Fase 16).
     if (rerequest) {
       params.set('auth_type', 'rerequest');
     }
