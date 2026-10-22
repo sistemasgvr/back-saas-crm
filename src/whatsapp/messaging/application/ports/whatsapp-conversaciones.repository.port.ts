@@ -4,6 +4,7 @@ export const WHATSAPP_CONVERSACIONES_REPOSITORY = Symbol(
 );
 
 export interface ReferenciaNombrada {
+  activo?: boolean;
   id: string;
   nombre: string;
 }

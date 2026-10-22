@@ -1,4 +1,8 @@
 import {
+  USUARIO_ASIGNADO_SELECT,
+  referenciaUsuarioAsignado,
+} from '../../../shared/infrastructure/usuario-asignado';
+import {
   construirResultadoPaginado,
   type ResultadoPaginado,
 } from '../../../shared/application/paginacion';
@@ -50,28 +54,28 @@ function previewDesdeMensaje(m: {
 }
 
 const LEAD_CON_INMUEBLE_SELECT = {
+  organizacionId: true,
   id: true,
   nombre: true,
   origen: true,
   asignadoUsuarioId: true,
-  asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
+  asignadoUsuario: { select: USUARIO_ASIGNADO_SELECT },
   inmuebleInteres: { select: { id: true, codigo: true, titulo: true } },
 } as const;
-
-function nombreUsuario(u: { nombre: string; apellido: string | null }): string {
-  return [u.nombre, u.apellido].filter(Boolean).join(' ');
-}
 
 function mapearLead(
   lead: {
     id: string;
     nombre: string | null;
     origen: string;
+    organizacionId: string;
     asignadoUsuarioId: string | null;
     asignadoUsuario: {
       id: string;
       nombre: string;
       apellido: string | null;
+      estado: number;
+      organizacionUsuarios: { organizacionId: string; estado: number }[];
     } | null;
     inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
   } | null,
@@ -83,12 +87,10 @@ function mapearLead(
     nombre: lead.nombre ?? nombreFallback,
     origen: lead.origen,
     asignadoUsuarioId: lead.asignadoUsuarioId,
-    asignado: lead.asignadoUsuario
-      ? {
-          id: lead.asignadoUsuario.id,
-          nombre: nombreUsuario(lead.asignadoUsuario),
-        }
-      : null,
+    asignado: referenciaUsuarioAsignado(
+      lead.asignadoUsuario,
+      lead.organizacionId,
+    ),
     inmuebleInteres: lead.inmuebleInteres
       ? {
           id: lead.inmuebleInteres.id,
@@ -289,18 +291,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     ventanaExpiraEn: Date | null;
     noLeidos: number;
     bloqueado: number;
-    lead: {
-      id: string;
-      nombre: string | null;
-      origen: string;
-      asignadoUsuarioId: string | null;
-      asignadoUsuario: {
-        id: string;
-        nombre: string;
-        apellido: string | null;
-      } | null;
-      inmuebleInteres: { id: string; codigo: string; titulo: string } | null;
-    } | null;
+    lead: Parameters<typeof mapearLead>[0];
     mensajes: {
       texto: string | null;
       mediaCaption: string | null;

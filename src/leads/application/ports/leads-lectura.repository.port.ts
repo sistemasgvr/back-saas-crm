@@ -28,6 +28,7 @@ export interface FiltroLeads {
 }
 
 export interface ReferenciaNombrada {
+  activo?: boolean;
   id: string;
   nombre: string;
 }

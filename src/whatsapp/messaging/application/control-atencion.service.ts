@@ -477,14 +477,7 @@ export class ControlAtencionService {
         orderBy: { usuario: { nombre: 'asc' } },
       });
       return miembros
-        .filter(
-          (m) =>
-            m.usuarioId !== c.controlUsuarioId &&
-            puedeEscribirConversacionWhatsApp(c.lead, {
-              usuarioId: m.usuarioId,
-              rol: m.rol as RolOrganizacion,
-            }),
-        )
+        .filter((m) => m.usuarioId !== c.controlUsuarioId)
         .map((m) => ({ ...m.usuario, rol: m.rol }));
     });
   }
@@ -580,16 +573,43 @@ export class ControlAtencionService {
           usuario: { estado: 1 },
         },
       });
-      if (
-        !miembro ||
-        !puedeEscribirConversacionWhatsApp(c.lead, {
-          usuarioId: destino,
-          rol: miembro.rol as RolOrganizacion,
-        })
-      )
+      if (!miembro)
         throw new ForbiddenException(
-          'El destinatario debe tener permiso de escritura sobre el lead',
+          'El destinatario debe ser un usuario activo de esta empresa',
         );
+      const pendientes = await tx.whatsappSalidaIntento.count({
+        where: {
+          organizacionId: org,
+          conversacionId: id,
+          estado: 'DESPACHANDO',
+        },
+      });
+      if (pendientes)
+        throw new ConflictException(
+          'Espera a que terminen los envíos anteriores',
+        );
+      // La transferencia entrega también el lead: el destinatario podrá
+      // escribir y encontrará la conversación entre sus chats.
+      if (c.leadId && c.lead && c.lead.asignadoUsuarioId !== destino) {
+        const cambio = await tx.lead.updateMany({
+          where: {
+            id: c.leadId,
+            organizacionId: org,
+            estado: 1,
+            asignadoUsuarioId: c.lead.asignadoUsuarioId,
+          },
+          data: {
+            asignadoUsuarioId: destino,
+            asignadoEn: new Date(),
+            asignadoPorUsuarioId: ctx.usuarioId,
+            usuarioEdicion: ctx.usuarioId,
+          },
+        });
+        if (cambio.count !== 1)
+          throw new ConflictException(
+            'La asignación cambió; actualiza el chat',
+          );
+      }
       const nuevo = await tx.whatsappConversacion.update({
         where: { id },
         data: {

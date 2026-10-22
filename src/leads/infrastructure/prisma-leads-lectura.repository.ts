@@ -1,3 +1,7 @@
+import {
+  USUARIO_ASIGNADO_SELECT,
+  referenciaUsuarioAsignado,
+} from '../../shared/infrastructure/usuario-asignado';
 import type { ResultadoPaginado } from '../../shared/application/paginacion';
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
@@ -26,7 +30,7 @@ type LeadConRelaciones = Prisma.LeadGetPayload<{
     campana: true;
     anuncio: true;
     conjuntoAnuncio: true;
-    asignadoUsuario: true;
+    asignadoUsuario: { select: typeof USUARIO_ASIGNADO_SELECT };
     inmuebleInteres: { select: typeof INMUEBLE_INTERES_SELECT };
   };
 }>;
@@ -70,7 +74,10 @@ function toResumen(lead: LeadConRelaciones): LeadResumen {
     anuncio: refOpcional(lead.anuncio),
     tipoLead: lead.tipoLead,
     origen: lead.origen,
-    asignado: nombreUsuario(lead.asignadoUsuario),
+    asignado: referenciaUsuarioAsignado(
+      lead.asignadoUsuario,
+      lead.organizacionId,
+    ),
     estadoGestion: lead.estadoGestion,
     inmuebleInteres: inmuebleInteresRef(lead.inmuebleInteres),
   };
@@ -181,7 +188,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
           campana: true,
           anuncio: true,
           conjuntoAnuncio: true,
-          asignadoUsuario: true,
+          asignadoUsuario: { select: USUARIO_ASIGNADO_SELECT },
           inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
         },
         orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
@@ -209,7 +216,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
         campana: true,
         anuncio: true,
         conjuntoAnuncio: true,
-        asignadoUsuario: true,
+        asignadoUsuario: { select: USUARIO_ASIGNADO_SELECT },
         inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
       },
     });
@@ -356,7 +363,7 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
     const leads = await this.prisma.lead.findMany({
       where,
       include: {
-        asignadoUsuario: true,
+        asignadoUsuario: { select: USUARIO_ASIGNADO_SELECT },
         inmuebleInteres: { select: INMUEBLE_INTERES_SELECT },
       },
       orderBy: [{ fechaLead: 'desc' }, { id: 'desc' }],
@@ -371,7 +378,10 @@ export class PrismaLeadsLecturaRepository implements LeadsLecturaRepository {
       email: lead.email,
       tipoLead: lead.tipoLead,
       origen: lead.origen,
-      asignado: nombreUsuario(lead.asignadoUsuario),
+      asignado: referenciaUsuarioAsignado(
+        lead.asignadoUsuario,
+        lead.organizacionId,
+      ),
       estadoGestion: lead.estadoGestion,
       fechaLead: lead.fechaLead,
       inmuebleInteres: inmuebleInteresRef(lead.inmuebleInteres),

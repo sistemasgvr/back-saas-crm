@@ -715,7 +715,7 @@ describe('Selección de asesores para transferencia', () => {
     rol,
     usuario: { id, nombre: id, apellido: null },
   });
-  it('ofrece miembros del tenant con permiso sobre el lead y excluye al responsable', async () => {
+  it('ofrece agentes activos aunque el lead pertenezca a otro y excluye al responsable', async () => {
     const f = fixture();
     f.c().lead = { asignadoUsuarioId: 'ana' };
     await f.service.tomar('org', 'chat', humano, 0);
@@ -726,7 +726,7 @@ describe('Selección de asesores para transferencia', () => {
     );
     expect(
       (await f.service.asesores('org', 'chat', humano)).map((m) => m.id),
-    ).toEqual(['admin']);
+    ).toEqual(['otro', 'admin']);
     expect(f.tx.organizacionUsuario.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -737,6 +737,96 @@ describe('Selección de asesores para transferencia', () => {
         },
       }),
     );
+  });
+  it('transfiere atención y asignación al agente elegido para que pueda escribir', async () => {
+    const f = fixture();
+    f.c().leadId = 'lead';
+    f.c().lead = { asignadoUsuarioId: 'inactivo' };
+    const admin = { usuarioId: 'admin', rol: 'ADMINISTRADOR' as const };
+    const tomado = await f.service.tomar('org', 'chat', admin, 0);
+    const transferido = await f.service.transferir(
+      'org',
+      'chat',
+      admin,
+      'david',
+      tomado.controlVersion,
+    );
+    expect(transferido.controlUsuarioId).toBe('david');
+    expect(f.c().lead?.asignadoUsuarioId).toBe('david');
+    expect(f.tx.lead.updateMany).toHaveBeenCalledTimes(1);
+    expect(f.tx.lead.updateMany.mock.calls[0][0]).toMatchObject({
+      where: {
+        id: 'lead',
+        organizacionId: 'org',
+        estado: 1,
+        asignadoUsuarioId: 'inactivo',
+      },
+      data: {
+        asignadoUsuarioId: 'david',
+        asignadoPorUsuarioId: 'admin',
+      },
+    });
+    await expect(
+      f.service.despachar(
+        'org',
+        'chat',
+        { tipo: 'HUMAN', usuarioId: 'david', rol: 'USUARIO' },
+        'texto',
+        () => Promise.resolve({ messages: [{ id: 'mensaje-david' }] }),
+      ),
+    ).resolves.toEqual({ messages: [{ id: 'mensaje-david' }] });
+  });
+  it('rechaza destinatarios desactivados o de otra empresa', async () => {
+    const f = fixture();
+    const tomado = await f.service.tomar('org', 'chat', humano, 0);
+    f.tx.organizacionUsuario.findFirst
+      .mockResolvedValueOnce({ usuarioId: 'ana', rol: 'USUARIO' })
+      .mockResolvedValueOnce(null);
+    await expect(
+      f.service.transferir(
+        'org',
+        'chat',
+        humano,
+        'inactivo',
+        tomado.controlVersion,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(f.tx.lead.updateMany).not.toHaveBeenCalled();
+  });
+  it('no transfiere mientras hay un envío en curso ni si cambió la asignación', async () => {
+    const f = fixture();
+    f.c().leadId = 'lead';
+    f.c().lead = { asignadoUsuarioId: 'ana' };
+    const tomado = await f.service.tomar('org', 'chat', humano, 0);
+    f.intentos.push({
+      id: 'envio',
+      actor: 'HUMAN',
+      estado: 'DESPACHANDO',
+      organizacionId: 'org',
+      conversacionId: 'chat',
+    });
+    await expect(
+      f.service.transferir(
+        'org',
+        'chat',
+        humano,
+        'david',
+        tomado.controlVersion,
+      ),
+    ).rejects.toThrow(ConflictException);
+    expect(f.tx.lead.updateMany).not.toHaveBeenCalled();
+    f.intentos.length = 0;
+    f.tx.lead.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      f.service.transferir(
+        'org',
+        'chat',
+        humano,
+        'david',
+        tomado.controlVersion,
+      ),
+    ).rejects.toThrow('La asignación cambió');
+    expect(f.c().controlUsuarioId).toBe('ana');
   });
   it('un chat libre puede transferirse a otro miembro activo', async () => {
     const f = fixture();
