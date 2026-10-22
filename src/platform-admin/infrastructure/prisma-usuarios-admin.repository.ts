@@ -100,10 +100,11 @@ export class PrismaUsuariosAdminRepository implements UsuariosAdminRepository {
   }
 
   cambiarEstado(id: string, estado: 0 | 1, usuarioEdicion: string) {
-    return this.prisma.usuario.update({
-      where: { id },
-      data: { estado, usuarioEdicion },
-    });
+    return this.gestion.cambiarEstadoCuentaPlataforma(
+      id,
+      estado,
+      usuarioEdicion,
+    );
   }
 
   async asignarAOrganizacion(

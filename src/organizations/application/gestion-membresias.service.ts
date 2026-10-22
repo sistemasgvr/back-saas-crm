@@ -343,6 +343,63 @@ export class GestionMembresiasService {
     });
   }
 
+  async cambiarEstadoCuentaPlataforma(
+    usuarioId: string,
+    estado: 0 | 1,
+    actorId: string,
+  ) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const actor = await tx.usuario.findUnique({ where: { id: actorId } });
+        if (actor?.estado !== 1 || actor.esAdminPlataforma !== 1)
+          throw new ForbiddenException('Solo plataforma');
+
+        const membresias = await tx.organizacionUsuario.findMany({
+          where: { usuarioId, estado: 1 },
+          select: { organizacionId: true },
+          orderBy: { organizacionId: 'asc' },
+        });
+        // El mismo orden que las altas/asignaciones: empresa antes de usuario.
+        // La reactivación global también vuelve a consumir las plazas de sus
+        // membresías activas, aunque estas nunca se hayan desactivado.
+        for (const m of membresias)
+          await this.bloquear(
+            tx,
+            `org-usuarios:${m.organizacionId.toLowerCase()}`,
+          );
+        await this.bloquear(tx, `usuario-empresa:${usuarioId.toLowerCase()}`);
+        const usuario = await tx.usuario.findUnique({
+          where: { id: usuarioId },
+        });
+        if (!usuario) throw new NotFoundException('Usuario no encontrado');
+        if (
+          estado === 1 &&
+          usuario.estado !== 1 &&
+          usuario.esAdminPlataforma !== 1
+        ) {
+          const actuales = await tx.organizacionUsuario.findMany({
+            where: { usuarioId, estado: 1 },
+            select: { organizacionId: true },
+          });
+          const bloqueadas = new Set(membresias.map((m) => m.organizacionId));
+          for (const m of actuales) {
+            if (!bloqueadas.has(m.organizacionId))
+              throw new ConflictException(
+                'La membresía cambió. Vuelve a intentarlo.',
+              );
+            await this.cupo(tx, m.organizacionId);
+          }
+        }
+
+        return tx.usuario.update({
+          where: { id: usuarioId },
+          data: { estado, usuarioEdicion: actorId },
+        });
+      },
+      { timeout: 20000 },
+    );
+  }
+
   async crearCuentaPlataforma(
     input: {
       email: string;
