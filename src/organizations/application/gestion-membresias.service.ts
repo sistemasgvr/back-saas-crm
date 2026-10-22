@@ -161,14 +161,44 @@ export class GestionMembresiasService {
     }
   }
 
-  private async unaEmpresa(tx: Tx, org: string, usuarioId: string) {
+  private async unaEmpresa(
+    tx: Tx,
+    org: string,
+    usuarioId: string,
+    plataforma = false,
+  ) {
     await this.bloquear(tx, `usuario-empresa:${usuarioId.toLowerCase()}`);
     if (
       await tx.organizacionUsuario.count({
         where: { usuarioId, organizacionId: { not: org } },
       })
     )
-      throw new ConflictException(noDisponible);
+      throw plataforma
+        ? await this.yaRegistrado(tx, usuarioId, org)
+        : new ConflictException(noDisponible);
+  }
+
+  /** Comprobación previa para plataforma (p. ej. antes de crear una empresa
+   * con su propietario); el alta vuelve a validarlo bajo bloqueo. */
+  async verificarEmailLibre(email: string) {
+    const existente = await this.prisma.usuario.findFirst({
+      where: { email: { equals: email.trim(), mode: 'insensitive' } },
+    });
+    if (existente) throw await this.yaRegistrado(this.prisma, existente.id);
+  }
+
+  /** Solo para plataforma: a una empresa cliente no se le revela otra empresa. */
+  private async yaRegistrado(tx: Tx, usuarioId: string, org?: string) {
+    const m = await tx.organizacionUsuario.findFirst({
+      where: { usuarioId, ...(org ? { organizacionId: { not: org } } : {}) },
+      orderBy: { estado: 'desc' },
+      include: { organizacion: { select: { nombre: true } } },
+    });
+    return new ConflictException(
+      m
+        ? `Este correo ya está registrado en la empresa "${m.organizacion.nombre}"${m.estado === 1 ? '' : ' (desactivado)'}.`
+        : 'Este correo ya está registrado en otra cuenta.',
+    );
   }
 
   private async protegerCuentaPlataforma(
@@ -418,12 +448,10 @@ export class GestionMembresiasService {
     const crear = async (tx: Tx, plataforma: boolean) => {
       if (!plataforma) throw new ForbiddenException('Solo plataforma');
       await this.bloquear(tx, `usuario-email:${email}`);
-      if (
-        await tx.usuario.findFirst({
-          where: { email: { equals: email, mode: 'insensitive' } },
-        })
-      )
-        throw new ConflictException(noDisponible);
+      const existente = await tx.usuario.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      });
+      if (existente) throw await this.yaRegistrado(tx, existente.id);
       if (input.asignacion && !input.esAdminPlataforma)
         await this.cupo(tx, input.asignacion.organizacionId);
       const usuario = await tx.usuario.create({
@@ -474,7 +502,7 @@ export class GestionMembresiasService {
     ctx: RequestContext,
   ) {
     return this.ejecutar(org, ctx, async (tx, plataforma) => {
-      await this.unaEmpresa(tx, org, usuarioId);
+      await this.unaEmpresa(tx, org, usuarioId, plataforma);
       const usuario = await tx.usuario.findUnique({ where: { id: usuarioId } });
       if (!usuario || usuario.estado !== 1)
         throw new NotFoundException('Usuario no disponible');
