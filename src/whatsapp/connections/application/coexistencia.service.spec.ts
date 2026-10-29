@@ -147,6 +147,25 @@ describe('Alta de coexistencia', () => {
       }) as unknown,
     });
   });
+  it('sin URI capturada intercambia el code como la guía oficial, sin redirect_uri', async () => {
+    const f = fixture();
+    f.http.get
+      .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
+      .mockReturnValueOnce(
+        of({ data: { data: { is_valid: true, app_id: '123' } } }),
+      );
+    await expect(
+      f.service.intercambiar('org', 'user', 'code'),
+    ).resolves.toEqual({ sessionId: 'session' });
+    expect(f.http.get).toHaveBeenNthCalledWith(
+      1,
+      'https://graph.facebook.com/v26.0/oauth/access_token',
+      {
+        params: { client_id: '123', client_secret: 'secret', code: 'code' },
+        timeout: 10000,
+      },
+    );
+  });
   it('explica el mismatch del redirect sin crear sesiones ni reintentar códigos', async () => {
     const f = fixture();
     const error = new AxiosError('Request failed');

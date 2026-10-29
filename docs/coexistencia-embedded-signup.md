@@ -97,6 +97,15 @@ El servidor exige esa URI y solo acepta las rutas internas previstas del SDK,
 con HTTPS y sin credenciales de URL; no sustituye la URI por el callback OAuth
 del backend ni reintenta códigos probando distintas direcciones.
 
+Revisión 28/10/2026 contra la guía oficial: el intercambio documentado por Meta
+(onboarding-customers-as-a-tech-provider) usa solo client_id, client_secret y code.
+Si el frontend no captura la URI, el backend omite redirect_uri (no envía vacío).
+La guía de coexistencia exige `sessionInfoVersion: "3"` en `extras`; faltaba y
+sin él Meta puede no enviar el evento con waba_id. El SDK se precarga al abrir
+la pantalla para lanzar el popup con un solo clic. El aviso “no puede incorporar
+clientes en este momento” lo emite Meta por elegibilidad de la app (Tech
+Provider, verificación de empresa, acceso avanzado, app Live), no el CRM.
+
 Este cambio requiere desplegar backend y frontend juntos y recargar el navegador.
 No requiere migraciones nuevas. La prueba real posterior al despliegue sigue
 pendiente; las pruebas locales cubren captura GET/POST, aislamiento por App ID

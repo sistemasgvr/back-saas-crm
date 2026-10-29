@@ -136,34 +136,37 @@ export class CoexistenciaService {
     organizacionId: string,
     usuarioId: string,
     code: string,
-    redirectUri: string,
+    redirectUri?: string,
   ) {
-    // Solo admitir destinos internos del SDK oficial. Se conserva la cadena
-    // exacta, incluido el fragmento, para que Meta valide el mismo diálogo.
-    let uri: URL;
-    try {
-      uri = new URL(redirectUri);
-    } catch {
-      throw new BadRequestException(
-        'Falta la URI original del diálogo de Meta. Actualiza el CRM y vuelve a conectar.',
-      );
+    // Sin URI se sigue la guía oficial (client_id, client_secret y code).
+    // Con URI solo se admiten destinos internos del SDK y se conserva la
+    // cadena exacta, incluido el fragmento, para que Meta valide el diálogo.
+    if (redirectUri !== undefined) {
+      let uri: URL;
+      try {
+        uri = new URL(redirectUri);
+      } catch {
+        throw new BadRequestException(
+          'La URI del diálogo de Meta no es válida. Actualiza el CRM y vuelve a conectar.',
+        );
+      }
+      const arbiter =
+        ['staticxx.facebook.com', 'www.facebook.com'].includes(uri.hostname) &&
+        /^\/x\/connect\/xd_arbiter\/?$/.test(uri.pathname);
+      const success =
+        uri.hostname === 'www.facebook.com' &&
+        uri.pathname === '/connect/login_success.html';
+      if (
+        uri.protocol !== 'https:' ||
+        uri.username ||
+        uri.password ||
+        uri.port ||
+        (!arbiter && !success)
+      )
+        throw new BadRequestException(
+          'La URI del diálogo no pertenece al SDK de Facebook.',
+        );
     }
-    const arbiter =
-      ['staticxx.facebook.com', 'www.facebook.com'].includes(uri.hostname) &&
-      /^\/x\/connect\/xd_arbiter\/?$/.test(uri.pathname);
-    const success =
-      uri.hostname === 'www.facebook.com' &&
-      uri.pathname === '/connect/login_success.html';
-    if (
-      uri.protocol !== 'https:' ||
-      uri.username ||
-      uri.password ||
-      uri.port ||
-      (!arbiter && !success)
-    )
-      throw new BadRequestException(
-        'La URI del diálogo no pertenece al SDK de Facebook.',
-      );
     const setup = await this.configuracion(organizacionId);
     if (!setup.configId)
       throw new BadRequestException(
@@ -178,7 +181,7 @@ export class CoexistenciaService {
         client_id: c.appId,
         client_secret: secret,
         code,
-        redirect_uri: redirectUri,
+        ...(redirectUri !== undefined ? { redirect_uri: redirectUri } : {}),
       },
     );
     if (!token.access_token)

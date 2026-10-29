@@ -20,7 +20,12 @@ import { CoexistenciaService } from '../application/coexistencia.service';
 
 class CodigoDto {
   @IsString() @MinLength(1) @MaxLength(4096) code!: string;
-  @IsString() @MinLength(1) @MaxLength(8192) redirectUri!: string;
+  // Opcional: la guía oficial de Embedded Signup intercambia el code sin redirect_uri.
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(8192)
+  redirectUri?: string;
 }
 class CompletarDto {
   @IsUUID() sessionId!: string;
