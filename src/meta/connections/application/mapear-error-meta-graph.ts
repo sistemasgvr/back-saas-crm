@@ -1,5 +1,6 @@
 import {
   BadGatewayException,
+  BadRequestException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -129,6 +130,12 @@ function construirExcepcionMeta(error: unknown): HttpException {
   const code = graph?.code;
   const subcode = graph?.error_subcode;
   const permisos = extraerPermisosMencionados(mensajeMeta);
+
+  if (code === 100 && /redirect_uri|redirect uri/i.test(mensajeMeta)) {
+    return new BadRequestException(
+      'Meta rechazó el código de autorización porque la URI de redirección no coincide con la del inicio de sesión. Inicia una nueva conexión después de revisar el intercambio del código; no cambies los tokens del webhook.',
+    );
+  }
 
   // Token inválido / expirado / sesión
   if (

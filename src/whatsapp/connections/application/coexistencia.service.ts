@@ -92,7 +92,7 @@ export class CoexistenciaService {
 
   private async get<T>(
     path: string,
-    token: string,
+    token: string | undefined,
     params: Record<string, string> = {},
   ): Promise<T> {
     try {
@@ -101,7 +101,9 @@ export class CoexistenciaService {
           this.http.get<T>(
             `https://graph.facebook.com/${obtenerVersionGraph(this.config)}${path}`,
             {
-              headers: { Authorization: `Bearer ${token}` },
+              ...(token
+                ? { headers: { Authorization: `Bearer ${token}` } }
+                : {}),
               params,
               timeout: 10000,
             },
@@ -140,8 +142,16 @@ export class CoexistenciaService {
     const secret = this.encryption.decrypt(c.appSecretCifrado);
     const token = await this.get<{ access_token: string }>(
       '/oauth/access_token',
-      `${c.appId}|${secret}`,
-      { client_id: c.appId, client_secret: secret, code },
+      undefined,
+      {
+        client_id: c.appId,
+        client_secret: secret,
+        code,
+        // El SDK entrega el code por su callback JS, no por nuestro callback
+        // OAuth de Facebook. Enviar explícitamente el valor vacío para este
+        // intercambio; nunca reutilizar META_OAUTH_REDIRECT_URI aquí.
+        redirect_uri: '',
+      },
     );
     if (!token.access_token)
       throw new BadRequestException('Meta no devolvió una credencial de alta.');

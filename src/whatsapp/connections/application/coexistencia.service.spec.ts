@@ -1,4 +1,5 @@
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
+import { AxiosError } from 'axios';
 import { CoexistenciaService } from './coexistencia.service';
 
 function fixture() {
@@ -87,6 +88,69 @@ function fixture() {
 }
 
 describe('Alta de coexistencia', () => {
+  it('intercambia el code del SDK con redirect_uri vacío y sin Bearer de app, conservando la validación del grant', async () => {
+    const f = fixture();
+    f.http.get
+      .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
+      .mockReturnValueOnce(
+        of({ data: { data: { is_valid: true, app_id: '123' } } }),
+      );
+    await expect(
+      f.service.intercambiar('org', 'user', 'code'),
+    ).resolves.toEqual({ sessionId: 'session' });
+    expect(f.http.get).toHaveBeenNthCalledWith(
+      1,
+      'https://graph.facebook.com/v26.0/oauth/access_token',
+      {
+        params: {
+          client_id: '123',
+          client_secret: 'secret',
+          code: 'code',
+          redirect_uri: '',
+        },
+        timeout: 10000,
+      },
+    );
+    expect(f.http.get).toHaveBeenNthCalledWith(
+      2,
+      'https://graph.facebook.com/v26.0/debug_token',
+      {
+        params: { input_token: 'grant' },
+        headers: { Authorization: 'Bearer 123|secret' },
+        timeout: 10000,
+      },
+    );
+    expect(f.db.whatsappOnboarding.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizacionId: 'org',
+        usuarioId: 'user',
+        tokenCifrado: 'encrypted:grant',
+      }) as unknown,
+    });
+  });
+  it('explica el mismatch del redirect sin crear sesiones ni reintentar códigos', async () => {
+    const f = fixture();
+    const error = new AxiosError('Request failed');
+    Object.assign(error, {
+      response: {
+        status: 400,
+        data: {
+          error: {
+            code: 100,
+            error_subcode: 36008,
+            message:
+              'Error validating verification code. Please make sure your redirect_uri is identical to the one you used in the OAuth dialog request',
+          },
+        },
+      },
+    });
+    f.http.get.mockReturnValue(throwError(() => error));
+    await expect(f.service.intercambiar('org', 'user', 'code')).rejects.toThrow(
+      'URI de redirección',
+    );
+    expect(f.http.get).toHaveBeenCalledTimes(1);
+    expect(f.db.whatsappOnboarding.create).not.toHaveBeenCalled();
+  });
   it('lee el Configuration ID de la conexión de la empresa', async () => {
     const f = fixture();
     await expect(f.service.configuracion('org')).resolves.toEqual({
