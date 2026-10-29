@@ -101,20 +101,42 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
     id: string,
     usuarioEdicion: string,
   ): Promise<void> {
-    await this.prisma.metaConexion.update({
-      where: { id },
-      data: {
-        metaUserId: null,
-        metaUserNombre: null,
-        tokenCifrado: null,
-        tokenExpiraEn: null,
-        scopes: null,
-        pageId: null,
-        pageNombre: null,
-        adAccountId: null,
-        adAccountNombre: null,
-        usuarioEdicion,
-      },
+    // La sesión de Meta y las rutas de WhatsApp se desconectan juntas.
+    // Conservar las filas permite volver a vincular sin perder conversaciones.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.whatsappConexion.updateMany({
+        where: { metaConexionId: id, estado: 1 },
+        data: {
+          estado: 0,
+          estadoNumero: null,
+          webhookSuscrito: 0,
+          webhookSuscritoEn: null,
+          webhookUltimoCheckEn: null,
+          webhookUltimoError: null,
+          callingHabilitado: 0,
+          callingUltimoError: null,
+          usuarioEdicion,
+        },
+      });
+      await tx.whatsappOnboarding.updateMany({
+        where: { metaConexionId: id, estado: 'TOKEN' },
+        data: { estado: 'CANCELADO', tokenCifrado: '' },
+      });
+      await tx.metaConexion.update({
+        where: { id },
+        data: {
+          metaUserId: null,
+          metaUserNombre: null,
+          tokenCifrado: null,
+          tokenExpiraEn: null,
+          scopes: null,
+          pageId: null,
+          pageNombre: null,
+          adAccountId: null,
+          adAccountNombre: null,
+          usuarioEdicion,
+        },
+      });
     });
   }
 

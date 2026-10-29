@@ -112,7 +112,18 @@ describe('Alta de coexistencia', () => {
     f.http.get
       .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
       .mockReturnValueOnce(
-        of({ data: { data: { is_valid: true, app_id: '123' } } }),
+        of({
+          data: {
+            data: {
+              is_valid: true,
+              app_id: '123',
+              scopes: [
+                'whatsapp_business_management',
+                'whatsapp_business_messaging',
+              ],
+            },
+          },
+        }),
       );
     await expect(
       f.service.intercambiar('org', 'user', 'code', REDIRECT_URI),
@@ -152,7 +163,18 @@ describe('Alta de coexistencia', () => {
     f.http.get
       .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
       .mockReturnValueOnce(
-        of({ data: { data: { is_valid: true, app_id: '123' } } }),
+        of({
+          data: {
+            data: {
+              is_valid: true,
+              app_id: '123',
+              scopes: [
+                'whatsapp_business_management',
+                'whatsapp_business_messaging',
+              ],
+            },
+          },
+        }),
       );
     await expect(
       f.service.intercambiar('org', 'user', 'code'),
@@ -312,10 +334,64 @@ describe('Alta de coexistencia', () => {
   it('no vuelve a sincronizar una sesión ya completada', async () => {
     const f = fixture();
     Object.assign(f.s, { estado: 'COMPLETO', phoneNumberId: 'phone' });
+    f.lineas.findPorPhoneNumberId.mockResolvedValue({
+      organizacionId: 'org',
+      metaConexionId: 'meta',
+    });
     await expect(
       f.service.completar('org', 'user', 'session', 'waba'),
     ).resolves.toEqual({ ok: true, phoneNumberId: 'phone' });
     expect(f.http.post).not.toHaveBeenCalled();
+  });
+  it('no confirma éxito de una sesión antigua si la línea ya se desvinculó', async () => {
+    const f = fixture();
+    Object.assign(f.s, { estado: 'COMPLETO', phoneNumberId: 'phone' });
+    await expect(
+      f.service.completar('org', 'user', 'session', 'waba'),
+    ).rejects.toThrow('ya no está activa');
+    expect(f.http.post).not.toHaveBeenCalled();
+  });
+  it('una sesión cancelada al desconectar no puede reactivar la línea', async () => {
+    const f = fixture();
+    Object.assign(f.s, { estado: 'CANCELADO', tokenCifrado: '' });
+    f.db.whatsappOnboarding.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      f.service.completar('org', 'user', 'session', 'waba'),
+    ).rejects.toThrow('necesita revisión');
+    expect(f.lineas.vincular).not.toHaveBeenCalled();
+    expect(f.http.get).not.toHaveBeenCalled();
+  });
+  it('vacía el grant de una sesión pendiente que expiró', async () => {
+    const f = fixture();
+    f.s.expiraEn = new Date(Date.now() - 1000);
+    await expect(
+      f.service.completar('org', 'user', 'session', 'waba'),
+    ).rejects.toThrow('expiró');
+    expect(f.db.whatsappOnboarding.updateMany).toHaveBeenCalledWith({
+      where: { id: 'session', estado: 'TOKEN' },
+      data: { estado: 'EXPIRADO', tokenCifrado: '' },
+    });
+    expect(f.http.get).not.toHaveBeenCalled();
+  });
+  it('un token válido sin permiso de mensajes no se convierte en una sesión de alta', async () => {
+    const f = fixture();
+    f.http.get
+      .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
+      .mockReturnValueOnce(
+        of({
+          data: {
+            data: {
+              is_valid: true,
+              app_id: '123',
+              scopes: ['whatsapp_business_management'],
+            },
+          },
+        }),
+      );
+    await expect(f.service.intercambiar('org', 'user', 'code')).rejects.toThrow(
+      'whatsapp_business_messaging',
+    );
+    expect(f.db.whatsappOnboarding.create).not.toHaveBeenCalled();
   });
   it('rechaza un grant emitido para otra aplicación', async () => {
     const f = fixture();

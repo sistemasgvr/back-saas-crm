@@ -1,4 +1,12 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { META_CONEXIONES_REPOSITORY } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../../meta/connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../../meta/connections/application/ports/meta-graph-client.port';
@@ -24,8 +32,8 @@ export class VincularNumeroUseCase {
     organizacionId: string,
     wabaId: string,
     phoneNumberId: string,
-    numeroDisplay: string | undefined,
-    nombreVerificado: string | undefined,
+    _numeroDisplay: string | undefined,
+    _nombreVerificado: string | undefined,
     usuarioEdicion: string,
   ) {
     const conexion =
@@ -37,14 +45,41 @@ export class VincularNumeroUseCase {
     }
 
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
+    // El selector puede estar desactualizado. Meta, no los datos del navegador,
+    // debe confirmar la pareja WABA/número y su conexión actual con Cloud API.
+    const disponibles = await this.graph.listarNumerosWhatsApp(accessToken);
+    const activo = disponibles.find(
+      (n) => n.wabaId === wabaId && n.phoneNumberId === phoneNumberId,
+    );
+    if (!activo)
+      throw new ForbiddenException(
+        'El número ya no está disponible en la cuenta de Meta de esta empresa. Actualiza el listado.',
+      );
+    const existente =
+      await this.whatsappConexiones.findPorPhoneNumberId(phoneNumberId);
+    if (existente && existente.organizacionId !== organizacionId)
+      throw new ConflictException(
+        'El número ya pertenece a otra organización del CRM.',
+      );
+    const salud = await this.graph.obtenerSaludNumeroWhatsApp(
+      phoneNumberId,
+      accessToken,
+    );
+    if (salud.status !== 'CONNECTED' || salud.platform_type !== 'CLOUD_API')
+      throw new BadRequestException(
+        salud.is_on_biz_app
+          ? 'El número funciona en WhatsApp Business, pero Meta todavía no confirma su conexión con Cloud API. Completa el alta de coexistencia del mismo número antes de vincularlo al CRM.'
+          : 'Meta todavía no confirma este número conectado a Cloud API. Completa su configuración en Meta y vuelve a vincularlo.',
+      );
 
     const numero = await this.whatsappConexiones.vincular({
       organizacionId,
       metaConexionId: conexion.id,
       wabaId,
       phoneNumberId,
-      numeroDisplay,
-      nombreVerificado,
+      numeroDisplay: activo.displayPhoneNumber,
+      nombreVerificado: activo.verifiedName,
+      estadoNumero: salud.status,
       usuarioEdicion,
     });
 

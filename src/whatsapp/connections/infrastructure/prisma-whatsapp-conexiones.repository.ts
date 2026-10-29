@@ -127,14 +127,29 @@ export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRep
         organizacionId: input.organizacionId,
         phoneNumberId: input.phoneNumberId,
       },
+      orderBy: [{ estado: 'desc' }, { fechaModificacion: 'desc' }],
     });
 
+    const nuevaVinculacion =
+      !existente ||
+      existente.estado !== 1 ||
+      existente.metaConexionId !== input.metaConexionId ||
+      existente.wabaId !== input.wabaId;
     const data = {
       metaConexionId: input.metaConexionId,
       wabaId: input.wabaId,
       numeroDisplay: input.numeroDisplay,
       nombreVerificado: input.nombreVerificado,
-      estadoNumero: input.estadoNumero,
+      // undefined en Prisma conserva el valor anterior (p. ej. DISCONNECTED).
+      // Sin una lectura nueva, el estado debe quedar desconocido.
+      estadoNumero: input.estadoNumero ?? null,
+      webhookSuscrito: 0,
+      webhookSuscritoEn: null,
+      webhookUltimoCheckEn: null,
+      webhookUltimoError: null,
+      ...(nuevaVinculacion
+        ? { callingHabilitado: 0, callingUltimoError: null }
+        : {}),
       estado: 1,
       usuarioEdicion: input.usuarioEdicion,
     };
@@ -166,9 +181,34 @@ export class PrismaWhatsappConexionesRepository implements WhatsappConexionesRep
     });
     if (!existente) return null;
 
-    const conexion = await this.prisma.whatsappConexion.update({
-      where: { id },
-      data: { estado: 0, usuarioEdicion },
+    const conexion = await this.prisma.$transaction(async (tx) => {
+      // Un diálogo de alta abierto antes de desvincular no debe poder
+      // reutilizar después su grant pendiente para esta línea.
+      await tx.whatsappOnboarding.updateMany({
+        where: {
+          organizacionId,
+          metaConexionId: existente.metaConexionId,
+          estado: 'TOKEN',
+          OR: [{ wabaId: null }, { wabaId: existente.wabaId }],
+        },
+        data: { estado: 'CANCELADO', tokenCifrado: '' },
+      });
+      return tx.whatsappConexion.update({
+        where: { id },
+        // Desvinculación local: conserva historial e identificadores. No llama
+        // a deregister ni desvincula WhatsApp Business del teléfono.
+        data: {
+          estado: 0,
+          estadoNumero: null,
+          webhookSuscrito: 0,
+          webhookSuscritoEn: null,
+          webhookUltimoCheckEn: null,
+          webhookUltimoError: null,
+          callingHabilitado: 0,
+          callingUltimoError: null,
+          usuarioEdicion,
+        },
+      });
     });
     return toRow(conexion);
   }

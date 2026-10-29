@@ -187,7 +187,7 @@ export class CoexistenciaService {
     if (!token.access_token)
       throw new BadRequestException('Meta no devolvió una credencial de alta.');
     const debug = await this.get<{
-      data: { is_valid?: boolean; app_id?: string };
+      data: { is_valid?: boolean; app_id?: string; scopes?: string[] };
     }>('/debug_token', `${c.appId}|${secret}`, {
       input_token: token.access_token,
     });
@@ -195,6 +195,23 @@ export class CoexistenciaService {
       throw new ForbiddenException(
         'La autorización no pertenece a la aplicación de esta empresa.',
       );
+    const faltantes = [
+      'whatsapp_business_management',
+      'whatsapp_business_messaging',
+    ].filter((scope) => !debug.data.scopes?.includes(scope));
+    if (faltantes.length)
+      throw new ForbiddenException(
+        `Meta no concedió los permisos de WhatsApp: ${faltantes.join(', ')}. Revisa los permisos del Configuration ID y vuelve a autorizar en Meta.`,
+      );
+    await this.prisma.whatsappOnboarding.updateMany({
+      where: {
+        organizacionId,
+        metaConexionId: c.id,
+        estado: 'TOKEN',
+        expiraEn: { lt: new Date() },
+      },
+      data: { estado: 'EXPIRADO', tokenCifrado: '' },
+    });
     const session = await this.prisma.whatsappOnboarding.create({
       data: {
         organizacionId,
@@ -229,12 +246,29 @@ export class CoexistenciaService {
       throw new ForbiddenException(
         'La sesión de alta no pertenece a esta empresa y usuario.',
       );
-    if (s.estado === 'COMPLETO')
+    if (s.estado === 'COMPLETO') {
+      const vigente = s.phoneNumberId
+        ? await this.lineas.findPorPhoneNumberId(s.phoneNumberId)
+        : null;
+      if (
+        !vigente ||
+        vigente.organizacionId !== organizacionId ||
+        vigente.metaConexionId !== c.id
+      )
+        throw new BadRequestException(
+          'Esta vinculación ya no está activa. Inicia una nueva conexión con Meta.',
+        );
       return { ok: true, phoneNumberId: s.phoneNumberId };
-    if (s.expiraEn < new Date())
+    }
+    if (s.expiraEn < new Date()) {
+      await this.prisma.whatsappOnboarding.updateMany({
+        where: { id: s.id, estado: 'TOKEN' },
+        data: { estado: 'EXPIRADO', tokenCifrado: '' },
+      });
       throw new BadRequestException(
         'La sesión expiró. Vuelve a conectar tu WhatsApp Business.',
       );
+    }
     // Una sola ejecución: las operaciones de sincronización solo se pueden solicitar una vez.
     const claimed = await this.prisma.whatsappOnboarding.updateMany({
       where: { id: s.id, estado: 'TOKEN' },
