@@ -84,3 +84,20 @@ de ensayo antes de habilitar grandes importaciones. El procesador actual de
 webhooks es síncrono y puede requerir cola para historiales grandes.
 
 Producción se mantuvo en solo lectura durante esta implementación.
+
+## Corrección del intercambio de códigos del SDK
+
+Un intento real devolvió error de redirect_uri aun enviando un valor vacío.
+El código público oficial consultado en https://connect.facebook.net/es_LA/bundle/sdk.js/
+construye su propio redirect_uri interno y abre el diálogo por URL o formulario POST.
+El frontend observa exclusivamente la petición de Facebook que coincide con el
+App ID y Configuration ID en curso, conserva su redirect_uri exacto y restaura
+los métodos de transporte después del lanzamiento, cancelación o timeout.
+El servidor exige esa URI y solo acepta las rutas internas previstas del SDK,
+con HTTPS y sin credenciales de URL; no sustituye la URI por el callback OAuth
+del backend ni reintenta códigos probando distintas direcciones.
+
+Este cambio requiere desplegar backend y frontend juntos y recargar el navegador.
+No requiere migraciones nuevas. La prueba real posterior al despliegue sigue
+pendiente; las pruebas locales cubren captura GET/POST, aislamiento por App ID
+y Configuration ID, restauración y transmisión exacta al intercambio OAuth.

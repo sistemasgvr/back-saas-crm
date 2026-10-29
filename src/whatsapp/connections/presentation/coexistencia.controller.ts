@@ -20,6 +20,7 @@ import { CoexistenciaService } from '../application/coexistencia.service';
 
 class CodigoDto {
   @IsString() @MinLength(1) @MaxLength(4096) code!: string;
+  @IsString() @MinLength(1) @MaxLength(8192) redirectUri!: string;
 }
 class CompletarDto {
   @IsUUID() sessionId!: string;
@@ -57,7 +58,12 @@ export class CoexistenciaController {
     );
   }
   @Post('code') code(@CurrentUser() c: RequestContext, @Body() dto: CodigoDto) {
-    return this.service.intercambiar(c.organizacionId!, c.usuarioId, dto.code);
+    return this.service.intercambiar(
+      c.organizacionId!,
+      c.usuarioId,
+      dto.code,
+      dto.redirectUri,
+    );
   }
   @Post('complete') complete(
     @CurrentUser() c: RequestContext,

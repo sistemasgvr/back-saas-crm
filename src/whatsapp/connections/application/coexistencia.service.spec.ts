@@ -2,6 +2,9 @@ import { of, throwError } from 'rxjs';
 import { AxiosError } from 'axios';
 import { CoexistenciaService } from './coexistencia.service';
 
+const REDIRECT_URI =
+  'https://staticxx.facebook.com/x/connect/xd_arbiter/?version=46#cb=synthetic&origin=https%3A%2F%2Fcrm.example.test';
+
 function fixture() {
   const c = {
     id: 'meta',
@@ -88,7 +91,23 @@ function fixture() {
 }
 
 describe('Alta de coexistencia', () => {
-  it('intercambia el code del SDK con redirect_uri vacío y sin Bearer de app, conservando la validación del grant', async () => {
+  it('rechaza redirects ajenos, con credenciales, sin HTTPS o con ruta distinta antes de llamar a Meta', async () => {
+    const f = fixture();
+    for (const uri of [
+      '',
+      'https://evil.test/',
+      'https://facebook.com.evil.test/x/connect/xd_arbiter/',
+      'http://staticxx.facebook.com/x/connect/xd_arbiter/',
+      'https://user:pass@staticxx.facebook.com/x/connect/xd_arbiter/',
+      'https://www.facebook.com/other',
+    ]) {
+      await expect(
+        f.service.intercambiar('org', 'user', 'code', uri),
+      ).rejects.toThrow('URI');
+    }
+    expect(f.http.get).not.toHaveBeenCalled();
+  });
+  it('intercambia el code del SDK con la URI exacta del SDK y sin Bearer de app, conservando la validación del grant', async () => {
     const f = fixture();
     f.http.get
       .mockReturnValueOnce(of({ data: { access_token: 'grant' } }))
@@ -96,7 +115,7 @@ describe('Alta de coexistencia', () => {
         of({ data: { data: { is_valid: true, app_id: '123' } } }),
       );
     await expect(
-      f.service.intercambiar('org', 'user', 'code'),
+      f.service.intercambiar('org', 'user', 'code', REDIRECT_URI),
     ).resolves.toEqual({ sessionId: 'session' });
     expect(f.http.get).toHaveBeenNthCalledWith(
       1,
@@ -106,7 +125,7 @@ describe('Alta de coexistencia', () => {
           client_id: '123',
           client_secret: 'secret',
           code: 'code',
-          redirect_uri: '',
+          redirect_uri: REDIRECT_URI,
         },
         timeout: 10000,
       },
@@ -145,9 +164,9 @@ describe('Alta de coexistencia', () => {
       },
     });
     f.http.get.mockReturnValue(throwError(() => error));
-    await expect(f.service.intercambiar('org', 'user', 'code')).rejects.toThrow(
-      'URI de redirección',
-    );
+    await expect(
+      f.service.intercambiar('org', 'user', 'code', REDIRECT_URI),
+    ).rejects.toThrow('URI de redirección');
     expect(f.http.get).toHaveBeenCalledTimes(1);
     expect(f.db.whatsappOnboarding.create).not.toHaveBeenCalled();
   });
@@ -286,9 +305,9 @@ describe('Alta de coexistencia', () => {
       .mockReturnValueOnce(
         of({ data: { data: { is_valid: true, app_id: 'otra' } } }),
       );
-    await expect(f.service.intercambiar('org', 'user', 'code')).rejects.toThrow(
-      'no pertenece',
-    );
+    await expect(
+      f.service.intercambiar('org', 'user', 'code', REDIRECT_URI),
+    ).rejects.toThrow('no pertenece');
     expect(f.db.whatsappOnboarding.create).not.toHaveBeenCalled();
   });
 });

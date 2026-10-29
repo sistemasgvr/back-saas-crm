@@ -132,7 +132,38 @@ export class CoexistenciaService {
 
   /** Se ejecuta inmediatamente al recibir el code (TTL de Meta: 30 segundos),
    * sin esperar que llegue el evento de sesión por postMessage. */
-  async intercambiar(organizacionId: string, usuarioId: string, code: string) {
+  async intercambiar(
+    organizacionId: string,
+    usuarioId: string,
+    code: string,
+    redirectUri: string,
+  ) {
+    // Solo admitir destinos internos del SDK oficial. Se conserva la cadena
+    // exacta, incluido el fragmento, para que Meta valide el mismo diálogo.
+    let uri: URL;
+    try {
+      uri = new URL(redirectUri);
+    } catch {
+      throw new BadRequestException(
+        'Falta la URI original del diálogo de Meta. Actualiza el CRM y vuelve a conectar.',
+      );
+    }
+    const arbiter =
+      ['staticxx.facebook.com', 'www.facebook.com'].includes(uri.hostname) &&
+      /^\/x\/connect\/xd_arbiter\/?$/.test(uri.pathname);
+    const success =
+      uri.hostname === 'www.facebook.com' &&
+      uri.pathname === '/connect/login_success.html';
+    if (
+      uri.protocol !== 'https:' ||
+      uri.username ||
+      uri.password ||
+      uri.port ||
+      (!arbiter && !success)
+    )
+      throw new BadRequestException(
+        'La URI del diálogo no pertenece al SDK de Facebook.',
+      );
     const setup = await this.configuracion(organizacionId);
     if (!setup.configId)
       throw new BadRequestException(
@@ -147,10 +178,7 @@ export class CoexistenciaService {
         client_id: c.appId,
         client_secret: secret,
         code,
-        // El SDK entrega el code por su callback JS, no por nuestro callback
-        // OAuth de Facebook. Enviar explícitamente el valor vacío para este
-        // intercambio; nunca reutilizar META_OAUTH_REDIRECT_URI aquí.
-        redirect_uri: '',
+        redirect_uri: redirectUri,
       },
     );
     if (!token.access_token)
