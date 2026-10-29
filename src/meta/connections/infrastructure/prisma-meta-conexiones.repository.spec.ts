@@ -58,7 +58,7 @@ describe('Configuration ID al actualizar credenciales Meta', () => {
 describe('Desconexión de OAuth y vinculaciones de WhatsApp', () => {
   it('desactiva las rutas y descarta grants pendientes en la misma transacción, conservando la app', async () => {
     const tx = {
-      metaConexion: { update: jest.fn() },
+      metaConexion: { update: jest.fn<Promise<void>, [{ where: { id: string }; data: Record<string, unknown> }]>() },
       whatsappConexion: { updateMany: jest.fn() },
       whatsappOnboarding: { updateMany: jest.fn() },
     };
@@ -79,16 +79,13 @@ describe('Desconexión de OAuth y vinculaciones de WhatsApp', () => {
         webhookSuscrito: 0,
         webhookUltimoError: null,
         callingHabilitado: 0,
-      }),
+      }) as unknown,
     });
     expect(tx.whatsappOnboarding.updateMany).toHaveBeenCalledWith({
       where: { metaConexionId: 'meta', estado: 'TOKEN' },
       data: { estado: 'CANCELADO', tokenCifrado: '' },
     });
-    const data = tx.metaConexion.update.mock.calls[0][0].data as Record<
-      string,
-      unknown
-    >;
+    const data = tx.metaConexion.update.mock.calls[0][0].data;
     expect(data.tokenCifrado).toBeNull();
     expect(data.scopes).toBeNull();
     expect(data).not.toHaveProperty('appId');
