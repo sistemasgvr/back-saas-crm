@@ -43,8 +43,11 @@ del portafolio no prueban por sí solas el motivo del cierre del diálogo de Met
   App ID, secreto y Configuration ID para una nueva autorización.
 - El vínculo manual aceptaba IDs y nombres del navegador sin verificar su
   vigencia. Ahora comprueba acceso a la pareja WABA/phone ID, aislamiento y
-  estado `CONNECTED/CLOUD_API` antes de guardar y suscribir. El rechazo explica
-  que la app del teléfono puede funcionar aunque falte el alta de Cloud API.
+  estado actual antes de guardar y suscribir. El estado es diagnóstico, no una
+  condición para el vínculo directo: se pueden vincular y suscribir números
+  `DISCONNECTED/ON_PREMISE` sin pasar por Embedded Signup. Tampoco se obliga a
+  usar ese asistente si falla la consulta opcional de salud. El CRM conserva el
+  estado real o desconocido; vincular no afirma que Meta esté entregando mensajes.
 - La caché del diagnóstico no compartía el prefijo invalidado al desvincular.
   Ahora se invalida junto con la lista; volver de OAuth también refresca los
   permisos y la configuración de WhatsApp.
@@ -65,7 +68,8 @@ completar el alta de Consorcio en Meta y contrastar un mensaje real con los logs
 
 El OAuth general pide los scopes de la matriz de permisos, incluidos los dos de
 WhatsApp con el módulo WHATSAPP activo; `business_management` permite descubrir
-los WABA a través de `/me/businesses`. Embedded Signup toma los permisos de su
+los WABA a través de `/me/businesses`. El flujo directo no exige Configuration ID.
+Embedded Signup toma los permisos de su
 Configuration ID; no se agregaron scopes ajenos ni se cambiaron los permisos
 de clientes en Meta. El acceso avanzado de la aplicación es una comprobación
 distinta de los permisos concedidos al token.
@@ -75,5 +79,14 @@ distinta de los permisos concedidos al token.
 - [Guía de integración de Twilio: lanzamiento con rerequest](https://www.twilio.com/docs/whatsapp/isv/tech-provider-program/integration-guide)
 
 Los tests de regresión cubren reactivación, bajas locales, descarte de grants,
-aislamiento, rechazo de números sin alta Cloud API, scopes omitidos y matriz
+aislamiento, vínculo directo con estados remotos pendientes, scopes omitidos y matriz
 OAuth. No requieren credenciales de producción ni envían mensajes.
+
+## Aviso del panel de Meta aportado por el usuario
+
+El panel indica que las aplicaciones sin publicar solo reciben webhooks de
+prueba y no datos de producción, incluidos los de administradores, desarrolladores
+o evaluadores. Las capturas de `crm-byd` muestran modo desarrollo/sin publicar.
+Es una restricción de entrega explícita que debe resolverse en Meta para probar
+mensajes reales. Tener el callback verificado y los cinco campos suscritos no
+elimina esa restricción. Este cambio no publica la aplicación ni modifica Meta.

@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   ConflictException,
   ForbiddenException,
   Inject,
@@ -46,7 +45,7 @@ export class VincularNumeroUseCase {
 
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
     // El selector puede estar desactualizado. Meta, no los datos del navegador,
-    // debe confirmar la pareja WABA/número y su conexión actual con Cloud API.
+    // debe confirmar que la pareja WABA/número sigue accesible para la empresa.
     const disponibles = await this.graph.listarNumerosWhatsApp(accessToken);
     const activo = disponibles.find(
       (n) => n.wabaId === wabaId && n.phoneNumberId === phoneNumberId,
@@ -61,16 +60,20 @@ export class VincularNumeroUseCase {
       throw new ConflictException(
         'El número ya pertenece a otra organización del CRM.',
       );
-    const salud = await this.graph.obtenerSaludNumeroWhatsApp(
-      phoneNumberId,
-      accessToken,
-    );
-    if (salud.status !== 'CONNECTED' || salud.platform_type !== 'CLOUD_API')
-      throw new BadRequestException(
-        salud.is_on_biz_app
-          ? 'El número funciona en WhatsApp Business, pero Meta todavía no confirma su conexión con Cloud API. Completa el alta de coexistencia del mismo número antes de vincularlo al CRM.'
-          : 'Meta todavía no confirma este número conectado a Cloud API. Completa su configuración en Meta y vuelve a vincularlo.',
+    // Vincular registra la ruta y suscribe el WABA; no es un alta de Embedded
+    // Signup. El diagnóstico remoto se muestra aparte y no bloquea ese vínculo.
+    let estadoNumero: string | undefined;
+    try {
+      const salud = await this.graph.obtenerSaludNumeroWhatsApp(
+        phoneNumberId,
+        accessToken,
       );
+      estadoNumero = salud.status;
+    } catch {
+      this.logger.warn(
+        `No se pudo consultar el estado del número ${phoneNumberId}; se verificará después de vincularlo`,
+      );
+    }
 
     const numero = await this.whatsappConexiones.vincular({
       organizacionId,
@@ -79,7 +82,7 @@ export class VincularNumeroUseCase {
       phoneNumberId,
       numeroDisplay: activo.displayPhoneNumber,
       nombreVerificado: activo.verifiedName,
-      estadoNumero: salud.status,
+      estadoNumero,
       usuarioEdicion,
     });
 

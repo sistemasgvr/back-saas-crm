@@ -78,13 +78,19 @@ describe('Vincular un número desde la página', () => {
     { status: 'PENDING', platform_type: 'CLOUD_API', is_on_biz_app: false },
     {},
   ])(
-    'impide presentar como lista una línea que Meta aún no conecta: %j',
+    'permite el vínculo directo y la suscripción sin ocultar el estado remoto: %j',
     async (salud) => {
       const f = fixture();
       f.graph.obtenerSaludNumeroWhatsApp.mockResolvedValue(salud);
-      await expect(f.link()).rejects.toThrow(/Cloud API/);
-      expect(f.wa.vincular).not.toHaveBeenCalled();
-      expect(f.graph.suscribirWabaWebhook).not.toHaveBeenCalled();
+      await f.link();
+      expect(f.wa.vincular).toHaveBeenCalledWith(
+        expect.objectContaining({ estadoNumero: salud.status }),
+      );
+      expect(f.graph.suscribirWabaWebhook).toHaveBeenCalledWith(
+        'waba',
+        'token',
+      );
+      expect(f.wa.marcarWebhookSuscrito).toHaveBeenCalledWith('line', 'admin');
     },
   );
   it('rechaza una pareja WABA/número que ya no pertenece al acceso de la empresa', async () => {
@@ -101,14 +107,26 @@ describe('Vincular un número desde la página', () => {
     await expect(f.link()).rejects.toThrow('otra organización');
     expect(f.wa.vincular).not.toHaveBeenCalled();
   });
-  it('un fallo de consulta a Meta no guarda ni suscribe la línea', async () => {
+  it('un fallo del diagnóstico no impide vincular un número cuyo acceso ya se comprobó', async () => {
     const f = fixture();
     f.graph.obtenerSaludNumeroWhatsApp.mockRejectedValue(
       new Error('Permiso denegado'),
     );
-    await expect(f.link()).rejects.toThrow('Permiso denegado');
-    expect(f.wa.vincular).not.toHaveBeenCalled();
-    expect(f.graph.suscribirWabaWebhook).not.toHaveBeenCalled();
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      await f.link();
+      expect(f.wa.vincular).toHaveBeenCalledWith(
+        expect.objectContaining({ estadoNumero: undefined }),
+      );
+      expect(f.graph.suscribirWabaWebhook).toHaveBeenCalledWith(
+        'waba',
+        'token',
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
   it('si falla la suscripción no reutiliza una marca previa de webhook suscrito', async () => {
     const f = fixture();
