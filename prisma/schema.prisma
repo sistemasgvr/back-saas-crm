@@ -571,6 +571,7 @@ model MetaConexion {
   // Meta App propia de la organización (cada cliente registra la suya) — se
   // guarda antes de iniciar el OAuth; sin esto no se puede generar la URL.
   appId            String? @map("app_id") @db.VarChar(64)
+  whatsappSignupConfigId String? @map("whatsapp_signup_config_id") @db.VarChar(64)
   appSecretCifrado String? @map("app_secret_cifrado")
 
   // Se completan recién cuando el OAuth de esa app termina con éxito.
@@ -1431,4 +1432,23 @@ model WhatsappBotConfiguracionEvento {
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Restrict, onUpdate: NoAction)
   @@unique([organizacionId, version])
   @@map("whatsapp_bot_configuracion_eventos")
+}
+
+// Credencial de alta separada del OAuth de Facebook.
+model WhatsappOnboarding {
+ id String @id @default(uuid()) @db.Uuid
+ organizacionId String @map("organizacion_id") @db.Uuid
+ usuarioId String @map("usuario_id") @db.Uuid
+ metaConexionId String @map("meta_conexion_id") @db.Uuid
+ appId String @map("app_id")
+ tokenCifrado String @map("token_cifrado")
+ expiraEn DateTime @map("expira_en") @db.Timestamptz
+ estado String @default("TOKEN")
+ wabaId String? @map("waba_id")
+ phoneNumberId String? @map("phone_number_id")
+ contactosRequestId String? @map("contactos_request_id")
+ historialRequestId String? @map("historial_request_id")
+ fechaCreacion DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+ @@index([organizacionId, usuarioId])
+ @@map("whatsapp_onboarding")
 }

@@ -55,6 +55,9 @@ export class PrismaMetaConexionesRepository implements MetaConexionesRepository 
         where: { id: existente.id },
         data: {
           appId: input.appId,
+          ...(existente.appId !== input.appId
+            ? { whatsappSignupConfigId: null }
+            : {}),
           appSecretCifrado: input.appSecretCifrado,
           usuarioEdicion: input.usuarioEdicion,
         },

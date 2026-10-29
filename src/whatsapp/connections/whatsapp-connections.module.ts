@@ -1,4 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { CoexistenciaService } from './application/coexistencia.service';
+import { CoexistenciaController } from './presentation/coexistencia.controller';
 import { MetaConnectionsModule } from '../../meta/connections/meta-connections.module';
 import { WhatsappConnectionsController } from './presentation/whatsapp-connections.controller';
 import { ListarNumerosVinculadosUseCase } from './application/use-cases/listar-numeros-vinculados.use-case';
@@ -12,9 +15,10 @@ import { WHATSAPP_CONEXIONES_REPOSITORY } from './application/ports/whatsapp-con
 import { PrismaWhatsappConexionesRepository } from './infrastructure/prisma-whatsapp-conexiones.repository';
 
 @Module({
-  imports: [forwardRef(() => MetaConnectionsModule)],
-  controllers: [WhatsappConnectionsController],
+  imports: [HttpModule, forwardRef(() => MetaConnectionsModule)],
+  controllers: [WhatsappConnectionsController, CoexistenciaController],
   providers: [
+    CoexistenciaService,
     ListarNumerosVinculadosUseCase,
     ListarNumerosDisponiblesUseCase,
     VincularNumeroUseCase,
