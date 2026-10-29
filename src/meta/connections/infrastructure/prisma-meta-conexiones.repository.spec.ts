@@ -58,7 +58,12 @@ describe('Configuration ID al actualizar credenciales Meta', () => {
 describe('Desconexión de OAuth y vinculaciones de WhatsApp', () => {
   it('desactiva las rutas y descarta grants pendientes en la misma transacción, conservando la app', async () => {
     const tx = {
-      metaConexion: { update: jest.fn<Promise<void>, [{ where: { id: string }; data: Record<string, unknown> }]>() },
+      metaConexion: {
+        update: jest.fn<
+          Promise<void>,
+          [{ where: { id: string }; data: Record<string, unknown> }]
+        >(),
+      },
       whatsappConexion: { updateMany: jest.fn() },
       whatsappOnboarding: { updateMany: jest.fn() },
     };

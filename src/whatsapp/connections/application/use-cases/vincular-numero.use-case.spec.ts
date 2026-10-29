@@ -16,23 +16,19 @@ function fixture() {
       .mockResolvedValue({ id: 'line', estadoNumero: 'CONNECTED' }),
   };
   const graph = {
-    listarNumerosWhatsApp: jest
-      .fn()
-      .mockResolvedValue([
-        {
-          wabaId: 'waba',
-          phoneNumberId: 'phone',
-          displayPhoneNumber: '+51900000000',
-          verifiedName: 'Actual en Meta',
-        },
-      ]),
-    obtenerSaludNumeroWhatsApp: jest
-      .fn()
-      .mockResolvedValue({
-        status: 'CONNECTED',
-        platform_type: 'CLOUD_API',
-        is_on_biz_app: true,
-      }),
+    listarNumerosWhatsApp: jest.fn().mockResolvedValue([
+      {
+        wabaId: 'waba',
+        phoneNumberId: 'phone',
+        displayPhoneNumber: '+51900000000',
+        verifiedName: 'Actual en Meta',
+      },
+    ]),
+    obtenerSaludNumeroWhatsApp: jest.fn().mockResolvedValue({
+      status: 'CONNECTED',
+      platform_type: 'CLOUD_API',
+      is_on_biz_app: true,
+    }),
     suscribirWabaWebhook: jest.fn().mockResolvedValue(undefined),
   };
   const service = new VincularNumeroUseCase(

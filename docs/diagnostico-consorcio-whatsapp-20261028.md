@@ -52,7 +52,10 @@ del portafolio no prueban por sí solas el motivo del cierre del diálogo de Met
   revisar scopes de WhatsApp. Ahora se enumeran los permisos faltantes antes
   de crearla; las sesiones pendientes expiradas descartan el token al iniciar
   otra conexión o intentar completarlas. Una sesión completa antigua no
-  devuelve éxito si su vínculo ya no sigue activo.
+  devuelve éxito si su vínculo ya no sigue activo. El lanzamiento de Embedded
+  Signup usa `auth_type=rerequest`, como el OAuth general, para que Meta pueda
+  volver a solicitar permisos previamente denegados; los permisos de ese diálogo
+  siguen definidos por el Configuration ID.
 
 Estas correcciones evitan datos y diagnósticos heredados. No convierten
 `ON_PREMISE` en `CLOUD_API` ni confirman la recepción real: continúa pendiente
@@ -69,6 +72,7 @@ distinta de los permisos concedidos al token.
 
 - [Colección oficial de Meta: permisos Cloud API](https://www.postman.com/meta/whatsapp-business-platform/collection/wlk6lh4/whatsapp-cloud-api)
 - [Meta: coexistencia con WhatsApp Business](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users)
+- [Guía de integración de Twilio: lanzamiento con rerequest](https://www.twilio.com/docs/whatsapp/isv/tech-provider-program/integration-guide)
 
 Los tests de regresión cubren reactivación, bajas locales, descarte de grants,
 aislamiento, rechazo de números sin alta Cloud API, scopes omitidos y matriz
