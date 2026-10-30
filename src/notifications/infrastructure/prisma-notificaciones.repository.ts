@@ -1,11 +1,22 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import { construirResultadoPaginado } from '../../shared/application/paginacion';
 import type {
   CrearNotificacionInput,
+  NotificacionListItem,
   NotificacionesRepository,
 } from '../application/ports/notificaciones.repository.port';
+
+// Se agrupa antes de paginar: también incluye los avisos históricos y evita
+// repetir un chat entre páginas. Los demás tipos conservan su propia fila.
+const claveGrupo = Prisma.sql`CASE
+  WHEN n.tipo = 'WHATSAPP_MENSAJE'
+    AND jsonb_typeof(n.payload->'whatsappConversacionId') = 'string'
+    AND n.payload->>'whatsappConversacionId' <> ''
+  THEN 'whatsapp:' || (n.payload->>'whatsappConversacionId')
+  ELSE nu.id::text
+END`;
 
 @Injectable()
 export class PrismaNotificacionesRepository implements NotificacionesRepository {
@@ -51,37 +62,58 @@ export class PrismaNotificacionesRepository implements NotificacionesRepository 
     page: number,
     pageSize: number,
   ) {
-    const where = { organizacionId, usuarioId, estado: 1 };
-
-    const [total, filas] = await Promise.all([
-      this.prisma.notificacionUsuario.count({ where }),
-      this.prisma.notificacionUsuario.findMany({
-        where,
-        include: { notificacion: true },
-        orderBy: { fechaCreacion: 'desc' },
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
+    const [conteo, data] = await Promise.all([
+      this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
+        SELECT COUNT(DISTINCT ${claveGrupo})::int AS total
+        FROM notificaciones_usuario nu
+        JOIN notificaciones n ON n.id = nu.notificacion_id
+        WHERE nu.organizacion_id = ${organizacionId}::uuid
+          AND nu.usuario_id = ${usuarioId}::uuid AND nu.estado = 1
+      `),
+      this.prisma.$queryRaw<NotificacionListItem[]>(Prisma.sql`
+        WITH agrupadas AS (
+          SELECT nu.id, n.tipo, n.titulo, n.mensaje, n.payload,
+            nu.fecha_creacion AS "fechaCreacion",
+            CASE WHEN MIN(nu.leida) OVER grupo = 1
+              THEN nu.fecha_lectura ELSE NULL END AS "fechaLectura",
+            MIN(nu.leida) OVER grupo = 1 AS leida,
+            (COUNT(*) FILTER (WHERE nu.leida = 0) OVER grupo)::int AS "cantidadNoLeidas",
+            ROW_NUMBER() OVER (
+              PARTITION BY ${claveGrupo}
+              ORDER BY nu.fecha_creacion DESC, nu.id DESC
+            ) AS posicion
+          FROM notificaciones_usuario nu
+          JOIN notificaciones n ON n.id = nu.notificacion_id
+          WHERE nu.organizacion_id = ${organizacionId}::uuid
+            AND nu.usuario_id = ${usuarioId}::uuid AND nu.estado = 1
+          WINDOW grupo AS (PARTITION BY ${claveGrupo})
+        )
+        SELECT id, tipo, titulo, mensaje, payload, leida,
+          "fechaCreacion", "fechaLectura", "cantidadNoLeidas"
+        FROM agrupadas WHERE posicion = 1
+        ORDER BY "fechaCreacion" DESC, id DESC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+      `),
     ]);
 
-    const data = filas.map((fila) => ({
-      id: fila.id,
-      tipo: fila.notificacion.tipo,
-      titulo: fila.notificacion.titulo,
-      mensaje: fila.notificacion.mensaje,
-      payload: fila.notificacion.payload,
-      leida: fila.leida === 1,
-      fechaCreacion: fila.fechaCreacion,
-      fechaLectura: fila.fechaLectura,
-    }));
-
-    return construirResultadoPaginado(data, total, page, pageSize);
+    return construirResultadoPaginado(
+      data,
+      conteo[0]?.total ?? 0,
+      page,
+      pageSize,
+    );
   }
 
-  contarNoLeidas(organizacionId: string, usuarioId: string) {
-    return this.prisma.notificacionUsuario.count({
-      where: { organizacionId, usuarioId, estado: 1, leida: 0 },
-    });
+  async contarNoLeidas(organizacionId: string, usuarioId: string) {
+    const filas = await this.prisma.$queryRaw<{ total: number }[]>(Prisma.sql`
+      SELECT COUNT(DISTINCT ${claveGrupo})::int AS total
+      FROM notificaciones_usuario nu
+      JOIN notificaciones n ON n.id = nu.notificacion_id
+      WHERE nu.organizacion_id = ${organizacionId}::uuid
+        AND nu.usuario_id = ${usuarioId}::uuid
+        AND nu.estado = 1 AND nu.leida = 0
+    `);
+    return filas[0]?.total ?? 0;
   }
 
   async marcarLeida(
@@ -89,11 +121,50 @@ export class PrismaNotificacionesRepository implements NotificacionesRepository 
     usuarioId: string,
     notificacionUsuarioId: string,
   ): Promise<boolean> {
-    const resultado = await this.prisma.notificacionUsuario.updateMany({
-      where: { id: notificacionUsuarioId, organizacionId, usuarioId },
-      data: { leida: 1, fechaLectura: new Date() },
+    return this.prisma.$transaction(async (tx) => {
+      const fila = await tx.notificacionUsuario.findFirst({
+        where: {
+          id: notificacionUsuarioId,
+          organizacionId,
+          usuarioId,
+          estado: 1,
+        },
+        include: { notificacion: true },
+      });
+      if (!fila) return false;
+      const payload = fila.notificacion.payload as Record<
+        string,
+        unknown
+      > | null;
+      const conversacionId = payload?.whatsappConversacionId;
+      const agrupar =
+        fila.notificacion.tipo === 'WHATSAPP_MENSAJE' &&
+        typeof conversacionId === 'string' &&
+        conversacionId.length > 0;
+
+      await tx.notificacionUsuario.updateMany({
+        where: {
+          organizacionId,
+          usuarioId,
+          estado: 1,
+          ...(agrupar
+            ? {
+                // No consumir un mensaje nuevo recibido después del aviso abierto.
+                fechaCreacion: { lte: fila.fechaCreacion },
+                notificacion: {
+                  tipo: 'WHATSAPP_MENSAJE',
+                  payload: {
+                    path: ['whatsappConversacionId'],
+                    equals: conversacionId,
+                  },
+                },
+              }
+            : { id: fila.id }),
+        },
+        data: { leida: 1, fechaLectura: new Date() },
+      });
+      return true;
     });
-    return resultado.count > 0;
   }
 
   async marcarTodasLeidas(

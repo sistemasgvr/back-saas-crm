@@ -22,6 +22,7 @@ export interface NotificacionCreada {
 }
 
 export interface NotificacionListItem {
+  cantidadNoLeidas?: number;
   id: string;
   tipo: string;
   titulo: string;
