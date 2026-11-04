@@ -19,8 +19,8 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import {
@@ -37,9 +37,9 @@ import { BackfillLeadsDto } from './dto/backfill-leads.dto';
  * sin colisión de rutas con MetaPagesController: :id vs :id/forms difieren en profundidad). */
 @ApiTags('Meta Forms')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('meta.configurar')
 @Controller('meta/pages')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('META_LEADS')
 export class MetaPageFormsController {
   constructor(

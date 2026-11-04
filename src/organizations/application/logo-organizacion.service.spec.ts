@@ -16,7 +16,7 @@ import {
   logoOrganizacionUrl,
 } from '../../shared/domain/logo-organizacion';
 import { OrganizationLogoController } from '../presentation/organization-logo.controller';
-import { ROLES_KEY } from '../../shared/presentation/decorators/roles.decorator';
+import { REQUIRE_PERMISSION_KEY } from '../../shared/presentation/decorators/require-permission.decorator';
 
 const ORG = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -207,28 +207,28 @@ describe('Logo independiente por empresa en el bucket compartido', () => {
     );
   });
 
-  it('solo administradores pueden modificar; cualquier miembro autenticado puede ver', () => {
+  it('solo quien tiene empresa.configurar puede modificar; cualquier miembro autenticado puede ver', () => {
     expect(
       Reflect.getMetadata(
-        ROLES_KEY,
+        REQUIRE_PERMISSION_KEY,
         Object.getOwnPropertyDescriptor(
           OrganizationLogoController.prototype,
           'subir',
         )!.value as object,
       ),
-    ).toEqual(['PROPIETARIO', 'ADMINISTRADOR']);
+    ).toEqual(['empresa.configurar']);
     expect(
       Reflect.getMetadata(
-        ROLES_KEY,
+        REQUIRE_PERMISSION_KEY,
         Object.getOwnPropertyDescriptor(
           OrganizationLogoController.prototype,
           'quitar',
         )!.value as object,
       ),
-    ).toEqual(['PROPIETARIO', 'ADMINISTRADOR']);
+    ).toEqual(['empresa.configurar']);
     expect(
       Reflect.getMetadata(
-        ROLES_KEY,
+        REQUIRE_PERMISSION_KEY,
         Object.getOwnPropertyDescriptor(
           OrganizationLogoController.prototype,
           'obtener',

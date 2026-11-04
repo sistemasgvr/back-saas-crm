@@ -180,10 +180,10 @@ export interface MediaMensaje {
   nombreArchivo: string | null;
 }
 
-/** Ve todo (modo 'todos') o solo conversaciones cuyo lead está asignado a él
- * (modo 'usuario') — mismo patrón de FiltroAsignacion de leads (§3). */
+/** Alcance de lectura de conversaciones dentro de la organización. */
 export type FiltroVisibilidadChats =
-  { modo: 'todos' } | { modo: 'usuario'; usuarioId: string };
+  | { modo: 'todos' }
+  | { modo: 'usuario' | 'usuario_y_libres'; usuarioId: string };
 
 export interface RegistrarMensajeInput {
   autorTipo?: string;

@@ -47,7 +47,11 @@ export class EnviarContactoWhatsAppUseCase {
     organizacionId: string,
     conversacionId: string,
     input: EnviarContactoInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     if (input.contactos.length === 0) {
       throw new BadRequestException('Falta al menos un contacto');

@@ -51,7 +51,11 @@ export class EnviarInteractivoWhatsAppUseCase {
     organizacionId: string,
     conversacionId: string,
     input: EnviarInteractivoInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     this.validar(input);
 

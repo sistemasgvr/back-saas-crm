@@ -15,6 +15,12 @@ function fixture(clientesHabilitados = true) {
     organizacionUsuario: {
       findFirst: jest.fn().mockResolvedValue({ rol: 'PROPIETARIO' }),
     },
+    organizacionRol: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
     organizacionModulo: {
       findMany: jest
         .fn()

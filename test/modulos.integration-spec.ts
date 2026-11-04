@@ -20,7 +20,6 @@ import { LeadsController } from '../src/leads/presentation/leads.controller';
 import { MetaWebhooksController } from '../src/meta/webhooks/presentation/meta-webhooks.controller';
 import { JwtAuthGuard } from '../src/auth/presentation/guards/jwt-auth.guard';
 import { OrgMembershipGuard } from '../src/shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../src/shared/presentation/guards/roles.guard';
 import { ModuleGuard } from '../src/shared/presentation/guards/module.guard';
 import { REQUIRE_MODULE_KEY } from '../src/shared/presentation/decorators/require-module.decorator';
 
@@ -271,13 +270,12 @@ if (connection) {
                 usuarioId: f.actor,
                 organizacionId: f.org,
                 rol: 'PROPIETARIO',
+                permisos: ['leads.ver'],
               };
               return true;
             },
           })
           .overrideGuard(OrgMembershipGuard)
-          .useValue({ canActivate: () => true })
-          .overrideGuard(RolesGuard)
           .useValue({ canActivate: () => true })
           .compile();
         const app = module.createNestApplication();

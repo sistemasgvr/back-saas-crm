@@ -121,6 +121,8 @@ model Organizacion {
 
   organizacionUsuarios     OrganizacionUsuario[]
   usuarioEventos OrganizacionUsuarioEvento[]
+  roles          OrganizacionRol[]
+  rolEventos     OrganizacionRolEvento[]
   organizacionModulos      OrganizacionModulo[]
   metaConexiones           MetaConexion[]
   metaPaginas              MetaPagina[]
@@ -787,7 +789,9 @@ model OrganizacionUsuario {
   id             String @id @default(uuid()) @db.Uuid
   organizacionId String @map("organizacion_id") @db.Uuid
   usuarioId      String @map("usuario_id") @db.Uuid
-  rol            String @db.VarChar(30) // PROPIETARIO | ADMINISTRADOR | USUARIO
+  rol            String @db.VarChar(30) // PROPIETARIO | ADMINISTRADOR | USUARIO | PERSONALIZADO
+  /** Rol de la empresa. Null = rol de sistema según `rol` (PLAN-PERMISOS-GRANULARES.md §4.2). */
+  rolId          String? @map("rol_id") @db.Uuid
 
   estado            Int      @default(1) @db.SmallInt
   usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
@@ -797,6 +801,7 @@ model OrganizacionUsuario {
 
   organizacion Organizacion @relation(fields: [organizacionId], references: [id])
   usuario      Usuario      @relation(fields: [usuarioId], references: [id])
+  rolAsignado  OrganizacionRol? @relation(fields: [rolId], references: [id])
   conversacionesControladas WhatsappConversacion[] @relation("ControlResponsable")
   controlEventosActor WhatsappControlEvento[] @relation("ControlEventoActor")
   controlEventosResponsable WhatsappControlEvento[] @relation("ControlEventoResponsable")
@@ -804,6 +809,7 @@ model OrganizacionUsuario {
 
   @@unique([organizacionId, usuarioId])
   @@index([usuarioId])
+  @@index([rolId])
   @@index([rol])
   @@index([estado])
   @@map("organizacion_usuarios")
@@ -826,6 +832,53 @@ model OrganizacionUsuarioEvento {
 
   @@index([organizacionId, creadoEn])
   @@map("organizacion_usuario_eventos")
+}
+
+/**
+ * Roles por empresa con permisos granulares (PLAN-PERMISOS-GRANULARES.md §4).
+ * Los códigos de `permisos` viven en shared/domain/permisos.ts.
+ */
+model OrganizacionRol {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizacionId String   @map("organizacion_id") @db.Uuid
+  /** PROPIETARIO | ADMINISTRADOR | USUARIO en roles de sistema; null en personalizados. */
+  codigo         String?  @db.VarChar(30)
+  nombre         String   @db.VarChar(80)
+  descripcion    String?  @db.VarChar(255)
+  esSistema      Int      @default(0) @map("es_sistema") @db.SmallInt
+  permisos       String[] @default([]) @db.VarChar(80)
+
+  estado            Int      @default(1) @db.SmallInt
+  usuarioCreacion   String?  @map("usuario_creacion") @db.Uuid
+  usuarioEdicion    String?  @map("usuario_edicion") @db.Uuid
+  fechaCreacion     DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+  fechaModificacion DateTime @updatedAt @map("fecha_modificacion") @db.Timestamptz
+
+  organizacion Organizacion            @relation(fields: [organizacionId], references: [id])
+  membresias   OrganizacionUsuario[]
+  eventos      OrganizacionRolEvento[]
+
+  @@unique([organizacionId, codigo])
+  @@index([organizacionId, estado])
+  @@map("organizacion_roles")
+}
+
+/** Historial inmutable de cambios de roles hechos por la empresa. */
+model OrganizacionRolEvento {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizacionId     String   @map("organizacion_id") @db.Uuid
+  rolId              String   @map("rol_id") @db.Uuid
+  actorId            String   @map("actor_id") @db.Uuid
+  accion             String   @db.VarChar(40)
+  nombre             String   @db.VarChar(80)
+  permisosAnteriores String[] @default([]) @map("permisos_anteriores") @db.VarChar(80)
+  permisosNuevos     String[] @default([]) @map("permisos_nuevos") @db.VarChar(80)
+  creadoEn           DateTime @default(now()) @map("creado_en") @db.Timestamptz
+  organizacion Organizacion    @relation(fields: [organizacionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  rol          OrganizacionRol @relation(fields: [rolId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([organizacionId, creadoEn])
+  @@map("organizacion_rol_eventos")
 }
 
 model ModuloGrupo {

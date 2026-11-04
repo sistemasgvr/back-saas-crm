@@ -43,8 +43,8 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { ListarConversacionesUseCase } from '../application/use-cases/listar-conversaciones.use-case';
@@ -88,8 +88,9 @@ const LIMITE_MULTER_BYTES = 100 * 1024 * 1024;
 
 @ApiTags('WhatsApp Chats')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('chats.ver')
 @Controller('whatsapp/chats')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('WHATSAPP')
 export class WhatsappChatsController {
   constructor(
@@ -117,14 +118,20 @@ export class WhatsappChatsController {
 
   @Get(':id/control')
   @ApiOperation({ summary: 'Estado canónico del control y envíos inciertos' })
-  control(
+  async control(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
+    await this.obtenerConversacion.verificarAcceso(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+      permisos: ctx.permisos,
+    });
     return this.controlAtencion.estado(ctx.organizacionId!, id);
   }
 
   @Post(':id/control/asumir-humano')
+  @RequirePermission('chats.responder')
   asumirHumano(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
@@ -133,13 +140,14 @@ export class WhatsappChatsController {
     return this.controlAtencion.asumirHumano(
       ctx.organizacionId!,
       id,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
       dto.controlVersion,
       dto.asignadoUsuarioId,
     );
   }
 
   @Post(':id/control/tomar')
+  @RequirePermission('chats.responder')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tomar control humano; nunca reactiva el bot' })
   tomarControl(
@@ -150,12 +158,13 @@ export class WhatsappChatsController {
     return this.controlAtencion.tomar(
       ctx.organizacionId!,
       id,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
       body.controlVersion,
     );
   }
 
   @Post(':id/control/asignar-bot')
+  @RequirePermission('chats.responder')
   @HttpCode(HttpStatus.OK)
   asignarBot(
     @CurrentUser() ctx: RequestContext,
@@ -165,12 +174,13 @@ export class WhatsappChatsController {
     return this.controlAtencion.asignarBot(
       ctx.organizacionId!,
       id,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
       body.controlVersion,
     );
   }
 
   @Post(':id/control/transferir')
+  @RequirePermission('chats.responder')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Transferir responsable manteniendo el control humano',
@@ -183,13 +193,14 @@ export class WhatsappChatsController {
     return this.controlAtencion.transferir(
       ctx.organizacionId!,
       id,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
       body.usuarioId,
       body.controlVersion,
     );
   }
 
   @Get(':id/control/asesores')
+  @RequirePermission('chats.responder')
   @ApiOperation({
     summary:
       'Asesores activos autorizados para recibir el control de este chat',
@@ -201,16 +212,22 @@ export class WhatsappChatsController {
     return this.controlAtencion.asesores(ctx.organizacionId!, id, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Get(':id/control/historial')
   @ApiOperation({ summary: 'Historial inmutable de control' })
-  historialControl(
+  async historialControl(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: PaginacionQueryDto,
   ) {
+    await this.obtenerConversacion.verificarAcceso(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+      permisos: ctx.permisos,
+    });
     return this.controlAtencion.historial(
       ctx.organizacionId!,
       id,
@@ -239,6 +256,7 @@ export class WhatsappChatsController {
       {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
+        permisos: ctx.permisos,
       },
       query,
     );
@@ -260,7 +278,11 @@ export class WhatsappChatsController {
   @ApiResponse({ status: 403, description: 'Módulo WHATSAPP no activo.' })
   unreadCount(@CurrentUser() ctx: RequestContext) {
     return this.contarNoLeidos
-      .execute(ctx.organizacionId!, { usuarioId: ctx.usuarioId, rol: ctx.rol! })
+      .execute(ctx.organizacionId!, {
+        usuarioId: ctx.usuarioId,
+        rol: ctx.rol!,
+        permisos: ctx.permisos,
+      })
       .then((count) => ({ count }));
   }
 
@@ -279,7 +301,7 @@ export class WhatsappChatsController {
 
   /** Todas (con estado), no solo APPROVED — para la pantalla de gestión. */
   @Get('templates/all')
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('chats.plantillas')
   @ApiOperation({
     summary: 'Todas las plantillas (con estado)',
     description:
@@ -297,8 +319,8 @@ export class WhatsappChatsController {
   }
 
   @Post('templates')
+  @RequirePermission('chats.plantillas')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @ApiOperation({
     summary: 'Crear una plantilla de mensaje',
     description:
@@ -324,6 +346,7 @@ export class WhatsappChatsController {
   }
 
   @Post('start-from-lead/:leadId')
+  @RequirePermission('chats.responder')
   @ApiOperation({
     summary: 'Iniciar/abrir un chat desde un lead',
     description:
@@ -347,6 +370,7 @@ export class WhatsappChatsController {
   }
 
   @Post(':id/crear-lead')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @ApiOperation({
     summary: 'Crear lead desde un chat de WhatsApp',
@@ -373,7 +397,7 @@ export class WhatsappChatsController {
     return this.crearLeadDesdeChat.execute(
       ctx.organizacionId!,
       id,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
       dto,
     );
   }
@@ -397,6 +421,7 @@ export class WhatsappChatsController {
     return this.obtenerConversacion.execute(ctx.organizacionId!, id, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
@@ -413,12 +438,14 @@ export class WhatsappChatsController {
       {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
+        permisos: ctx.permisos,
       },
       query.before,
     );
   }
 
   @Post(':id/messages')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -449,10 +476,12 @@ export class WhatsappChatsController {
     return this.enviarMensaje.execute(ctx.organizacionId!, id, dto, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Post(':id/messages/:mensajeId/reaction')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -482,11 +511,12 @@ export class WhatsappChatsController {
       id,
       mensajeId,
       dto.emoji,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post(':id/media')
+  @RequirePermission('chats.responder')
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseInterceptors(
     FileInterceptor('archivo', { limits: { fileSize: LIMITE_MULTER_BYTES } }),
@@ -547,11 +577,12 @@ export class WhatsappChatsController {
         respondeAMensajeId: dto.respondeAMensajeId,
         esVoz,
       },
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post(':id/location')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -579,10 +610,12 @@ export class WhatsappChatsController {
     return this.enviarUbicacion.execute(ctx.organizacionId!, id, dto, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Post(':id/contact')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -612,11 +645,12 @@ export class WhatsappChatsController {
       ctx.organizacionId!,
       id,
       { contactos: dto.contactos, respondeAMensajeId: dto.respondeAMensajeId },
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post(':id/interactive')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -647,10 +681,12 @@ export class WhatsappChatsController {
     return this.enviarInteractivo.execute(ctx.organizacionId!, id, dto, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Post(':id/block')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Bloquear contacto en WhatsApp (block_users)' })
@@ -662,10 +698,12 @@ export class WhatsappChatsController {
     return this.bloquearContacto.execute(ctx.organizacionId!, id, true, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Patch(':id/nombre')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -689,11 +727,12 @@ export class WhatsappChatsController {
       ctx.organizacionId!,
       id,
       dto.nombre,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Delete(':id/block')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Desbloquear contacto en WhatsApp' })
@@ -705,10 +744,12 @@ export class WhatsappChatsController {
     return this.bloquearContacto.execute(ctx.organizacionId!, id, false, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Post(':id/messages/forward')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -736,11 +777,12 @@ export class WhatsappChatsController {
       id,
       dto.mensajeIds,
       destinaciones,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post(':id/messages/:mensajeId/forward')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -760,11 +802,12 @@ export class WhatsappChatsController {
       id,
       mensajeId,
       dto.conversacionDestinoId,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Delete(':id/messages/:mensajeId')
+  @RequirePermission('chats.responder')
   @UseInterceptors(AvisarCambioChatInterceptor)
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
@@ -782,10 +825,12 @@ export class WhatsappChatsController {
     return this.eliminarMensajeCrm.execute(ctx.organizacionId!, id, mensajeId, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Post(':id/typing')
+  @RequirePermission('chats.responder')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Mostrar "escribiendo…" en el WhatsApp del contacto',
@@ -804,6 +849,11 @@ export class WhatsappChatsController {
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
+    await this.obtenerConversacion.verificarAcceso(ctx.organizacionId!, id, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+      permisos: ctx.permisos,
+    });
     // Ídem: efecto de UX, nunca debe devolver un error que el front tenga
     // que manejar mientras alguien solo está escribiendo un mensaje.
     await this.marcarLeidoWhatsApp
@@ -841,7 +891,7 @@ export class WhatsappChatsController {
       ctx.organizacionId!,
       id,
       mensajeId,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
     res.set({
       'Content-Type': media.mimeType,

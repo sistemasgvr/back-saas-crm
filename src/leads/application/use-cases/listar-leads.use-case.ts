@@ -9,8 +9,7 @@ import {
   inicioDiaLimaUtc,
   finDiaLimaUtc,
 } from '../../../shared/application/lima-time';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 export interface ListarLeadsInput {
   q?: string;
@@ -41,9 +40,13 @@ export class ListarLeadsUseCase {
    * query param (PLAN-GESTION-LEADS-WHATSAPP.md §3). */
   private resolverAsignacion(
     input: ListarLeadsInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): FiltroAsignacion {
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
 
     if (input.asignado === 'sin_asignar') {
       return { modo: 'sin_asignar' };
@@ -65,7 +68,11 @@ export class ListarLeadsUseCase {
   execute(
     organizacionId: string,
     input: ListarLeadsInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     return this.leads.listar(organizacionId, {
       q: input.q,

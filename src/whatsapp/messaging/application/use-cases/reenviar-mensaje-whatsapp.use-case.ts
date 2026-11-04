@@ -27,7 +27,10 @@ import type {
 } from '../ports/whatsapp-conversaciones.repository.port';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 import { categoriaMediaPorMimeType } from '../limites-media-whatsapp';
-import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
+import {
+  puedeEscribirConversacionWhatsApp,
+  puedeVerConversacionWhatsApp,
+} from '../../domain/acceso-conversacion-whatsapp';
 import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 
 /** Tope alineado con el multi-forward de la app WhatsApp (~30). */
@@ -74,7 +77,11 @@ export class ReenviarMensajeWhatsAppUseCase {
     conversacionOrigenId: string,
     mensajeId: string,
     conversacionDestinoId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     const resultado = await this.executeLote(
       organizacionId,
@@ -95,7 +102,11 @@ export class ReenviarMensajeWhatsAppUseCase {
     conversacionOrigenId: string,
     mensajeIds: string[],
     conversacionDestinoIds: string[],
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<ReenviarLoteResultado> {
     if (mensajeIds.length < 1 || mensajeIds.length > MAX_MENSAJES_REENVIAR) {
       throw new BadRequestException(
@@ -123,7 +134,7 @@ export class ReenviarMensajeWhatsAppUseCase {
       organizacionId,
       conversacionOrigenId,
     );
-    if (!origen) {
+    if (!origen || !puedeVerConversacionWhatsApp(origen.lead, ctx)) {
       throw new NotFoundException('Conversación de origen no encontrada');
     }
 
@@ -210,7 +221,11 @@ export class ReenviarMensajeWhatsAppUseCase {
   /** null = ok; string = motivo de rechazo (ventana 24h, bloqueado, etc.). */
   private validarDestino(
     destino: ConversacionResumen,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): string | null {
     try {
       this.assertPuedeEscribir(destino, ctx);
@@ -237,7 +252,11 @@ export class ReenviarMensajeWhatsAppUseCase {
     destinoWaId: string,
     phoneNumberId: string,
     accessToken: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     const mensaje = await this.conversaciones.buscarMensajeParaReenviar(
       organizacionId,
@@ -426,7 +445,11 @@ export class ReenviarMensajeWhatsAppUseCase {
 
   private assertPuedeEscribir(
     conversacion: { lead: { asignadoUsuarioId: string | null } | null },
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): void {
     if (!puedeEscribirConversacionWhatsApp(conversacion.lead, ctx)) {
       throw new ForbiddenException(

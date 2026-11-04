@@ -33,7 +33,11 @@ export class ObtenerMediaMensajeUseCase {
     organizacionId: string,
     conversacionId: string,
     mensajeId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<MediaMensajeStream> {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,

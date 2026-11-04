@@ -17,7 +17,11 @@ import {
   type WsEmitter,
 } from '../../../notifications/application/ports/ws-emitter.port';
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
-import { puedeEscribirConversacionWhatsApp } from '../domain/acceso-conversacion-whatsapp';
+import { resolverPermisosEfectivos } from '../../../shared/infrastructure/permisos-efectivos';
+import {
+  gestionaTodosLosChats,
+  puedeEscribirConversacionWhatsApp,
+} from '../domain/acceso-conversacion-whatsapp';
 import { esRechazoMeta } from '../../../meta/connections/application/mapear-error-meta-graph';
 
 export type ActorSalida =
@@ -30,7 +34,11 @@ export type ActorSalida =
       clave: string;
     }
   | { tipo: 'SYSTEM'; origen: 'agenda_recordatorio' };
-type ContextoHumano = { usuarioId: string; rol: RolOrganizacion };
+type ContextoHumano = {
+  usuarioId: string;
+  rol: RolOrganizacion;
+  permisos?: readonly string[];
+};
 
 /** Coordinación persistente entre réplicas. Ninguna transacción permanece
  * abierta durante llamadas a Meta. Un intento DESPACHANDO nunca vence por TTL:
@@ -116,21 +124,21 @@ export class ControlAtencionService {
     },
     ctx: ContextoHumano,
   ) {
-    const miembro = await tx.organizacionUsuario.findFirst({
-      where: {
-        organizacionId: c.organizacionId,
-        usuarioId: ctx.usuarioId,
-        estado: 1,
-        organizacion: { estado: 1 },
-        usuario: { estado: 1 },
-      },
-    });
-    const actual = { ...ctx, rol: miembro?.rol as RolOrganizacion };
-    if (!miembro || !puedeEscribirConversacionWhatsApp(c.lead, actual))
+    // Rol y permisos releídos en la transacción, no los del contexto recibido.
+    const miembro = await resolverPermisosEfectivos(
+      tx,
+      c.organizacionId,
+      ctx.usuarioId,
+      { exigirCuentaActiva: true, techoModulos: false },
+    );
+    const actual = miembro
+      ? { ...ctx, rol: miembro.rol, permisos: miembro.permisos }
+      : null;
+    if (!actual || !puedeEscribirConversacionWhatsApp(c.lead, actual))
       throw new ForbiddenException(
         'No tienes permiso para tomar esta conversación',
       );
-    const admin = ['PROPIETARIO', 'ADMINISTRADOR'].includes(miembro.rol);
+    const admin = gestionaTodosLosChats(actual);
     // El asignado del lead puede retomar su chat (reasignación o intervención
     // de un administrador) sin esperar una transferencia manual.
     const asignado = c.lead?.asignadoUsuarioId === ctx.usuarioId;

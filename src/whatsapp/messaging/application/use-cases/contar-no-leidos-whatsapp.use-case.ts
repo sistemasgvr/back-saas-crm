@@ -4,6 +4,7 @@ import type {
   FiltroVisibilidadChats,
   WhatsappConversacionesRepository,
 } from '../ports/whatsapp-conversaciones.repository.port';
+import { veTodosLosChats } from '../../domain/acceso-conversacion-whatsapp';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 
 /** Badge de no leídos del sidebar: misma regla que la lista por defecto
@@ -17,9 +18,15 @@ export class ContarNoLeidosWhatsAppUseCase {
 
   execute(
     organizacionId: string,
-    _ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<number> {
-    const filtro: FiltroVisibilidadChats = { modo: 'todos' };
+    const filtro: FiltroVisibilidadChats = veTodosLosChats(ctx)
+      ? { modo: 'todos' }
+      : { modo: 'usuario_y_libres', usuarioId: ctx.usuarioId };
     return this.conversaciones.contarNoLeidos(organizacionId, filtro);
   }
 }

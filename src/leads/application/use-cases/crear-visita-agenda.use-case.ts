@@ -26,8 +26,7 @@ import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
 import { INMUEBLES_REPOSITORY } from '../../../inmuebles/application/ports/inmuebles.repository.port';
 import type { InmueblesRepository } from '../../../inmuebles/application/ports/inmuebles.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 function formatearCuandoAgenda(programadaEn: Date): string {
   return programadaEn.toLocaleString('es-PE', {
@@ -66,7 +65,11 @@ export class CrearVisitaAgendaUseCase {
       nota?: string;
       asignadoUsuarioId?: string;
     },
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     const lead = await this.leads.buscarParaGestion(
       organizacionId,
@@ -76,7 +79,7 @@ export class CrearVisitaAgendaUseCase {
       throw new NotFoundException('Lead no encontrado');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     if (
       !esAdmin &&
       lead.asignadoUsuarioId &&

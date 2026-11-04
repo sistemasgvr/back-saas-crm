@@ -9,8 +9,7 @@ import {
   rankearInteresados,
   type InteresadoRankeado,
 } from '../../domain/ranking-interesados';
-
-const ROLES_ADMIN = new Set(['PROPIETARIO', 'ADMINISTRADOR']);
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 @Injectable()
 export class ListarInteresadosInmuebleUseCase {
@@ -47,7 +46,7 @@ export class ListarInteresadosInmuebleUseCase {
     candidatos: LeadCandidatoInteres[],
     ctx: RequestContext,
   ): LeadCandidatoInteres[] {
-    if (ctx.rol && ROLES_ADMIN.has(ctx.rol)) {
+    if (tienePermiso(ctx, 'leads.ver_todos')) {
       return candidatos;
     }
     return candidatos.filter(

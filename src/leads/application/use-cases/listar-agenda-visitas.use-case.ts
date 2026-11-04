@@ -4,6 +4,7 @@ import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
 import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repository.port';
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 /** Ítem unificado de calendario: visitas del pipeline + actividades de agenda. */
 export interface AgendaItemRow {
@@ -38,7 +39,11 @@ export class ListarAgendaVisitasUseCase {
   async execute(
     organizacionId: string,
     query: { desde: string; hasta: string; asignado?: string },
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<AgendaItemRow[]> {
     const desde = new Date(query.desde);
     const hasta = new Date(query.hasta);
@@ -51,7 +56,7 @@ export class ListarAgendaVisitasUseCase {
       );
     }
 
-    const esAdmin = ['PROPIETARIO', 'ADMINISTRADOR'].includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     let asignadoUsuarioId: string | undefined;
 
     if (!esAdmin) {

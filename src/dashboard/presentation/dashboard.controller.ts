@@ -9,8 +9,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { ObtenerKpisUseCase } from '../application/use-cases/obtener-kpis.use-case';
@@ -24,9 +24,9 @@ import { FiltroEmbudoQueryDto } from './dto/filtro-embudo.query.dto';
 
 @ApiTags('Dashboard')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('dashboard.ver')
 @Controller('dashboard')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('DASHBOARD')
 export class DashboardController {
   constructor(

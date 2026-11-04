@@ -56,7 +56,11 @@ export class EnviarMensajeWhatsAppUseCase {
     organizacionId: string,
     conversacionId: string,
     input: EnviarMensajeInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,

@@ -25,8 +25,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { ListarLeadsUseCase } from '../application/use-cases/listar-leads.use-case';
@@ -60,8 +60,9 @@ import { ActualizarActividadAgendaDto } from './dto/actualizar-actividad-agenda.
 
 @ApiTags('Leads')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('leads.ver')
 @Controller('leads')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('LEADS')
 export class LeadsController {
   constructor(
@@ -108,12 +109,13 @@ export class LeadsController {
     return this.listarLeads.execute(ctx.organizacionId!, query, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   /** Antes de :id — si no, Nest lo confunde con un id de lead. */
   @Get('asignables')
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('leads.asignar', 'leads.ver_todos')
   @ApiOperation({
     summary: 'Miembros a los que se puede asignar un lead',
     description:
@@ -130,7 +132,7 @@ export class LeadsController {
   }
 
   @Get('auto-asignacion/config')
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('leads.configurar')
   @ApiOperation({
     summary: 'Configurar auto-asignación secuencial de leads',
     description:
@@ -142,8 +144,8 @@ export class LeadsController {
   }
 
   @Patch('auto-asignacion/config')
+  @RequirePermission('leads.configurar')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @ApiOperation({
     summary: 'Guardar configuración de auto-asignación secuencial de leads',
   })
@@ -170,6 +172,7 @@ export class LeadsController {
     return this.contarLeadsNuevos.execute(ctx.organizacionId!, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
@@ -230,6 +233,7 @@ export class LeadsController {
       {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
+        permisos: ctx.permisos,
       },
       pagination,
     );
@@ -267,11 +271,12 @@ export class LeadsController {
     return this.listarAgendaVisitas.execute(
       ctx.organizacionId!,
       { desde, hasta, asignado },
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post('actividades')
+  @RequirePermission('leads.editar')
   @ApiOperation({
     summary: 'Registrar actividad en la agenda',
     description:
@@ -290,10 +295,12 @@ export class LeadsController {
     return this.crearActividadAgenda.execute(ctx.organizacionId!, body, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Patch('actividades/:actividadId')
+  @RequirePermission('leads.editar')
   @ApiOperation({
     summary: 'Actualizar actividad de agenda',
     description: 'Reagendar, completar o cancelar una actividad.',
@@ -307,11 +314,12 @@ export class LeadsController {
       ctx.organizacionId!,
       actividadId,
       body,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
   @Post('visitas')
+  @RequirePermission('leads.editar')
   @ApiOperation({
     summary: 'Registrar visita desde la agenda',
     description:
@@ -334,10 +342,12 @@ export class LeadsController {
     return this.crearVisitaAgenda.execute(ctx.organizacionId!, body, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
   @Patch('visitas/:visitaId')
+  @RequirePermission('leads.editar')
   @ApiOperation({
     summary: 'Reagendar o actualizar estado de una visita',
     description:
@@ -355,7 +365,7 @@ export class LeadsController {
       ctx.organizacionId!,
       visitaId,
       body,
-      { usuarioId: ctx.usuarioId, rol: ctx.rol! },
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }
 
@@ -384,6 +394,7 @@ export class LeadsController {
     return this.obtenerLead.execute(ctx.organizacionId!, id, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 
@@ -410,6 +421,7 @@ export class LeadsController {
       {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
+        permisos: ctx.permisos,
       },
       pagination.page,
       pagination.pageSize,
@@ -433,6 +445,7 @@ export class LeadsController {
       {
         usuarioId: ctx.usuarioId,
         rol: ctx.rol!,
+        permisos: ctx.permisos,
       },
       pagination.page,
       pagination.pageSize,
@@ -440,6 +453,7 @@ export class LeadsController {
   }
 
   @Post(':id/claim')
+  @RequirePermission('leads.reclamar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Tomar un lead sin asignar',
@@ -461,8 +475,8 @@ export class LeadsController {
   }
 
   @Post(':id/assign')
+  @RequirePermission('leads.asignar')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @ApiOperation({
     summary: 'Asignar un lead a un miembro',
     description:
@@ -489,8 +503,8 @@ export class LeadsController {
   }
 
   @Post(':id/release')
+  @RequirePermission('leads.asignar')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
   @ApiOperation({
     summary: 'Liberar un lead',
     description: 'Quita al responsable actual y deja el lead sin asignar.',
@@ -507,6 +521,7 @@ export class LeadsController {
   }
 
   @Patch(':id/gestion')
+  @RequirePermission('leads.editar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Gestionar el pipeline del lead',
@@ -544,6 +559,7 @@ export class LeadsController {
     return this.actualizarGestion.execute(ctx.organizacionId!, id, dto, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 }

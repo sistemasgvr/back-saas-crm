@@ -6,6 +6,7 @@ import {
 import { AutomatizacionesIntegracionService } from '../../../shared/infrastructure/automatizaciones-integracion.service';
 import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
+import { resolverPermisosEfectivos } from '../../../shared/infrastructure/permisos-efectivos';
 import { lockBotOrganizacion } from './bot-organizacion-lock';
 import { ConfigService } from '@nestjs/config';
 
@@ -83,18 +84,14 @@ export class BotEmpresaService {
   ) {
     await this.prisma.$transaction(async (tx) => {
       await lockBotOrganizacion(tx, org);
-      const miembro = await tx.organizacionUsuario.findFirst({
-        where: {
-          organizacionId: org,
-          usuarioId: usuario,
-          estado: 1,
-          organizacion: { estado: 1 },
-          usuario: { estado: 1 },
-        },
+      // El controlador ya exigió WHATSAPP; aquí solo se revalida el rol.
+      const miembro = await resolverPermisosEfectivos(tx, org, usuario, {
+        exigirCuentaActiva: true,
+        techoModulos: false,
       });
-      if (!miembro || !['PROPIETARIO', 'ADMINISTRADOR'].includes(miembro.rol))
+      if (!miembro?.permisos.includes('bot.configurar'))
         throw new ForbiddenException(
-          'Solo el propietario o administrador puede configurar la atención',
+          'No tienes permiso para configurar la atención del bot',
         );
       const d = await this.disponibilidad(tx, org);
       if ((d.config?.preferenciasVersion ?? 0) !== input.preferenciasVersion)

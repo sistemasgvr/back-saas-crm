@@ -109,7 +109,11 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     filtro: FiltroVisibilidadChats,
   ): Prisma.WhatsappConversacionWhereInput {
     if (filtro.modo === 'todos') return {};
-    return { lead: { asignadoUsuarioId: filtro.usuarioId } };
+    const propios = { lead: { asignadoUsuarioId: filtro.usuarioId } };
+    if (filtro.modo === 'usuario') return propios;
+    return {
+      OR: [propios, { lead: null }, { lead: { asignadoUsuarioId: null } }],
+    };
   }
 
   async listar(
@@ -133,7 +137,7 @@ export class PrismaWhatsappConversacionesRepository implements WhatsappConversac
     const where: Prisma.WhatsappConversacionWhereInput = {
       organizacionId,
       estado: 1,
-      ...this.whereVisibilidad(filtro),
+      AND: [this.whereVisibilidad(filtro)],
       ...(q
         ? {
             OR: [

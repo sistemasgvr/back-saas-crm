@@ -21,7 +21,8 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
+import { PermisosGuard } from '../../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { ObtenerIceServersUseCase } from '../application/use-cases/obtener-ice-servers.use-case';
@@ -52,8 +53,9 @@ import {
 
 @ApiTags('WhatsApp Calls')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('llamadas.usar')
 @Controller('whatsapp/calls')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('WHATSAPP')
 export class WhatsappCallsController {
   constructor(
@@ -144,6 +146,7 @@ export class WhatsappCallsController {
     return this.solicitarPermiso.execute(ctx.organizacionId!, dto, {
       usuarioId: ctx.usuarioId,
       rol: ctx.rol!,
+      permisos: ctx.permisos,
     });
   }
 

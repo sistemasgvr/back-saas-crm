@@ -22,8 +22,8 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.query.dto';
@@ -38,9 +38,9 @@ import { VincularCuentaDto } from './dto/vincular-cuenta.dto';
 
 @ApiTags('Meta Ad Accounts')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('meta.configurar')
 @Controller('meta/ad-accounts')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('META_LEADS')
 export class MetaAdAccountsController {
   constructor(
@@ -95,7 +95,7 @@ export class MetaAdAccountsController {
 
   /** Sin restricción de rol — cualquier miembro con el módulo puede poblar el filtro de /dashboard. */
   @Get('filtro')
-  @Roles()
+  @RequirePermission('meta.ver')
   @ApiOperation({
     summary: 'Cuentas para poblar el filtro del dashboard',
     description:

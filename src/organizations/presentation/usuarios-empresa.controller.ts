@@ -13,8 +13,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { GestionMembresiasService } from '../application/gestion-membresias.service';
 import {
   CrearUsuarioEmpresaDto,
@@ -26,9 +26,9 @@ import {
 
 import { ListarUsuariosEmpresaQueryDto } from './dto/listar-usuarios-empresa.query.dto';
 
+@RequirePermission('usuarios.gestionar')
 @Controller('organizations/current/users')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, PermisosGuard)
 export class UsuariosEmpresaController {
   constructor(private readonly gestion: GestionMembresiasService) {}
   @Get() listar(

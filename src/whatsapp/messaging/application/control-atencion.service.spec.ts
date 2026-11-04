@@ -91,6 +91,11 @@ function fixture() {
         return { count: 1 };
       }),
     },
+    organizacionRol: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+      count: jest.fn().mockResolvedValue(0),
+    },
     organizacionUsuario: {
       findMany: jest.fn(async () => miembros),
       findFirst: jest.fn(async ({ where }) =>

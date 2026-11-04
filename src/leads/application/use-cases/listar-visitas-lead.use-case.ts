@@ -9,8 +9,7 @@ import { LEADS_LECTURA_REPOSITORY } from '../ports/leads-lectura.repository.port
 import type { LeadsLecturaRepository } from '../ports/leads-lectura.repository.port';
 import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 @Injectable()
 export class ListarVisitasLeadUseCase {
@@ -24,7 +23,11 @@ export class ListarVisitasLeadUseCase {
   async execute(
     organizacionId: string,
     leadId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
     page = 1,
     pageSize = 20,
   ) {
@@ -33,7 +36,7 @@ export class ListarVisitasLeadUseCase {
       throw new NotFoundException('Lead no encontrado');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     const esDueno = lead.asignado?.id === ctx.usuarioId;
     if (!esAdmin && !esDueno) {
       throw new ForbiddenException('No puedes ver las visitas de este lead');

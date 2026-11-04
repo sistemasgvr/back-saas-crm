@@ -42,7 +42,11 @@ export class EnviarReaccionWhatsAppUseCase {
     conversacionId: string,
     mensajeId: string,
     emoji: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,

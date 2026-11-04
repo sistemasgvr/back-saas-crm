@@ -50,7 +50,11 @@ export class SolicitarPermisoLlamadaUseCase {
   async execute(
     organizacionId: string,
     input: SolicitarPermisoInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     const { waId, conexion } = await this.resolverDestino(
       organizacionId,

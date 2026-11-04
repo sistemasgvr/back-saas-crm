@@ -25,7 +25,11 @@ export class EliminarMensajeWhatsAppCrmUseCase {
     organizacionId: string,
     conversacionId: string,
     mensajeId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,

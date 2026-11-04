@@ -17,8 +17,8 @@ import { JwtAuthGuard } from '../../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../../shared/presentation/decorators/require-module.decorator';
 import { SincronizarInsightsCuentaUseCase } from '../application/use-cases/sincronizar-insights-cuenta.use-case';
@@ -28,9 +28,9 @@ import { SincronizarInsightsDto } from './dto/sincronizar-insights.dto';
  * que MetaAdAccountsController, sin colisión: :id/insights/sync difiere en profundidad de :id/sync). */
 @ApiTags('Meta Insights')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('meta.configurar')
 @Controller('meta/ad-accounts')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('META_LEADS')
 export class MetaInsightsController {
   constructor(private readonly sincronizar: SincronizarInsightsCuentaUseCase) {}

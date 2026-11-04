@@ -9,6 +9,8 @@ import type { UsuariosRepository } from '../ports/usuarios.repository.port';
 import { ORGANIZACION_USUARIOS_REPOSITORY } from '../ports/organizacion-usuarios.repository.port';
 import type { OrganizacionUsuariosRepository } from '../ports/organizacion-usuarios.repository.port';
 import { MODULOS_REPOSITORY } from '../ports/modulos.repository.port';
+import { PrismaService } from '../../../shared/infrastructure/prisma.service';
+import { resolverPermisosEfectivos } from '../../../shared/infrastructure/permisos-efectivos';
 import type {
   ModulosRepository,
   ModuloOrganizacion,
@@ -21,6 +23,7 @@ export class MeUseCase {
     @Inject(ORGANIZACION_USUARIOS_REPOSITORY)
     private readonly membresias: OrganizacionUsuariosRepository,
     @Inject(MODULOS_REPOSITORY) private readonly modulos: ModulosRepository,
+    private readonly prisma: PrismaService,
   ) {}
 
   async execute(context: RequestContext) {
@@ -37,6 +40,8 @@ export class MeUseCase {
     } | null = null;
     let rol: RolOrganizacion | null = null;
     let modulosOrg: ModuloOrganizacion[] = [];
+    let rolNombre: string | null = null;
+    let permisos: string[] = [];
 
     if (context.organizacionId) {
       const membresia = await this.membresias.findMembresiaActiva(
@@ -57,6 +62,13 @@ export class MeUseCase {
         modulosOrg = await this.modulos.findModulosPorOrganizacion(
           membresia.organizacionId,
         );
+        const efectivos = await resolverPermisosEfectivos(
+          this.prisma,
+          membresia.organizacionId,
+          usuario.id,
+        );
+        rolNombre = efectivos?.rolNombre ?? null;
+        permisos = efectivos?.permisos ?? [];
       }
     }
 
@@ -72,6 +84,9 @@ export class MeUseCase {
       },
       organizacion,
       rol,
+      rolNombre,
+      /** Permisos efectivos (rol ∩ módulos activos): el front decide con ellos. */
+      permisos,
       modulos: modulosOrg,
     };
   }

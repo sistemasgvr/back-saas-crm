@@ -145,20 +145,18 @@ if (connection) testUrl(connection);
       await db.organizacion.create({
         data: { id: org, nombre: 'Test', slug: org },
       });
-      const modulo = await db.modulo.upsert({
-        where: { codigo: 'WHATSAPP' },
-        create: { codigo: 'WHATSAPP', nombre: 'WhatsApp' },
-        update: {},
-      });
-      await db.organizacionModulo.create({
-        data: { organizacionId: org, moduloId: modulo.id, habilitado: 1 },
-      });
-      const auto = await db.modulo.create({
-        data: { codigo: 'AUTOMATIZACIONES', nombre: 'Automatizaciones' },
-      });
-      await db.organizacionModulo.create({
-        data: { organizacionId: org, moduloId: auto.id, habilitado: 1 },
-      });
+      // Este esquema todavía no tiene las columnas del cliente Prisma actual.
+      await db.$executeRaw`
+        INSERT INTO modulos (id, codigo, nombre, fecha_modificacion)
+        VALUES (gen_random_uuid(), 'WHATSAPP', 'WhatsApp', now()),
+               (gen_random_uuid(), 'AUTOMATIZACIONES', 'Automatizaciones', now()),
+               (gen_random_uuid(), 'META_LEADS', 'Leads', now())
+        ON CONFLICT (codigo) DO NOTHING`;
+      await db.$executeRaw`
+        INSERT INTO organizacion_modulos
+          (id, organizacion_id, modulo_id, habilitado, fecha_modificacion)
+        SELECT gen_random_uuid(), ${org}::uuid, id, 1, now()
+        FROM modulos WHERE codigo IN ('WHATSAPP', 'AUTOMATIZACIONES', 'META_LEADS')`;
       for (const id of [user, other]) {
         await db.usuario.create({
           data: {
@@ -168,22 +166,15 @@ if (connection) testUrl(connection);
             passwordHash: 'no-login',
           },
         });
-        await db.organizacionUsuario.create({
-          data: { organizacionId: org, usuarioId: id, rol: 'USUARIO' },
-        });
       }
-      const meta = await db.metaConexion.create({
-        data: { organizacionId: org, webhookVerifyToken: randomUUID() },
-      });
-      await db.whatsappConexion.create({
-        data: {
-          id: line,
-          organizacionId: org,
-          metaConexionId: meta.id,
-          wabaId: randomUUID(),
-          phoneNumberId: randomUUID(),
-        },
-      });
+      const metaId = randomUUID();
+      await db.$executeRaw`
+        INSERT INTO meta_conexiones (id, organizacion_id, webhook_verify_token, fecha_modificacion)
+        VALUES (${metaId}::uuid, ${org}::uuid, ${randomUUID()}, now())`;
+      await db.$executeRaw`
+        INSERT INTO whatsapp_conexiones
+          (id, organizacion_id, meta_conexion_id, waba_id, phone_number_id, fecha_modificacion)
+        VALUES (${line}::uuid, ${org}::uuid, ${metaId}::uuid, ${randomUUID()}, ${randomUUID()}, now())`;
       // Sembrar un chat anterior a fase 1 antes de ejecutar su backfill.
       await db.$executeRaw`INSERT INTO whatsapp_conversaciones (id, organizacion_id, whatsapp_conexion_id, wa_id, fecha_modificacion) VALUES (${legacy}::uuid, ${org}::uuid, ${line}::uuid, '51900000000', NOW())`;
       // Más de 500 filas clasificables: ejercita varias vueltas del backfill.
@@ -238,6 +229,13 @@ if (connection) testUrl(connection);
           );
       }
       deploy();
+      await db.organizacionUsuario.createMany({
+        data: [user, other].map((usuarioId) => ({
+          organizacionId: org,
+          usuarioId,
+          rol: 'USUARIO',
+        })),
+      });
       const bot = new BotEmpresaService(
         db as PrismaService,
         {
@@ -587,12 +585,6 @@ if (connection) testUrl(connection);
           rol: 'ADMINISTRADOR',
         },
       });
-      const modulo = await db.modulo.create({
-        data: { codigo: 'META_LEADS', nombre: 'Leads' },
-      });
-      await db.organizacionModulo.create({
-        data: { organizacionId: org, moduloId: modulo.id, habilitado: 1 },
-      });
       const env = {
         NODE_ENV: 'test',
         DATABASE_URL: url.toString(),
@@ -677,6 +669,78 @@ if (connection) testUrl(connection);
         expect(
           await db.tokenRefresco.count({ where: { usuarioId: actor.id } }),
         ).toBe(1);
+        const asesor = await db.usuario.update({
+          where: { id: user },
+          data: { passwordHash: await hash(password, 4) },
+        });
+        const loginAsesor = await http
+          .post('/auth/login')
+          .send({ email: asesor.email, password })
+          .expect(201);
+        const authAsesor = 'Bearer ' + tokens(loginAsesor).accessToken;
+        const leadAjeno = await db.lead.create({
+          data: {
+            organizacionId: org,
+            idExterno: randomUUID(),
+            datosCrudos: {},
+            asignadoUsuarioId: other,
+          },
+        });
+        const chatAjeno = await db.whatsappConversacion.create({
+          data: {
+            organizacionId: org,
+            whatsappConexionId: line,
+            waId: randomUUID(),
+            leadId: leadAjeno.id,
+          },
+        });
+        const otra = await db.organizacion.create({
+          data: { nombre: 'QA segunda empresa', slug: randomUUID() },
+        });
+        const otraMeta = await db.metaConexion.create({
+          data: { organizacionId: otra.id, webhookVerifyToken: randomUUID() },
+        });
+        const otraLinea = await db.whatsappConexion.create({
+          data: {
+            organizacionId: otra.id,
+            metaConexionId: otraMeta.id,
+            wabaId: randomUUID(),
+            phoneNumberId: randomUUID(),
+          },
+        });
+        const otroChat = await db.whatsappConversacion.create({
+          data: {
+            organizacionId: otra.id,
+            whatsappConexionId: otraLinea.id,
+            waId: randomUUID(),
+          },
+        });
+        const urlOtroChat = '/whatsapp/chats/' + otroChat.id;
+        const urlChat = '/whatsapp/chats/' + chatAjeno.id;
+        const rolAsesor = await db.organizacionRol.findFirstOrThrow({
+          where: { organizacionId: org, codigo: 'USUARIO' },
+        });
+        const urlRol = '/organizations/current/roles/' + rolAsesor.id;
+        await http.get(urlChat).set('Authorization', authAsesor).expect(403);
+        await http.get('/leads').set('Authorization', authAsesor).expect(200);
+        await http
+          .get('/leads/visitas/agenda')
+          .query({ desde: '2026-11-01', hasta: '2026-11-07' })
+          .set('Authorization', authAsesor)
+          .expect(200);
+        await http
+          .patch(urlRol)
+          .set('Authorization', auth)
+          .send({ permisos: [...rolAsesor.permisos, 'chats.ver_todos'] })
+          .expect(200);
+        await http.get(urlChat).set('Authorization', authAsesor).expect(200);
+        await http.get(urlOtroChat).set('Authorization', authAsesor).expect(404);
+        await http
+          .patch(urlRol)
+          .set('Authorization', auth)
+          .send({ permisos: rolAsesor.permisos })
+          .expect(200);
+        await http.get(urlChat).set('Authorization', authAsesor).expect(403);
         // Dos navegaciones simultáneas pueden renovar el mismo token sin
         // colisionar; cerrar la sesión invalida toda esa familia, incluso
         // cuando se recibe el token anterior dentro de la ventana de gracia.

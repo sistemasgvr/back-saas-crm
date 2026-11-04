@@ -22,8 +22,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import {
   LIMITE_LOGO_BYTES,
   LogoOrganizacionService,
@@ -32,7 +32,7 @@ import {
 @ApiTags('Organizations')
 @ApiBearerAuth('JWT-auth')
 @Controller('organizations/current/logo')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, PermisosGuard)
 export class OrganizationLogoController {
   constructor(private readonly logos: LogoOrganizacionService) {}
 
@@ -55,7 +55,7 @@ export class OrganizationLogoController {
   }
 
   @Post()
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('empresa.configurar')
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
@@ -81,7 +81,7 @@ export class OrganizationLogoController {
   }
 
   @Delete()
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('empresa.configurar')
   @ApiOperation({
     summary: 'Quitar el logo propio para volver al logo del sistema.',
   })

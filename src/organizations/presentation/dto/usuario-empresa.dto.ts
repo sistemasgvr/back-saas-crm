@@ -32,6 +32,10 @@ export class EditarUsuarioEmpresaDto {
   @ValidateIf((_obj, value) => value !== undefined)
   @IsIn(['PROPIETARIO', 'ADMINISTRADOR', 'USUARIO'])
   rol?: RolOrganizacion;
+  /** Rol de la empresa; tiene prioridad sobre `rol`. */
+  @IsOptional()
+  @IsUUID()
+  rolId?: string;
 }
 export class CrearUsuarioEmpresaDto {
   @Transform(({ value }: { value: unknown }) =>
@@ -55,8 +59,13 @@ export class CrearUsuarioEmpresaDto {
   @IsString()
   @MaxLength(40)
   telefono?: string;
+  /** Obligatorio si no se envía `rolId`. */
+  @ValidateIf((obj: { rolId?: string }) => !obj.rolId)
   @IsIn(['PROPIETARIO', 'ADMINISTRADOR', 'USUARIO'])
-  rol!: RolOrganizacion;
+  rol?: RolOrganizacion;
+  @IsOptional()
+  @IsUUID()
+  rolId?: string;
   @IsString()
   @MinLength(8)
   @MaxLength(72)

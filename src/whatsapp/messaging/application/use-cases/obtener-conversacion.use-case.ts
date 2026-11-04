@@ -23,11 +23,14 @@ export class ObtenerConversacionUseCase {
     private readonly marcarLeidoWhatsApp: MarcarLeidoWhatsAppUseCase,
   ) {}
 
-  async execute(
+  async verificarAcceso(
     organizacionId: string,
     id: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
-    before?: string,
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,
@@ -41,6 +44,16 @@ export class ObtenerConversacionUseCase {
       throw new ForbiddenException('No tienes acceso a esta conversación');
     }
 
+    return conversacion;
+  }
+
+  async execute(
+    organizacionId: string,
+    id: string,
+    ctx: Parameters<ObtenerConversacionUseCase['verificarAcceso']>[2],
+    before?: string,
+  ) {
+    const conversacion = await this.verificarAcceso(organizacionId, id, ctx);
     const limite = before ? 50 : LIMITE_MENSAJES;
     const filas = await this.conversaciones.listarMensajes(
       id,

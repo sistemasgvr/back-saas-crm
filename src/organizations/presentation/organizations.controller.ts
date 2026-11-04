@@ -11,8 +11,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { GetOrganizacionActualUseCase } from '../application/use-cases/get-organizacion-actual.use-case';
 import { ActualizarOrganizacionActualUseCase } from '../application/use-cases/actualizar-organizacion-actual.use-case';
 import { ObtenerPipelineConfigUseCase } from '../application/use-cases/obtener-pipeline-config.use-case';
@@ -22,9 +22,9 @@ import { ActualizarPipelineConfigDto } from './dto/actualizar-pipeline-config.dt
 
 @ApiTags('Organizations')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('empresa.configurar')
 @Controller('organizations')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard)
-@Roles('PROPIETARIO', 'ADMINISTRADOR')
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, PermisosGuard)
 export class OrganizationsController {
   constructor(
     private readonly getOrganizacionActual: GetOrganizacionActualUseCase,
@@ -69,6 +69,7 @@ export class OrganizationsController {
   @UseGuards(ModuleGuard)
   @RequireModule('LEADS')
   @Get('current/pipeline-config')
+  @RequirePermission('leads.configurar')
   @ApiOperation({
     summary: 'Override de matrices del pipeline (o null = defaults de código)',
   })
@@ -80,6 +81,7 @@ export class OrganizationsController {
   @UseGuards(ModuleGuard)
   @RequireModule('LEADS')
   @Patch('current/pipeline-config')
+  @RequirePermission('leads.configurar')
   @ApiOperation({
     summary: 'Guardar o restaurar el override de pipeline de la organización',
     description:

@@ -55,7 +55,11 @@ export class EnviarMediaWhatsAppUseCase {
     organizacionId: string,
     conversacionId: string,
     input: EnviarMediaInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     const { categoria } = validarArchivoWhatsApp(
       input.mimeType,

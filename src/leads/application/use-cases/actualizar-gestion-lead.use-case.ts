@@ -53,8 +53,7 @@ import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/po
 import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
 import { INMUEBLES_REPOSITORY } from '../../../inmuebles/application/ports/inmuebles.repository.port';
 import type { InmueblesRepository } from '../../../inmuebles/application/ports/inmuebles.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 export interface ActualizarGestionInput {
   tipoLead?: string;
@@ -103,7 +102,11 @@ export class ActualizarGestionLeadUseCase {
     organizacionId: string,
     leadId: string,
     input: ActualizarGestionInput,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<void> {
     if (
       input.tipoLead !== undefined &&
@@ -120,7 +123,7 @@ export class ActualizarGestionLeadUseCase {
     }
 
     const esDueno = lead.asignadoUsuarioId === ctx.usuarioId;
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     const esPoolLibre = lead.asignadoUsuarioId === null;
     // Pool sin asignar: el asesor que gestiona (p. ej. mueve en kanban) lo
     // puede operar; se auto-toma de forma race-safe antes de mutar.

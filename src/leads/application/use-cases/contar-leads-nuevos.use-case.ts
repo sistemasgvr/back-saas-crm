@@ -5,8 +5,7 @@ import type {
   FiltroAsignacion,
   LeadsLecturaRepository,
 } from '../ports/leads-lectura.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 @Injectable()
 export class ContarLeadsNuevosUseCase {
@@ -18,8 +17,9 @@ export class ContarLeadsNuevosUseCase {
   private resolverAsignacion(ctx: {
     usuarioId: string;
     rol: RolOrganizacion;
+    permisos?: readonly string[];
   }): FiltroAsignacion {
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     return esAdmin
       ? { modo: 'todos' }
       : { modo: 'mios_y_pool', usuarioId: ctx.usuarioId };
@@ -27,7 +27,11 @@ export class ContarLeadsNuevosUseCase {
 
   async execute(
     organizacionId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): Promise<{ count: number }> {
     const count = await this.leads.contarNuevos(
       organizacionId,

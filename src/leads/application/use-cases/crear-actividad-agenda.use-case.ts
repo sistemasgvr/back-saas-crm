@@ -28,8 +28,7 @@ import { LEAD_ACTIVIDADES_REPOSITORY } from '../ports/lead-actividades.repositor
 import type { LeadActividadesRepository } from '../ports/lead-actividades.repository.port';
 import { LEAD_VISITAS_REPOSITORY } from '../ports/lead-visitas.repository.port';
 import type { LeadVisitasRepository } from '../ports/lead-visitas.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 function formatearCuandoAgenda(programadaEn: Date): string {
   return programadaEn.toLocaleString('es-PE', {
@@ -67,7 +66,11 @@ export class CrearActividadAgendaUseCase {
       nota?: string;
       asignadoUsuarioId?: string;
     },
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     if (!esTipoActividadAgenda(input.tipo)) {
       throw new BadRequestException('Tipo de actividad inválido');
@@ -80,7 +83,7 @@ export class CrearActividadAgendaUseCase {
     );
     if (!lead) throw new NotFoundException('Lead no encontrado');
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     if (
       !esAdmin &&
       lead.asignadoUsuarioId &&

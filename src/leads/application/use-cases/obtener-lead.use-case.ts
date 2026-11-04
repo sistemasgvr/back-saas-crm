@@ -7,8 +7,7 @@ import {
 import { LEADS_LECTURA_REPOSITORY } from '../ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../ports/leads-lectura.repository.port';
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 @Injectable()
 export class ObtenerLeadUseCase {
@@ -20,7 +19,11 @@ export class ObtenerLeadUseCase {
   async execute(
     organizacionId: string,
     id: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ) {
     const lead = await this.leads.obtenerPorId(organizacionId, id);
     if (!lead) {
@@ -29,7 +32,7 @@ export class ObtenerLeadUseCase {
 
     // USUARIO solo ve el detalle si es suyo o está libre en el pool — no el
     // historial de leads asignados a otros (PLAN-GESTION-LEADS-WHATSAPP.md §3).
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     const esVisible =
       esAdmin || lead.asignado === null || lead.asignado.id === ctx.usuarioId;
     if (!esVisible) {

@@ -7,8 +7,7 @@ import {
 import type { RolOrganizacion } from '../../../auth/domain/request-context.interface';
 import { LEADS_GESTION_REPOSITORY } from '../ports/leads-gestion.repository.port';
 import type { LeadsGestionRepository } from '../ports/leads-gestion.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 /** GET /leads/:id/historial-estados — timeline de cambios de pipeline
  * (PLAN-PIPELINE-INMOBILIARIA.md §7/§8.2), mismo control de acceso que
@@ -23,7 +22,11 @@ export class ObtenerHistorialLeadUseCase {
   async execute(
     organizacionId: string,
     leadId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
     page = 1,
     pageSize = 20,
   ) {
@@ -32,7 +35,7 @@ export class ObtenerHistorialLeadUseCase {
       throw new NotFoundException('Lead no encontrado');
     }
 
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     const esDueno = lead.asignadoUsuarioId === ctx.usuarioId;
     if (!esAdmin && !esDueno) {
       throw new ForbiddenException('No tienes acceso a este lead');

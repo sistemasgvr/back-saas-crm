@@ -14,8 +14,7 @@ import {
 } from '../../../shared/domain/pipeline-inmobiliaria';
 import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
 import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 export interface ColumnaTablero {
   codigo: string;
@@ -39,9 +38,13 @@ export class ListarTableroLeadsUseCase {
 
   private resolverAsignacion(
     asignadoParam: string | undefined,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
   ): FiltroAsignacion {
-    const esAdmin = ROLES_ADMIN.includes(ctx.rol);
+    const esAdmin = tienePermiso(ctx, 'leads.ver_todos');
     if (asignadoParam === 'sin_asignar') return { modo: 'sin_asignar' };
     if (asignadoParam === 'mios')
       return { modo: 'mios_y_pool', usuarioId: ctx.usuarioId };
@@ -59,7 +62,11 @@ export class ListarTableroLeadsUseCase {
     organizacionId: string,
     tipoLeadParam: string | undefined,
     asignadoParam: string | undefined,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
     pagination: { page: number; pageSize: number; q?: string } = {
       page: 1,
       pageSize: 20,

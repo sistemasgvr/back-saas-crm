@@ -217,7 +217,7 @@ if (connection) {
     it('plataforma respeta el cupo y no puede compartir una cuenta', async () => {
       await expect(
         service.asignar(otra, asesor, 'USUARIO', ctx(platform, true)),
-      ).rejects.toThrow('email no está disponible');
+      ).rejects.toThrow('Este correo ya está registrado');
       await db.organizacion.update({
         where: { id: otra },
         data: { limiteUsuarios: 1 },

@@ -5,16 +5,15 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/prisma.service';
-import type {
-  RequestContext,
-  RolOrganizacion,
-} from '../../../auth/domain/request-context.interface';
+import { resolverPermisosEfectivos } from '../../infrastructure/permisos-efectivos';
+import type { RequestContext } from '../../../auth/domain/request-context.interface';
 
 /**
  * Revalida en vivo (no solo desde el JWT) que el usuario pertenece a la
  * organización activa y que tanto la membresía como la organización siguen
  * con estado = 1. Organización desactivada o membresía revocada → 403.
- * Refresca request.user.rol con el valor actual de la membresía.
+ * Refresca request.user.rol y calcula request.user.permisos (rol ∩ módulos
+ * activos): un cambio de rol aplica en la siguiente petición.
  */
 @Injectable()
 export class OrgMembershipGuard implements CanActivate {
@@ -32,14 +31,11 @@ export class OrgMembershipGuard implements CanActivate {
       );
     }
 
-    const membresia = await this.prisma.organizacionUsuario.findFirst({
-      where: {
-        usuarioId: user.usuarioId,
-        organizacionId: user.organizacionId,
-        estado: 1,
-        organizacion: { estado: 1 },
-      },
-    });
+    const membresia = await resolverPermisosEfectivos(
+      this.prisma,
+      user.organizacionId,
+      user.usuarioId,
+    );
 
     if (!membresia) {
       throw new ForbiddenException(
@@ -47,7 +43,11 @@ export class OrgMembershipGuard implements CanActivate {
       );
     }
 
-    request.user = { ...user, rol: membresia.rol as RolOrganizacion };
+    request.user = {
+      ...user,
+      rol: membresia.rol,
+      permisos: membresia.permisos,
+    };
     return true;
   }
 }

@@ -120,15 +120,13 @@ describe('Configuración de pipeline en leads y tablero', () => {
     const { guardar, config, organizaciones } = preparar();
     await guardar.execute('org', 'usuario', config);
     const leads = {
-      buscarParaGestion: jest
-        .fn()
-        .mockResolvedValue({
-          id: 'lead',
-          nombre: 'Lead',
-          asignadoUsuarioId: null,
-          tipoLead: 'COMPRA',
-          estadoGestion: 'NUEVO',
-        }),
+      buscarParaGestion: jest.fn().mockResolvedValue({
+        id: 'lead',
+        nombre: 'Lead',
+        asignadoUsuarioId: null,
+        tipoLead: 'COMPRA',
+        estadoGestion: 'NUEVO',
+      }),
       actualizarGestion: jest.fn().mockResolvedValue(undefined),
     };
     type Dependencias = ConstructorParameters<

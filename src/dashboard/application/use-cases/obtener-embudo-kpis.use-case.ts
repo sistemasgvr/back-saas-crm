@@ -5,10 +5,7 @@ import type {
   FiltroAsignacionDashboard,
   FiltroDashboard,
 } from '../ports/dashboard.repository.port';
-import type {
-  RequestContext,
-  RolOrganizacion,
-} from '../../../auth/domain/request-context.interface';
+import type { RequestContext } from '../../../auth/domain/request-context.interface';
 import {
   estadosColumnasTablero,
   etiquetasColumnasTablero,
@@ -23,8 +20,7 @@ import {
 } from '../../../shared/application/lima-time';
 import { ORGANIZACIONES_REPOSITORY } from '../../../organizations/application/ports/organizaciones.repository.port';
 import type { OrganizacionesRepository } from '../../../organizations/application/ports/organizaciones.repository.port';
-
-const ROLES_ADMIN: RolOrganizacion[] = ['PROPIETARIO', 'ADMINISTRADOR'];
+import { tienePermiso } from '../../../shared/domain/permisos';
 
 export interface ObtenerEmbudoKpisInput extends FiltroDashboard {
   fechaDesde?: string;
@@ -81,8 +77,7 @@ export class ObtenerEmbudoKpisUseCase {
   ): FiltroAsignacionDashboard {
     if (!asignado) return { modo: 'todos' };
 
-    const rol = ctx.rol;
-    const esAdmin = rol ? ROLES_ADMIN.includes(rol) : false;
+    const esAdmin = tienePermiso(ctx, 'dashboard.ver');
 
     if (asignado === 'sin_asignar') return { modo: 'sin_asignar' };
     if (asignado === 'mios') {

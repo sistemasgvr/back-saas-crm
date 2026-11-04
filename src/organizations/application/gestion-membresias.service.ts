@@ -22,12 +22,23 @@ import { ControlAtencionService } from '../../whatsapp/messaging/application/con
 import { resolverUsuarioIdsRoundRobin } from '../../leads/domain/resolver-usuario-ids-round-robin';
 import { membresiaQueConsumeCupo } from './membresia-cupo';
 import { CrearNotificacionUseCase } from '../../notifications/application/use-cases/crear-notificacion.use-case';
+import {
+  permisosDeMembresia,
+  resolverPermisosEfectivos,
+  type MembresiaConPermisos,
+} from '../../shared/infrastructure/permisos-efectivos';
+import {
+  asegurarRolesSistema,
+  esSubconjunto,
+  resolverRolDestino,
+  type RolDestino,
+} from './roles-empresa';
 
 export interface FiltrosUsuariosEmpresa {
   page: number;
   pageSize: number;
   q?: string;
-  rol?: 'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO';
+  rol?: 'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO' | 'PERSONALIZADO';
   estado?: 'activo' | 'inactivo' | 'suspendido';
 }
 
@@ -38,8 +49,13 @@ export interface DatosMiembro {
   apellido?: string;
   telefono?: string;
   password: string;
-  rol: RolOrganizacion;
+  rol?: RolOrganizacion;
+  /** Rol de la empresa (organizacion_roles). Tiene prioridad sobre `rol`. */
+  rolId?: string;
 }
+
+/** null = actor de plataforma (sin límite de permisos de la empresa). */
+type Actor = MembresiaConPermisos | null;
 const noDisponible = 'Este email no está disponible. Contacta a soporte.';
 
 /** Todas las altas y modificaciones de membresías se serializan por empresa.
@@ -58,34 +74,57 @@ export class GestionMembresiasService {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${clave}, 0))::text`;
   }
 
-  private async autorizar(tx: Tx, org: string, ctx: RequestContext) {
+  private async autorizar(
+    tx: Tx,
+    org: string,
+    ctx: RequestContext,
+  ): Promise<{ plataforma: boolean; actor: Actor }> {
     // No confiar en el rol ni en la marca de plataforma recibidos en el JWT.
-    const actor = await tx.usuario.findUnique({ where: { id: ctx.usuarioId } });
-    if (!actor || actor.estado !== 1)
-      throw new ForbiddenException('Cuenta inactiva');
-    if (ctx.esAdminPlataforma && actor.esAdminPlataforma === 1) return true;
-    const m = await tx.organizacionUsuario.findUnique({
-      where: {
-        organizacionId_usuarioId: {
-          organizacionId: org,
-          usuarioId: ctx.usuarioId,
-        },
-      },
+    const cuenta = await tx.usuario.findUnique({
+      where: { id: ctx.usuarioId },
     });
-    if (
-      ctx.organizacionId !== org ||
-      !m ||
-      m.estado !== 1 ||
-      !['PROPIETARIO', 'ADMINISTRADOR'].includes(m.rol)
-    )
+    if (!cuenta || cuenta.estado !== 1)
+      throw new ForbiddenException('Cuenta inactiva');
+    if (ctx.esAdminPlataforma && cuenta.esAdminPlataforma === 1)
+      return { plataforma: true, actor: null };
+    const actor =
+      ctx.organizacionId === org
+        ? await resolverPermisosEfectivos(tx, org, ctx.usuarioId)
+        : null;
+    if (!actor?.permisos.includes('usuarios.gestionar'))
       throw new ForbiddenException('No tienes permiso para gestionar usuarios');
-    return false;
+    return { plataforma: false, actor };
+  }
+
+  /** Nadie otorga un rol con permisos que no tiene (salvo propietario o plataforma). */
+  private sinEscalada(destino: RolDestino | null, actor: Actor) {
+    if (!destino || !actor || actor.rol === 'PROPIETARIO') return;
+    if (!esSubconjunto(destino.efectivo.permisos, actor.permisos))
+      throw new ForbiddenException(
+        'No puedes asignar un rol con permisos que tú no tienes',
+      );
+  }
+
+  /** Tampoco se gestiona a alguien con más permisos que uno mismo. */
+  private async jerarquia(tx: Tx, m: OrganizacionUsuario, actor: Actor) {
+    if (!actor || actor.rol === 'PROPIETARIO') return;
+    const objetivo = await permisosDeMembresia(tx, m.organizacionId, m);
+    if (!esSubconjunto(objetivo.permisos, actor.permisos))
+      throw new ForbiddenException(
+        'No puedes gestionar a un usuario con permisos que tú no tienes',
+      );
+  }
+
+  private cambiaRol(m: OrganizacionUsuario, destino: RolDestino | null) {
+    if (!destino) return false;
+    if (destino.rol !== m.rol) return true;
+    return !!destino.rolId && !!m.rolId && destino.rolId !== m.rolId;
   }
 
   private async ejecutar<T>(
     org: string,
     ctx: RequestContext,
-    fn: (tx: Tx, plataforma: boolean) => Promise<T>,
+    fn: (tx: Tx, plataforma: boolean, actor: Actor) => Promise<T>,
   ) {
     return this.prisma.$transaction(
       async (tx) => {
@@ -95,8 +134,8 @@ export class GestionMembresiasService {
         });
         if (!empresa || empresa.estado !== 1)
           throw new NotFoundException('Empresa no disponible');
-        const plataforma = await this.autorizar(tx, org, ctx);
-        return fn(tx, plataforma);
+        const { plataforma, actor } = await this.autorizar(tx, org, ctx);
+        return fn(tx, plataforma, actor);
       },
       { timeout: 20000 },
     );
@@ -121,15 +160,13 @@ export class GestionMembresiasService {
     estado: number | undefined,
     ctx: RequestContext,
     plataforma: boolean,
+    cambiaRol = !!m && !!rol && rol !== m.rol,
   ) {
     if (!plataforma && (m?.rol === 'PROPIETARIO' || rol === 'PROPIETARIO'))
       throw new ForbiddenException(
         'La plataforma gestiona las cuentas propietarias',
       );
-    if (
-      m?.usuarioId === ctx.usuarioId &&
-      (estado === 0 || (rol && rol !== m.rol))
-    )
+    if (m?.usuarioId === ctx.usuarioId && (estado === 0 || cambiaRol))
       throw new ForbiddenException(
         'No puedes desactivarte ni cambiar tu propio rol',
       );
@@ -295,6 +332,13 @@ export class GestionMembresiasService {
       const empresa = await tx.organizacion.findUniqueOrThrow({
         where: { id: org },
       });
+      await asegurarRolesSistema(tx, org);
+      const roles = await tx.organizacionRol.findMany({
+        where: { organizacionId: org },
+        select: { id: true, codigo: true, nombre: true },
+      });
+      const rolDe = (m: { rol: string; rolId: string | null }) =>
+        roles.find((r) => (m.rolId ? r.id === m.rolId : r.codigo === m.rol));
       const leads = await tx.lead.groupBy({
         by: ['asignadoUsuarioId'],
         where: { organizacionId: org, estado: 1 },
@@ -307,6 +351,8 @@ export class GestionMembresiasService {
             estado: m.estado,
             cuentaActiva: m.usuario.estado === 1,
             rol: m.rol,
+            rolId: rolDe(m)?.id ?? null,
+            rolNombre: rolDe(m)?.nombre ?? m.rol,
             leadsAsignados:
               leads.find((l) => l.asignadoUsuarioId === m.usuarioId)?._count ??
               0,
@@ -326,8 +372,11 @@ export class GestionMembresiasService {
   async crear(org: string, input: DatosMiembro, ctx: RequestContext) {
     const email = input.email.trim().toLowerCase();
     const passwordHash = await this.hasher.hash(input.password);
-    return this.ejecutar(org, ctx, async (tx, plataforma) => {
-      this.proteger(null, input.rol, 1, ctx, plataforma);
+    return this.ejecutar(org, ctx, async (tx, plataforma, actor) => {
+      const destino = await resolverRolDestino(tx, org, input);
+      if (!destino) throw new BadRequestException('Indica el rol del usuario');
+      this.proteger(null, destino.rol, 1, ctx, plataforma);
+      this.sinEscalada(destino, actor);
       await this.bloquear(tx, `usuario-email:${email}`);
       let usuario = await tx.usuario.findFirst({
         where: { email: { equals: email, mode: 'insensitive' } },
@@ -364,7 +413,8 @@ export class GestionMembresiasService {
         data: {
           organizacionId: org,
           usuarioId: usuario.id,
-          rol: input.rol,
+          rol: destino.rol,
+          rolId: destino.rolId,
           usuarioCreacion: ctx.usuarioId,
         },
       });
@@ -521,7 +571,7 @@ export class GestionMembresiasService {
           rol,
           usuarioCreacion: ctx.usuarioId,
         },
-        update: { rol, estado: 1, usuarioEdicion: ctx.usuarioId },
+        update: { rol, rolId: null, estado: 1, usuarioEdicion: ctx.usuarioId },
       });
       await this.evento(
         tx,
@@ -544,26 +594,44 @@ export class GestionMembresiasService {
       apellido?: string;
       telefono?: string;
       rol?: RolOrganizacion;
+      rolId?: string;
     },
     ctx: RequestContext,
   ) {
-    return this.ejecutar(org, ctx, async (tx, plataforma) => {
+    return this.ejecutar(org, ctx, async (tx, plataforma, actor) => {
       const m = await tx.organizacionUsuario.findUnique({
         where: { organizacionId_usuarioId: { organizacionId: org, usuarioId } },
       });
       if (!m) throw new NotFoundException('Usuario no encontrado');
-      this.proteger(m, input.rol, undefined, ctx, plataforma);
+      const destino = await resolverRolDestino(tx, org, input);
+      this.proteger(
+        m,
+        destino?.rol,
+        undefined,
+        ctx,
+        plataforma,
+        this.cambiaRol(m, destino),
+      );
       await this.protegerCuentaPlataforma(tx, usuarioId, plataforma);
+      await this.jerarquia(tx, m, actor);
+      this.sinEscalada(destino, actor);
       await this.unaEmpresa(tx, org, usuarioId);
-      await this.ultimoPropietario(tx, m, input.rol);
-      const { rol, ...datos } = input;
+      await this.ultimoPropietario(tx, m, destino?.rol);
+      const datos = {
+        nombre: input.nombre,
+        apellido: input.apellido,
+        telefono: input.telefono,
+      };
       await tx.usuario.update({
         where: { id: usuarioId },
         data: { ...datos, usuarioEdicion: ctx.usuarioId },
       });
       const despues = await tx.organizacionUsuario.update({
         where: { id: m.id },
-        data: { rol, usuarioEdicion: ctx.usuarioId },
+        data: {
+          ...(destino ? { rol: destino.rol, rolId: destino.rolId } : {}),
+          usuarioEdicion: ctx.usuarioId,
+        },
       });
       await this.evento(
         tx,
@@ -584,93 +652,106 @@ export class GestionMembresiasService {
     estado: 0 | 1,
     ctx: RequestContext,
   ) {
-    const resultado = await this.ejecutar(org, ctx, async (tx, plataforma) => {
-      const m = await tx.organizacionUsuario.findUnique({
-        where: { organizacionId_usuarioId: { organizacionId: org, usuarioId } },
-      });
-      if (!m) throw new NotFoundException('Usuario no encontrado');
-      this.proteger(m, undefined, estado, ctx, plataforma);
-      await this.protegerCuentaPlataforma(tx, usuarioId, plataforma);
-      await this.ultimoPropietario(tx, m, undefined, estado);
-      if (m.estado === estado) return { id: usuarioId, chats: [] };
-      if (estado === 1) {
-        await this.unaEmpresa(tx, org, usuarioId);
-        const u = await tx.usuario.findUniqueOrThrow({
-          where: { id: usuarioId },
+    const resultado = await this.ejecutar(
+      org,
+      ctx,
+      async (tx, plataforma, actor) => {
+        const m = await tx.organizacionUsuario.findUnique({
+          where: {
+            organizacionId_usuarioId: { organizacionId: org, usuarioId },
+          },
         });
-        if (u.estado !== 1)
-          throw new ConflictException('La plataforma debe activar esta cuenta');
-        if (u.esAdminPlataforma !== 1) await this.cupo(tx, org);
-      }
-      // Se bloquea el control antes de cambiar la membresía: un envío nuevo
-      // revalida su estado bajo el mismo bloqueo de WhatsApp.
-      const chats =
-        estado === 0
-          ? await this.control.liberarPorMembresia(
-              tx,
-              org,
-              usuarioId,
-              ctx.usuarioId,
-            )
-          : [];
-      const nuevo = await tx.organizacionUsuario.update({
-        where: { id: m.id },
-        data: { estado, usuarioEdicion: ctx.usuarioId },
-      });
-      if (estado === 0) {
-        const cfg = await tx.leadAutoAsignacionConfig.findUnique({
-          where: { organizacionId: org },
+        if (!m) throw new NotFoundException('Usuario no encontrado');
+        this.proteger(m, undefined, estado, ctx, plataforma);
+        await this.protegerCuentaPlataforma(tx, usuarioId, plataforma);
+        await this.jerarquia(tx, m, actor);
+        await this.ultimoPropietario(tx, m, undefined, estado);
+        if (m.estado === estado) return { id: usuarioId, chats: [] };
+        if (estado === 1) {
+          await this.unaEmpresa(tx, org, usuarioId);
+          const u = await tx.usuario.findUniqueOrThrow({
+            where: { id: usuarioId },
+          });
+          if (u.estado !== 1)
+            throw new ConflictException(
+              'La plataforma debe activar esta cuenta',
+            );
+          if (u.esAdminPlataforma !== 1) await this.cupo(tx, org);
+        }
+        // Se bloquea el control antes de cambiar la membresía: un envío nuevo
+        // revalida su estado bajo el mismo bloqueo de WhatsApp.
+        const chats =
+          estado === 0
+            ? await this.control.liberarPorMembresia(
+                tx,
+                org,
+                usuarioId,
+                ctx.usuarioId,
+              )
+            : [];
+        const nuevo = await tx.organizacionUsuario.update({
+          where: { id: m.id },
+          data: { estado, usuarioEdicion: ctx.usuarioId },
         });
-        if (cfg) {
-          const ids = resolverUsuarioIdsRoundRobin(cfg).filter(
-            (id) => id !== usuarioId,
-          );
-          await tx.leadAutoAsignacionConfig.update({
+        if (estado === 0) {
+          const cfg = await tx.leadAutoAsignacionConfig.findUnique({
             where: { organizacionId: org },
-            data: {
-              usuarioIds: ids,
-              siguienteIndice: 0,
-              ...(!ids.length
-                ? { habilitado: 0 }
-                : {
-                    usuarioPrimeroId: ids[0],
-                    usuarioSegundoId: ids[1] ?? ids[0],
-                  }),
-            },
           });
+          if (cfg) {
+            const ids = resolverUsuarioIdsRoundRobin(cfg).filter(
+              (id) => id !== usuarioId,
+            );
+            await tx.leadAutoAsignacionConfig.update({
+              where: { organizacionId: org },
+              data: {
+                usuarioIds: ids,
+                siguienteIndice: 0,
+                ...(!ids.length
+                  ? { habilitado: 0 }
+                  : {
+                      usuarioPrimeroId: ids[0],
+                      usuarioSegundoId: ids[1] ?? ids[0],
+                    }),
+              },
+            });
+          }
+          if (
+            !(await tx.organizacionUsuario.count({
+              where: { usuarioId, estado: 1 },
+            }))
+          ) {
+            const tokens = await tx.tokenRefresco.findMany({
+              where: { usuarioId, estado: 1 },
+            });
+            for (const familia of [
+              ...new Set(tokens.map((t) => t.familiaId ?? t.id)),
+            ].sort())
+              await this.bloquear(tx, `refresh:${familia}`);
+            await tx.tokenRefresco.updateMany({
+              where: { usuarioId, estado: 1 },
+              data: { estado: 0, revocadoEn: new Date() },
+            });
+          }
         }
-        if (
-          !(await tx.organizacionUsuario.count({
-            where: { usuarioId, estado: 1 },
-          }))
-        ) {
-          const tokens = await tx.tokenRefresco.findMany({
-            where: { usuarioId, estado: 1 },
-          });
-          for (const familia of [
-            ...new Set(tokens.map((t) => t.familiaId ?? t.id)),
-          ].sort())
-            await this.bloquear(tx, `refresh:${familia}`);
-          await tx.tokenRefresco.updateMany({
-            where: { usuarioId, estado: 1 },
-            data: { estado: 0, revocadoEn: new Date() },
-          });
-        }
-      }
-      await this.evento(
-        tx,
-        org,
-        usuarioId,
-        ctx.usuarioId,
-        estado ? 'REACTIVAR' : 'DESACTIVAR',
-        m,
-        nuevo,
-      );
-      const leadsAsignados = await tx.lead.count({
-        where: { organizacionId: org, asignadoUsuarioId: usuarioId, estado: 1 },
-      });
-      return { id: usuarioId, leadsAsignados, chats };
-    });
+        await this.evento(
+          tx,
+          org,
+          usuarioId,
+          ctx.usuarioId,
+          estado ? 'REACTIVAR' : 'DESACTIVAR',
+          m,
+          nuevo,
+        );
+        const leadsAsignados = await tx.lead.count({
+          where: {
+            organizacionId: org,
+            asignadoUsuarioId: usuarioId,
+            estado: 1,
+          },
+        });
+        return { id: usuarioId, leadsAsignados, chats };
+      },
+    );
     this.control.notificarLiberacionMembresia(resultado.chats);
     const { chats, ...respuesta } = resultado;
     return respuesta;
@@ -683,13 +764,14 @@ export class GestionMembresiasService {
     ctx: RequestContext,
   ) {
     const passwordHash = await this.hasher.hash(password);
-    return this.ejecutar(org, ctx, async (tx, plataforma) => {
+    return this.ejecutar(org, ctx, async (tx, plataforma, actor) => {
       const m = await tx.organizacionUsuario.findUnique({
         where: { organizacionId_usuarioId: { organizacionId: org, usuarioId } },
       });
       if (!m) throw new NotFoundException('Usuario no encontrado');
       this.proteger(m, undefined, undefined, ctx, plataforma);
       await this.protegerCuentaPlataforma(tx, usuarioId, plataforma);
+      await this.jerarquia(tx, m, actor);
       if (usuarioId === ctx.usuarioId)
         throw new BadRequestException('Cambia tu contraseña desde tu perfil');
       await this.unaEmpresa(tx, org, usuarioId);
@@ -725,47 +807,55 @@ export class GestionMembresiasService {
   ) {
     if (origen === destino)
       throw new BadRequestException('Selecciona otro usuario de destino');
-    const resultado = await this.ejecutar(org, ctx, async (tx, plataforma) => {
-      const fuente = await tx.organizacionUsuario.findUnique({
-        where: {
-          organizacionId_usuarioId: { organizacionId: org, usuarioId: origen },
-        },
-      });
-      if (!fuente) throw new NotFoundException('Usuario no encontrado');
-      this.proteger(fuente, undefined, undefined, ctx, plataforma);
-      if (fuente.estado !== 0)
-        throw new ConflictException('Desactiva primero al usuario de origen');
-      const receptor = await tx.organizacionUsuario.findFirst({
-        where: {
-          organizacionId: org,
-          usuarioId: destino,
-          estado: 1,
-          usuario: { estado: 1 },
-        },
-      });
-      if (!receptor)
-        throw new BadRequestException(
-          'El destinatario debe ser un usuario activo de esta empresa',
+    const resultado = await this.ejecutar(
+      org,
+      ctx,
+      async (tx, plataforma, actor) => {
+        const fuente = await tx.organizacionUsuario.findUnique({
+          where: {
+            organizacionId_usuarioId: {
+              organizacionId: org,
+              usuarioId: origen,
+            },
+          },
+        });
+        if (!fuente) throw new NotFoundException('Usuario no encontrado');
+        this.proteger(fuente, undefined, undefined, ctx, plataforma);
+        await this.jerarquia(tx, fuente, actor);
+        if (fuente.estado !== 0)
+          throw new ConflictException('Desactiva primero al usuario de origen');
+        const receptor = await tx.organizacionUsuario.findFirst({
+          where: {
+            organizacionId: org,
+            usuarioId: destino,
+            estado: 1,
+            usuario: { estado: 1 },
+          },
+        });
+        if (!receptor)
+          throw new BadRequestException(
+            'El destinatario debe ser un usuario activo de esta empresa',
+          );
+        const resultado = await tx.lead.updateMany({
+          where: { organizacionId: org, asignadoUsuarioId: origen, estado: 1 },
+          data: {
+            asignadoUsuarioId: destino,
+            asignadoEn: new Date(),
+            asignadoPorUsuarioId: ctx.usuarioId,
+            usuarioEdicion: ctx.usuarioId,
+          },
+        });
+        await this.evento(
+          tx,
+          org,
+          origen,
+          ctx.usuarioId,
+          'REASIGNAR_LEADS',
+          fuente,
         );
-      const resultado = await tx.lead.updateMany({
-        where: { organizacionId: org, asignadoUsuarioId: origen, estado: 1 },
-        data: {
-          asignadoUsuarioId: destino,
-          asignadoEn: new Date(),
-          asignadoPorUsuarioId: ctx.usuarioId,
-          usuarioEdicion: ctx.usuarioId,
-        },
-      });
-      await this.evento(
-        tx,
-        org,
-        origen,
-        ctx.usuarioId,
-        'REASIGNAR_LEADS',
-        fuente,
-      );
-      return { reasignados: resultado.count };
-    });
+        return { reasignados: resultado.count };
+      },
+    );
     // Mismo punto de entrada de notificaciones que AsignarLeadUseCase;
     // solo después del commit y una notificación por lote, nunca por lead.
     // El historial de estados existente no registra asignaciones individuales.

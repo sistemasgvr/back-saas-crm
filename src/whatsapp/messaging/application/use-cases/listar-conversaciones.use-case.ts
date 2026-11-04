@@ -4,6 +4,7 @@ import type {
   FiltroVisibilidadChats,
   WhatsappConversacionesRepository,
 } from '../ports/whatsapp-conversaciones.repository.port';
+import { veTodosLosChats } from '../../domain/acceso-conversacion-whatsapp';
 import type { RolOrganizacion } from '../../../../auth/domain/request-context.interface';
 
 /** Todos los roles pueden ver todos los chats (incl. sin lead / sin asignar)
@@ -17,7 +18,11 @@ export class ListarConversacionesUseCase {
 
   execute(
     organizacionId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
     query?: {
       asignado?: string;
       page?: number;
@@ -29,7 +34,9 @@ export class ListarConversacionesUseCase {
     const filtro: FiltroVisibilidadChats =
       query?.asignado === 'mios'
         ? { modo: 'usuario', usuarioId: ctx.usuarioId }
-        : { modo: 'todos' };
+        : veTodosLosChats(ctx)
+          ? { modo: 'todos' }
+          : { modo: 'usuario_y_libres', usuarioId: ctx.usuarioId };
 
     return this.conversaciones.listar(organizacionId, filtro, {
       page: query?.page ?? 1,

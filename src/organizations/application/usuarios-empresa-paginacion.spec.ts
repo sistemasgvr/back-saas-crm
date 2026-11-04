@@ -18,6 +18,12 @@ describe('Listado paginado de usuarios de empresa', () => {
         findMany: jest.fn().mockResolvedValue([]),
       },
       lead: { groupBy: jest.fn().mockResolvedValue([]) },
+      organizacionRol: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
+        count: jest.fn().mockResolvedValue(0),
+        createMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
     };
     const prisma = {
       $transaction: jest.fn((fn: (client: typeof tx) => unknown) => fn(tx)),

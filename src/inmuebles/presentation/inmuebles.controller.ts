@@ -23,8 +23,8 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
 import { ListarInmueblesUseCase } from '../application/use-cases/listar-inmuebles.use-case';
@@ -40,8 +40,9 @@ import { ActualizarInmuebleDto } from './dto/actualizar-inmueble.dto';
 
 @ApiTags('Inmuebles')
 @ApiBearerAuth('JWT-auth')
+@RequirePermission('inmuebles.ver')
 @Controller('inmuebles')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard, ModuleGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, ModuleGuard, PermisosGuard)
 @RequireModule('INMUEBLES')
 export class InmueblesController {
   constructor(
@@ -113,7 +114,7 @@ export class InmueblesController {
   }
 
   @Post()
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('inmuebles.crear')
   @ApiOperation({ summary: 'Crear inmueble' })
   @ApiResponse({ status: 201, description: 'Inmueble creado.' })
   @ApiResponse({ status: 409, description: 'Código duplicado.' })
@@ -122,7 +123,7 @@ export class InmueblesController {
   }
 
   @Patch(':id')
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('inmuebles.editar')
   @ApiOperation({ summary: 'Actualizar inmueble' })
   @ApiResponse({ status: 200, description: 'Inmueble actualizado.' })
   @ApiResponse({ status: 404, description: 'No encontrado.' })
@@ -140,7 +141,7 @@ export class InmueblesController {
   }
 
   @Delete(':id')
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  @RequirePermission('inmuebles.eliminar')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Eliminar inmueble (soft delete)' })
   @ApiResponse({ status: 204, description: 'Eliminado.' })

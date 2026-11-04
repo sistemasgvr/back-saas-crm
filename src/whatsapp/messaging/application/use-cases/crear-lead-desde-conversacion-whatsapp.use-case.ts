@@ -34,7 +34,11 @@ export class CrearLeadDesdeConversacionWhatsAppUseCase {
   async execute(
     organizacionId: string,
     conversacionId: string,
-    ctx: { usuarioId: string; rol: RolOrganizacion },
+    ctx: {
+      usuarioId: string;
+      rol: RolOrganizacion;
+      permisos?: readonly string[];
+    },
     input: CrearLeadDesdeChatInput,
   ) {
     const conversacion = await this.conversaciones.findPorId(

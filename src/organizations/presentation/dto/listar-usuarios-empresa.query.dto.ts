@@ -4,8 +4,8 @@ import { PaginacionQueryDto } from '../../../shared/presentation/dto/paginacion.
 export class ListarUsuariosEmpresaQueryDto extends PaginacionQueryDto {
   @IsOptional() @IsString() @MaxLength(255) q?: string;
   @IsOptional()
-  @IsIn(['PROPIETARIO', 'ADMINISTRADOR', 'USUARIO'])
-  rol?: 'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO';
+  @IsIn(['PROPIETARIO', 'ADMINISTRADOR', 'USUARIO', 'PERSONALIZADO'])
+  rol?: 'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO' | 'PERSONALIZADO';
   @IsOptional()
   @IsIn(['activo', 'inactivo', 'suspendido'])
   estado?: 'activo' | 'inactivo' | 'suspendido';

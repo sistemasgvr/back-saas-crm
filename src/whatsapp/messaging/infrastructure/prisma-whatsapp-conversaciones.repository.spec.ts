@@ -33,7 +33,7 @@ describe('Paginación de conversaciones', () => {
     );
     const result = await repository.listar(
       'org',
-      { modo: 'usuario', usuarioId: 'asesor' },
+      { modo: 'usuario_y_libres', usuarioId: 'asesor' },
       {
         page: 6,
         pageSize: 20,
@@ -46,7 +46,15 @@ describe('Paginación de conversaciones', () => {
     expect(countWhere).toMatchObject({
       organizacionId: 'org',
       estado: 1,
-      lead: { asignadoUsuarioId: 'asesor' },
+      AND: [
+        {
+          OR: [
+            { lead: { asignadoUsuarioId: 'asesor' } },
+            { lead: null },
+            { lead: { asignadoUsuarioId: null } },
+          ],
+        },
+      ],
     });
     expect(prisma.whatsappConversacion.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
