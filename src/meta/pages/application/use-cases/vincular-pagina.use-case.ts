@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { META_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import type { MetaConexionesRepository } from '../../../connections/application/ports/meta-conexiones.repository.port';
 import { META_GRAPH_CLIENT } from '../../../connections/application/ports/meta-graph-client.port';
@@ -31,6 +37,13 @@ export class VincularPaginaUseCase {
     if (!conexion?.tokenCifrado) {
       throw new NotFoundException(
         'No hay una sesión de Meta conectada para esta organización',
+      );
+    }
+
+    const paginaActiva = await this.paginas.findActivaPorPageId(pageId);
+    if (paginaActiva && paginaActiva.organizacionId !== organizacionId) {
+      throw new ConflictException(
+        'Esta página ya está vinculada a otra organización del CRM. Desvincúlala de esa organización antes de agregarla aquí.',
       );
     }
 

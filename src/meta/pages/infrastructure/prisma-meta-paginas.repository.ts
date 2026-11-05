@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import { construirResultadoPaginado } from '../../../shared/application/paginacion';
 import type {
@@ -133,21 +134,34 @@ export class PrismaMetaPaginasRepository implements MetaPaginasRepository {
       usuarioEdicion: input.usuarioEdicion,
     };
 
-    const pagina = existente
-      ? await this.prisma.metaPagina.update({
-          where: { id: existente.id },
-          data,
-        })
-      : await this.prisma.metaPagina.create({
-          data: {
-            organizacionId: input.organizacionId,
-            pageId: input.pageId,
-            usuarioCreacion: input.usuarioEdicion,
-            ...data,
-          },
-        });
+    try {
+      const pagina = existente
+        ? await this.prisma.metaPagina.update({
+            where: { id: existente.id },
+            data,
+          })
+        : await this.prisma.metaPagina.create({
+            data: {
+              organizacionId: input.organizacionId,
+              pageId: input.pageId,
+              usuarioCreacion: input.usuarioEdicion,
+              ...data,
+            },
+          });
 
-    return toRow(pagina);
+      return toRow(pagina);
+    } catch (error) {
+      // El índice parcial también protege de vinculaciones simultáneas.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Esta página ya tiene una vinculación activa en el CRM. Actualiza la lista; si pertenece a otra organización, desvincúlala allí antes de agregarla aquí.',
+        );
+      }
+      throw error;
+    }
   }
 
   async actualizarWebhookSuscrito(
