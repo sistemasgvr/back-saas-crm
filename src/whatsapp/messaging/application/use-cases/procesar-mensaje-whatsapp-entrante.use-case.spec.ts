@@ -108,20 +108,35 @@ function fixture(opciones: { creado?: boolean; pendiente?: boolean } = {}) {
     guardarMedia as unknown as GuardarMediaWhatsAppService,
     tiempoReal as unknown as TiempoRealChatsService,
   );
+  const atribucion = {
+    resolver: jest.fn().mockResolvedValue(null),
+    vincular: jest.fn(),
+  };
+  const asegurar = { execute: jest.fn().mockResolvedValue({ leadId: 'lead' }) };
   const useCase = new ProcesarMensajeWhatsAppEntranteUseCase(
     conexiones as unknown as WhatsappConexionesRepository,
     conversaciones as unknown as WhatsappConversacionesRepository,
     notificacion as unknown as CrearNotificacionUseCase,
-    {
-      execute: jest.fn().mockResolvedValue(undefined),
-    } as unknown as AsegurarLeadParaConversacionWhatsAppUseCase,
+    asegurar as unknown as AsegurarLeadParaConversacionWhatsAppUseCase,
     {
       aplicarModoInicial: jest.fn(),
     } as unknown as ControlAtencionService,
     media,
     tiempoReal as unknown as TiempoRealChatsService,
+    atribucion as unknown as ConstructorParameters<
+      typeof ProcesarMensajeWhatsAppEntranteUseCase
+    >[7],
   );
-  return { useCase, orden, conversaciones, notificacion, graph, guardarMedia };
+  return {
+    useCase,
+    orden,
+    conversaciones,
+    notificacion,
+    graph,
+    guardarMedia,
+    atribucion,
+    asegurar,
+  };
 }
 
 describe('Mensaje entrante: latencia y archivo diferido', () => {
@@ -189,5 +204,23 @@ describe('Mensaje entrante: latencia y archivo diferido', () => {
     await expect(useCase.execute(evento())).rejects.toBeInstanceOf(
       MediaPendienteError,
     );
+  });
+});
+
+describe('Mensajes de anuncios: selección y atribución', () => {
+  it('guarda el mensaje pero no crea el lead si la campaña está desactivada', async () => {
+    const { useCase, atribucion, asegurar, conversaciones } = fixture();
+    atribucion.resolver.mockResolvedValue({ habilitado: false });
+    await useCase.execute(evento({ tipo: 'text', media: undefined }));
+    expect(asegurar.execute).not.toHaveBeenCalled();
+    expect(conversaciones.registrarMensaje).toHaveBeenCalled();
+  });
+  it('vincula la campaña al lead asegurado en una campaña habilitada', async () => {
+    const { useCase, atribucion, asegurar } = fixture();
+    const origen = { habilitado: true, campanaId: 'campaign' };
+    atribucion.resolver.mockResolvedValue(origen);
+    await useCase.execute(evento({ tipo: 'text', media: undefined }));
+    expect(asegurar.execute).toHaveBeenCalledWith('org', 'chat');
+    expect(atribucion.vincular).toHaveBeenCalledWith('org', 'lead', origen);
   });
 });

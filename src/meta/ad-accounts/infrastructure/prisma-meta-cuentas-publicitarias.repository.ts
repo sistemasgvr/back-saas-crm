@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../shared/infrastructure/prisma.service';
 import { construirResultadoPaginado } from '../../../shared/application/paginacion';
@@ -170,19 +171,44 @@ export class PrismaMetaCuentasPublicitariasRepository implements MetaCuentasPubl
     });
   }
 
-  async listarUltimasCampanas(
+  async listarCampanas(
     metaCuentaPublicitariaId: string,
-  ): Promise<CampanaResumen[]> {
+    page: number,
+    pageSize: number,
+  ) {
+    // Orden global antes de LIMIT/OFFSET: activas, pausadas y demás estados.
+    const [total, ids] = await Promise.all([
+      this.contarCampanas(metaCuentaPublicitariaId),
+      this.prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+        SELECT id FROM campanas
+        WHERE meta_cuenta_publicitaria_id = ${metaCuentaPublicitariaId}::uuid AND estado = 1
+        ORDER BY CASE estado_meta WHEN 'ACTIVE' THEN 0 WHEN 'PAUSED' THEN 1 ELSE 2 END,
+          nombre ASC, id ASC
+        LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}
+      `),
+    ]);
     const campanas = await this.prisma.campana.findMany({
-      where: { metaCuentaPublicitariaId, estado: 1 },
-      orderBy: { fechaCreacion: 'desc' },
-      include: { _count: { select: { leads: true } } },
+      where: {
+        id: { in: ids.map((c) => c.id) },
+        metaCuentaPublicitariaId,
+        estado: 1,
+      },
+      include: { _count: { select: { leads: { where: { estado: 1 } } } } },
     });
-    return campanas.map((c) => ({
-      id: c.id,
-      nombre: c.nombre,
-      estadoMeta: c.estadoMeta,
-      totalLeads: c._count.leads,
-    }));
+    const porId = new Map(campanas.map((c) => [c.id, c]));
+    const data: CampanaResumen[] = ids.flatMap(({ id }) => {
+      const c = porId.get(id);
+      return c
+        ? [
+            {
+              id: c.id,
+              nombre: c.nombre,
+              estadoMeta: c.estadoMeta,
+              totalLeads: c._count.leads,
+            },
+          ]
+        : [];
+    });
+    return construirResultadoPaginado(data, total, page, pageSize);
   }
 }

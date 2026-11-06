@@ -1,3 +1,5 @@
+import { LeadSourcesModule } from '../lead-sources/lead-sources.module';
+import { DiagnosticarRecepcionCuentaUseCase } from './application/use-cases/diagnosticar-recepcion-cuenta.use-case';
 import { Module, forwardRef } from '@nestjs/common';
 import { MetaConnectionsModule } from '../connections/meta-connections.module';
 import { CampaignsModule } from '../campaigns/campaigns.module';
@@ -17,6 +19,7 @@ import { PrismaMetaCuentasPublicitariasRepository } from './infrastructure/prism
 
 @Module({
   imports: [
+    LeadSourcesModule,
     forwardRef(() => MetaConnectionsModule),
     CampaignsModule,
     AdsetsModule,
@@ -25,6 +28,7 @@ import { PrismaMetaCuentasPublicitariasRepository } from './infrastructure/prism
   ],
   controllers: [MetaAdAccountsController],
   providers: [
+    DiagnosticarRecepcionCuentaUseCase,
     ListarCuentasVinculadasUseCase,
     ListarCuentasDisponiblesUseCase,
     ObtenerPerfilCuentaUseCase,

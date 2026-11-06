@@ -1,3 +1,4 @@
+import { LeadSourcesModule } from '../../meta/lead-sources/lead-sources.module';
 import { ControlAtencionService } from './application/control-atencion.service';
 import { BotEmpresaService } from './application/bot-empresa.service';
 import { BotEmpresaController } from './presentation/bot-empresa.controller';
@@ -44,6 +45,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
 
 @Module({
   imports: [
+    LeadSourcesModule,
     forwardRef(() => MetaConnectionsModule),
     WhatsappConnectionsModule,
     forwardRef(() => NotificationsModule),

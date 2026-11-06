@@ -19,21 +19,29 @@ export class ObtenerPerfilCuentaUseCase {
       throw new NotFoundException('Cuenta publicitaria no encontrada');
     }
 
-    const [totalCampanas, totalLeads, ultimasCampanas, resumenSpend] =
-      await Promise.all([
-        this.cuentas.contarCampanas(cuenta.id),
-        this.cuentas.contarLeads(cuenta.id),
-        this.cuentas.listarUltimasCampanas(cuenta.id),
-        this.insights.sumarSpend(organizacionId, { metaCuentaId: cuenta.id }),
-      ]);
+    const [totalCampanas, totalLeads, resumenSpend] = await Promise.all([
+      this.cuentas.contarCampanas(cuenta.id),
+      this.cuentas.contarLeads(cuenta.id),
+      this.insights.sumarSpend(organizacionId, { metaCuentaId: cuenta.id }),
+    ]);
 
     return {
       ...cuenta,
       totalCampanas,
       totalLeads,
-      ultimasCampanas,
       spend: resumenSpend.spend,
       cpl: totalLeads > 0 ? resumenSpend.spend / totalLeads : null,
     };
+  }
+  async listarCampanas(
+    organizacionId: string,
+    id: string,
+    page: number,
+    pageSize: number,
+  ) {
+    const cuenta = await this.cuentas.findPorId(organizacionId, id);
+    if (!cuenta)
+      throw new NotFoundException('Cuenta publicitaria no encontrada');
+    return this.cuentas.listarCampanas(cuenta.id, page, pageSize);
   }
 }

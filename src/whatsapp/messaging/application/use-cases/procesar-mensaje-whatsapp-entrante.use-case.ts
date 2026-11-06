@@ -1,3 +1,4 @@
+import { WhatsappAdAttributionService } from '../../../../meta/lead-sources/whatsapp-ad-attribution.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ControlAtencionService } from '../control-atencion.service';
 import { WHATSAPP_CONEXIONES_REPOSITORY } from '../../../connections/application/ports/whatsapp-conexiones.repository.port';
@@ -47,6 +48,7 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     private readonly control: ControlAtencionService,
     private readonly media: MediaWebhookWhatsAppService,
     private readonly tiempoReal: TiempoRealChatsService,
+    private readonly atribucion: WhatsappAdAttributionService,
   ) {}
 
   async execute(
@@ -76,10 +78,23 @@ export class ProcesarMensajeWhatsAppEntranteUseCase {
     // History sync no crea/asegura leads ni notifica (solo rellena el hilo).
     if (evento.esHistorial !== true) {
       try {
-        await this.asegurarLead.execute(
+        const origen = await this.atribucion.resolver(
           conexion.organizacionId,
           conversacionId,
+          evento.raw,
         );
+        if (origen?.habilitado !== false) {
+          const lead = await this.asegurarLead.execute(
+            conexion.organizacionId,
+            conversacionId,
+          );
+          if (lead?.leadId && origen)
+            await this.atribucion.vincular(
+              conexion.organizacionId,
+              lead.leadId,
+              origen,
+            );
+        }
       } catch (error: unknown) {
         this.logger.error(
           `No se pudo asegurar lead para conversación ${conversacionId}`,

@@ -68,7 +68,9 @@ export interface MetaCuentasPublicitariasRepository {
   ): Promise<MetaCuentaPublicitariaRow[]>;
   contarCampanas(metaCuentaPublicitariaId: string): Promise<number>;
   contarLeads(metaCuentaPublicitariaId: string): Promise<number>;
-  listarUltimasCampanas(
+  listarCampanas(
     metaCuentaPublicitariaId: string,
-  ): Promise<CampanaResumen[]>;
+    page: number,
+    pageSize: number,
+  ): Promise<ResultadoPaginado<CampanaResumen>>;
 }

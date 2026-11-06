@@ -1,3 +1,5 @@
+import { WhatsappAdAttributionService } from '../../lead-sources/whatsapp-ad-attribution.service';
+import { DiagnosticarRecepcionCuentaUseCase } from '../application/use-cases/diagnosticar-recepcion-cuenta.use-case';
 import { PaginarColeccion } from '../../../shared/presentation/decorators/paginar-coleccion.decorator';
 import {
   Body,
@@ -51,6 +53,8 @@ export class MetaAdAccountsController {
     private readonly desvincular: DesvincularCuentaUseCase,
     private readonly sincronizar: SincronizarCuentaUseCase,
     private readonly listarFiltro: ListarCuentasFiltroUseCase,
+    private readonly diagnosticar: DiagnosticarRecepcionCuentaUseCase,
+    private readonly atribucion: WhatsappAdAttributionService,
   ) {}
 
   @Get()
@@ -130,6 +134,44 @@ export class MetaAdAccountsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.obtenerPerfil.execute(ctx.organizacionId!, id);
+  }
+
+  @Get(':id/campaigns')
+  @ApiOperation({
+    summary: 'Campañas paginadas: activas, pausadas y demás estados',
+  })
+  findCampaigns(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: PaginacionQueryDto,
+  ) {
+    return this.obtenerPerfil.listarCampanas(
+      ctx.organizacionId!,
+      id,
+      query.page,
+      query.pageSize,
+    );
+  }
+
+  @Post(':id/reconcile-whatsapp')
+  async reconcileWhatsapp(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    await this.obtenerPerfil.execute(ctx.organizacionId!, id);
+    return this.atribucion.recuperar(ctx.organizacionId!, id);
+  }
+
+  @Post(':id/diagnostics')
+  @ApiOperation({
+    summary:
+      'Verificar en Meta los webhooks, formularios y recepción de WhatsApp',
+  })
+  diagnostics(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.diagnosticar.execute(ctx.organizacionId!, id);
   }
 
   @Post()
