@@ -190,6 +190,7 @@ model Inmueble {
 }
 
 model Campana {
+  importarLeadsAutomaticamente Boolean @default(true) @map("importar_leads_automaticamente")
   id                       String  @id @default(uuid()) @db.Uuid
   organizacionId           String  @map("organizacion_id") @db.Uuid
   metaCuentaPublicitariaId String? @map("meta_cuenta_publicitaria_id") @db.Uuid
@@ -655,6 +656,7 @@ model MetaSolicitudEliminacionDatos {
 }
 
 model MetaPagina {
+  importarLeadsAutomaticamente Boolean @default(true) @map("importar_leads_automaticamente")
   id                   String    @id @default(uuid()) @db.Uuid
   organizacionId       String    @map("organizacion_id") @db.Uuid
   metaConexionId       String    @map("meta_conexion_id") @db.Uuid
@@ -721,6 +723,7 @@ model MetaCuentaPublicitaria {
 }
 
 model MetaFormulario {
+  importarLeadsAutomaticamente Boolean @default(true) @map("importar_leads_automaticamente")
   id             String    @id @default(uuid()) @db.Uuid
   organizacionId String    @map("organizacion_id") @db.Uuid
   metaPaginaId   String    @map("meta_pagina_id") @db.Uuid

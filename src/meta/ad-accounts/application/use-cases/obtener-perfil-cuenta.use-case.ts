@@ -4,8 +4,6 @@ import type { MetaCuentasPublicitariasRepository } from '../ports/meta-cuentas-p
 import { META_INSIGHTS_REPOSITORY } from '../../../insights/application/ports/meta-insights.repository.port';
 import type { MetaInsightsRepository } from '../../../insights/application/ports/meta-insights.repository.port';
 
-const ULTIMAS_CAMPANAS_LIMITE = 10;
-
 @Injectable()
 export class ObtenerPerfilCuentaUseCase {
   constructor(
@@ -25,7 +23,7 @@ export class ObtenerPerfilCuentaUseCase {
       await Promise.all([
         this.cuentas.contarCampanas(cuenta.id),
         this.cuentas.contarLeads(cuenta.id),
-        this.cuentas.listarUltimasCampanas(cuenta.id, ULTIMAS_CAMPANAS_LIMITE),
+        this.cuentas.listarUltimasCampanas(cuenta.id),
         this.insights.sumarSpend(organizacionId, { metaCuentaId: cuenta.id }),
       ]);
 

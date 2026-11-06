@@ -1,3 +1,4 @@
+import { LeadSourcesService } from '../../../lead-sources/lead-sources.service';
 import { Inject, Injectable } from '@nestjs/common';
 import { META_GRAPH_CLIENT } from '../../../connections/application/ports/meta-graph-client.port';
 import type { MetaGraphClient } from '../../../connections/application/ports/meta-graph-client.port';
@@ -23,6 +24,7 @@ export class ProcesarLeadEntranteUseCase {
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly ingestar: IngestarLeadGraphUseCase,
+    private readonly sources: LeadSourcesService,
   ) {}
 
   async execute(
@@ -35,6 +37,13 @@ export class ProcesarLeadEntranteUseCase {
       (!pagina.tokenPaginaCifrado && !pagina.conexionTokenCifrado)
     ) {
       throw new PageSinConexionError(pageId);
+    }
+
+    if (!(await this.sources.permitePagina(pagina.organizacionId, pagina.id))) {
+      return {
+        procesado: false,
+        motivo: 'Importación automática desactivada para la página',
+      };
     }
 
     const userToken = pagina.conexionTokenCifrado
@@ -61,6 +70,15 @@ export class ProcesarLeadEntranteUseCase {
     // loguea; un fallo puntual acá se recupera con el backfill manual, no
     // con reintento automático de Meta.
     const lead = await this.graph.obtenerLead(leadgenId, pageToken);
+
+    if (
+      !(await this.sources.permiteLead(pagina.organizacionId, pagina.id, lead))
+    ) {
+      return {
+        procesado: false,
+        motivo: 'Importación automática desactivada para el origen',
+      };
+    }
 
     // User token preferido para enriquecer nombres (ads_read); Page token como fallback.
     const tokenEnriquecimiento = userToken ?? pageToken;

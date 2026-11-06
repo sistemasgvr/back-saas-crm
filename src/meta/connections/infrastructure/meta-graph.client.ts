@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadGatewayException, Injectable, Logger } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
@@ -1407,7 +1407,7 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   /**
    * Acumula todas las páginas de un edge Graph siguiendo `paging.cursors.after`
    * mientras exista `paging.next` (mismo criterio que `listarLeadsDeForm`).
-   * `truncado=true` si se cortó por MAX_PAGINAS_GRAPH con más páginas pendientes.
+   * Rechaza paginación incompleta para no publicar catálogos parciales como completos.
    */
   private async getAllPages<T>(
     path: string,
@@ -1415,22 +1415,32 @@ export class AxiosMetaGraphClient implements MetaGraphClient {
   ): Promise<{ data: T[]; truncado: boolean }> {
     const acumulado: T[] = [];
     let after: string | undefined;
+    const cursores = new Set<string>();
 
     for (let pagina = 0; pagina < MAX_PAGINAS_GRAPH; pagina += 1) {
       const pageParams = after ? { ...params, after } : params;
       const data = await this.get<GraphListResponse<T>>(path, pageParams);
       acumulado.push(...(data.data ?? []));
 
-      if (!data.paging?.next || !data.paging.cursors?.after) {
+      if (!data.paging?.next) {
         return { data: acumulado, truncado: false };
       }
-      after = data.paging.cursors.after;
+      const siguiente = data.paging.cursors?.after;
+      if (!siguiente || cursores.has(siguiente)) {
+        throw new BadGatewayException(
+          'Meta devolvió una paginación incompleta o repetida. Vuelve a sincronizar para completar el listado.',
+        );
+      }
+      cursores.add(siguiente);
+      after = siguiente;
     }
 
     this.logger.warn(
       `getAllPages: resultado POSIBLEMENTE TRUNCADO — tope de ${MAX_PAGINAS_GRAPH} páginas alcanzado en ${path} (items=${acumulado.length}); puede haber más datos en Graph`,
     );
-    return { data: acumulado, truncado: true };
+    throw new BadGatewayException(
+      'La consulta de Meta superó el límite de paginación. El listado no se ha sincronizado completamente.',
+    );
   }
 
   private async get<T>(

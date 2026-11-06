@@ -70,6 +70,5 @@ export interface MetaCuentasPublicitariasRepository {
   contarLeads(metaCuentaPublicitariaId: string): Promise<number>;
   listarUltimasCampanas(
     metaCuentaPublicitariaId: string,
-    limite: number,
   ): Promise<CampanaResumen[]>;
 }

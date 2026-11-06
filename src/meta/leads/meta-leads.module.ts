@@ -1,3 +1,4 @@
+import { LeadSourcesModule } from '../lead-sources/lead-sources.module';
 import { Module } from '@nestjs/common';
 import { MetaConnectionsModule } from '../connections/meta-connections.module';
 import { MetaPagesModule } from '../pages/meta-pages.module';
@@ -13,6 +14,7 @@ import { PrismaLeadsRepository } from './infrastructure/prisma-leads.repository'
 
 @Module({
   imports: [
+    LeadSourcesModule,
     MetaConnectionsModule,
     MetaPagesModule,
     CampaignsModule,

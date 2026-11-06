@@ -81,3 +81,60 @@ describe('AxiosMetaGraphClient (contratos Graph v26)', () => {
     expect(evento).not.toHaveProperty('lead_event_source');
   });
 });
+
+describe('Paginación de catálogos Meta', () => {
+  it('acumula todas las campañas de varias páginas', async () => {
+    const { client, http } = fixture();
+    http.get
+      .mockReturnValueOnce(
+        of({
+          data: {
+            data: Array.from({ length: 10 }, (_, i) => ({
+              id: String(i),
+              name: String(i),
+            })),
+            paging: { next: 'next', cursors: { after: 'cursor' } },
+          },
+        }),
+      )
+      .mockReturnValueOnce(
+        of({
+          data: {
+            data: Array.from({ length: 5 }, (_, i) => ({
+              id: String(i + 10),
+              name: String(i + 10),
+            })),
+          },
+        }),
+      );
+    expect(
+      (await client.listarCampanasDeCuenta('act_1', 'token')).items,
+    ).toHaveLength(15);
+    expect(http.get.mock.calls[1][1]).toEqual(
+      expect.objectContaining({
+        params: expect.objectContaining({ after: 'cursor' }),
+      }),
+    );
+  });
+
+  it.each(['sin cursor', 'cursor repetido'])(
+    'rechaza formularios con paginación %s',
+    async (caso) => {
+      const { client, http } = fixture();
+      http.get.mockReturnValue(
+        of({
+          data: {
+            data: [{ id: '1', name: 'Formulario' }],
+            paging: {
+              next: 'next',
+              cursors: caso === 'sin cursor' ? {} : { after: 'repetido' },
+            },
+          },
+        }),
+      );
+      await expect(client.listarLeadgenForms('page', 'token')).rejects.toThrow(
+        'paginación incompleta o repetida',
+      );
+    },
+  );
+});

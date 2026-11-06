@@ -172,12 +172,10 @@ export class PrismaMetaCuentasPublicitariasRepository implements MetaCuentasPubl
 
   async listarUltimasCampanas(
     metaCuentaPublicitariaId: string,
-    limite: number,
   ): Promise<CampanaResumen[]> {
     const campanas = await this.prisma.campana.findMany({
       where: { metaCuentaPublicitariaId, estado: 1 },
       orderBy: { fechaCreacion: 'desc' },
-      take: limite,
       include: { _count: { select: { leads: true } } },
     });
     return campanas.map((c) => ({

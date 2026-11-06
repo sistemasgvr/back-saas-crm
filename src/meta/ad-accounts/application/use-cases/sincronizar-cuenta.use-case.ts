@@ -22,6 +22,8 @@ export interface ResultadoSync {
   anuncios: number;
   /** true si algún listado Graph se cortó por el tope de paginación del client. */
   truncado?: boolean;
+  errores?: number;
+  incompleto?: boolean;
   /** Mensaje legible cuando hubo truncación; ausente si el sync fue completo. */
   aviso?: string;
 }
@@ -69,6 +71,7 @@ export class SincronizarCuentaUseCase {
     const accessToken = this.tokenEncryption.decrypt(conexion.tokenCifrado);
     const resultado: ResultadoSync = { campanas: 0, conjuntos: 0, anuncios: 0 };
     let truncado = false;
+    let errores = 0;
 
     const listadoCampanas = await this.graph.listarCampanasDeCuenta(
       cuenta.adAccountId,
@@ -122,6 +125,7 @@ export class SincronizarCuentaUseCase {
                 });
                 resultado.anuncios += 1;
               } catch (error) {
+                errores += 1;
                 this.logger.warn(
                   `Sync: falló el anuncio ${anuncioGraph.id}`,
                   error instanceof Error ? error.stack : error,
@@ -129,6 +133,7 @@ export class SincronizarCuentaUseCase {
               }
             }
           } catch (error) {
+            errores += 1;
             this.logger.warn(
               `Sync: falló el conjunto ${conjuntoGraph.id}`,
               error instanceof Error ? error.stack : error,
@@ -136,6 +141,7 @@ export class SincronizarCuentaUseCase {
           }
         }
       } catch (error) {
+        errores += 1;
         this.logger.warn(
           `Sync: falló la campaña ${campanaGraph.id}`,
           error instanceof Error ? error.stack : error,
@@ -146,6 +152,12 @@ export class SincronizarCuentaUseCase {
       if (i < listadoCampanas.items.length - 1) {
         await new Promise((r) => setTimeout(r, PAUSA_ENTRE_CAMPANAS_MS));
       }
+    }
+
+    if (errores > 0) {
+      resultado.errores = errores;
+      resultado.incompleto = true;
+      resultado.aviso = `La sincronización quedó incompleta: ${errores} errores. Se guardaron ${resultado.campanas} de ${listadoCampanas.items.length} campañas. Vuelve a sincronizar para completar campañas, conjuntos y anuncios.`;
     }
 
     if (truncado) {
