@@ -5,21 +5,21 @@ import { JwtAuthGuard } from '../../auth/presentation/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/presentation/decorators/current-user.decorator';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { OrgMembershipGuard } from '../../shared/presentation/guards/org-membership.guard';
-import { RolesGuard } from '../../shared/presentation/guards/roles.guard';
-import { Roles } from '../../shared/presentation/decorators/roles.decorator';
+import { PermisosGuard } from '../../shared/presentation/guards/permisos.guard';
+import { RequirePermission } from '../../shared/presentation/decorators/require-permission.decorator';
 import { ExportarDatosService } from '../application/exportar-datos.service';
 import { ExportarDatosQueryDto } from './exportar-datos.query.dto';
 
 @ApiTags('Organizations')
 @ApiBearerAuth('JWT-auth')
 @Controller('organizations/current/export')
-@UseGuards(JwtAuthGuard, OrgMembershipGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, OrgMembershipGuard, PermisosGuard)
 export class ExportarDatosController {
   constructor(private readonly exportador: ExportarDatosService) {}
 
   @Get()
-  // Exporta TODA la empresa (incluye datos de clientes): solo dueño/admin.
-  @Roles('PROPIETARIO', 'ADMINISTRADOR')
+  // Exporta TODA la empresa (incluye datos de clientes): permiso explícito.
+  @RequirePermission('empresa.exportar')
   @ApiOperation({
     summary:
       'Descargar un ZIP con los datos de la empresa en CSV (y opcionalmente los archivos de WhatsApp).',

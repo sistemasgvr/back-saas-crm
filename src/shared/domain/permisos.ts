@@ -23,6 +23,14 @@ export const PERMISOS_CATALOGO = [
     requiere: [],
   },
   {
+    codigo: 'empresa.exportar',
+    modulo: null,
+    nombre: 'Exportar datos de la empresa',
+    descripcion:
+      'Descargar en CSV todos los leads, chats, campañas, inmuebles y usuarios, con sus archivos.',
+    requiere: [],
+  },
+  {
     codigo: 'usuarios.gestionar',
     modulo: null,
     nombre: 'Gestionar usuarios',
