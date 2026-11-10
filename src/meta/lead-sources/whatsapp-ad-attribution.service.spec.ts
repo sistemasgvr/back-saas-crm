@@ -39,7 +39,9 @@ describe('Atribución de anuncios Click to WhatsApp', () => {
       anuncioId: 'ad',
       habilitado: false,
     });
-    expect(prisma.anuncio.findFirst.mock.calls[0][0].where).toMatchObject({
+    expect(
+      (prisma.anuncio.findFirst.mock.calls[0] as [{ where: unknown }])[0].where,
+    ).toMatchObject({
       organizacionId: 'org',
       metaAnuncioId: '123456',
       conjuntoAnuncio: {
@@ -56,7 +58,9 @@ describe('Atribución de anuncios Click to WhatsApp', () => {
       campanaId: 'campaign',
     });
     expect(
-      prisma.whatsappMensaje.findFirst.mock.calls[0][0].where,
+      (
+        prisma.whatsappMensaje.findFirst.mock.calls[0] as [{ where: unknown }]
+      )[0].where,
     ).toMatchObject({
       organizacionId: 'org',
       whatsappConversacionId: 'chat',

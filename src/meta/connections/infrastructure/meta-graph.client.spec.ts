@@ -112,7 +112,7 @@ describe('Paginación de catálogos Meta', () => {
     ).toHaveLength(15);
     expect(http.get.mock.calls[1][1]).toEqual(
       expect.objectContaining({
-        params: expect.objectContaining({ after: 'cursor' }),
+        params: expect.objectContaining({ after: 'cursor' }) as unknown,
       }),
     );
   });

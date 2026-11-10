@@ -2,14 +2,12 @@ import { ProcesarLeadEntranteUseCase } from './procesar-lead-entrante.use-case';
 
 function fixture() {
   const paginas = {
-    findActivaPorPageId: jest
-      .fn()
-      .mockResolvedValue({
-        id: 'pagina',
-        organizacionId: 'org',
-        pageId: 'meta-page',
-        tokenPaginaCifrado: 'cifrado',
-      }),
+    findActivaPorPageId: jest.fn().mockResolvedValue({
+      id: 'pagina',
+      organizacionId: 'org',
+      pageId: 'meta-page',
+      tokenPaginaCifrado: 'cifrado',
+    }),
   };
   const graph = {
     obtenerLead: jest

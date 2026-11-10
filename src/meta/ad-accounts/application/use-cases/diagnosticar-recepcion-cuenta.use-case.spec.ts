@@ -7,28 +7,24 @@ import { DiagnosticarRecepcionCuentaUseCase } from './diagnosticar-recepcion-cue
 function fixture() {
   const prisma = {
     metaCuentaPublicitaria: {
-      findFirst: jest
-        .fn()
-        .mockResolvedValue({
-          metaConexion: {
-            id: 'conexion',
-            estado: 1,
-            tokenCifrado: 'cifrado',
-            appId: 'app',
-          },
-        }),
+      findFirst: jest.fn().mockResolvedValue({
+        metaConexion: {
+          id: 'conexion',
+          estado: 1,
+          tokenCifrado: 'cifrado',
+          appId: 'app',
+        },
+      }),
     },
     metaPagina: {
-      findMany: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: 'pagina',
-            pageId: 'meta-page',
-            nombre: 'Página',
-            importarLeadsAutomaticamente: true,
-          },
-        ]),
+      findMany: jest.fn().mockResolvedValue([
+        {
+          id: 'pagina',
+          pageId: 'meta-page',
+          nombre: 'Página',
+          importarLeadsAutomaticamente: true,
+        },
+      ]),
     },
     metaFormulario: { findFirst: jest.fn().mockResolvedValue(null) },
     lead: { count: jest.fn().mockResolvedValue(1) },
@@ -67,9 +63,16 @@ describe('Diagnóstico de recepción', () => {
       ],
     });
     expect(
-      prisma.metaCuentaPublicitaria.findFirst.mock.calls[0][0].where,
+      (
+        prisma.metaCuentaPublicitaria.findFirst.mock.calls[0] as [
+          { where: unknown },
+        ]
+      )[0].where,
     ).toEqual({ id: 'cuenta', organizacionId: 'org', estado: 1 });
-    expect(prisma.metaPagina.findMany.mock.calls[0][0].where).toEqual({
+    expect(
+      (prisma.metaPagina.findMany.mock.calls[0] as [{ where: unknown }])[0]
+        .where,
+    ).toEqual({
       organizacionId: 'org',
       metaConexionId: 'conexion',
       estado: 1,
@@ -85,7 +88,7 @@ describe('Diagnóstico de recepción', () => {
     expect(resultado.paginas[0].error).toBeTruthy();
     expect(resultado.paginas[0].formularios[0]).toMatchObject({
       leadsMeta: null,
-      error: expect.any(String),
+      error: expect.any(String) as unknown,
     });
   });
 

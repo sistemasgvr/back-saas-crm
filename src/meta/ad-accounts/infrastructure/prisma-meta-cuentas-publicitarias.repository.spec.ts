@@ -31,16 +31,22 @@ it('consulta la página en SQL con orden global y devuelve total y orden de las 
     totalPages: 2,
   });
   expect(resultado.data.map((c) => c.id)).toEqual(['activa', 'pausada']);
-  const sql = query.mock.calls[0][0];
+  const [sql] = query.mock.calls[0] as [{ sql: string; values: unknown[] }];
   expect(sql.sql).toContain("WHEN 'ACTIVE' THEN 0 WHEN 'PAUSED' THEN 1 ELSE 2");
   expect(sql.sql).toContain('LIMIT ? OFFSET ?');
   expect(sql.values).toEqual(['cuenta', 10, 10]);
-  expect(findMany.mock.calls[0][0].where).toEqual({
+  expect((findMany.mock.calls[0] as [{ where: unknown }])[0].where).toEqual({
     id: { in: ['activa', 'pausada'] },
     metaCuentaPublicitariaId: 'cuenta',
     estado: 1,
   });
-  expect(findMany.mock.calls[0][0].include._count.select.leads).toEqual({
+  expect(
+    (
+      findMany.mock.calls[0] as [
+        { include: { _count: { select: { leads: unknown } } } },
+      ]
+    )[0].include._count.select.leads,
+  ).toEqual({
     where: { estado: 1 },
   });
 });

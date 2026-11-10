@@ -20,6 +20,7 @@ import { LeadsModule } from './leads/leads.module';
 import { InmueblesModule } from './inmuebles/inmuebles.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { DataExportModule } from './data-export/data-export.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     InmueblesModule,
     NotificationsModule,
     WhatsappModule,
+    DataExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],
