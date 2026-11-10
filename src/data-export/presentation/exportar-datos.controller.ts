@@ -29,6 +29,13 @@ export class ExportarDatosController {
     @Query() query: ExportarDatosQueryDto,
     @Res() res: Response,
   ): Promise<void> {
+    const opciones = {
+      organizacionId: ctx.organizacionId!,
+      usuarioId: ctx.usuarioId,
+      secciones: query.secciones,
+      incluirMedios: query.medios === true,
+    };
+    const estimado = await this.exportador.estimarBytes(opciones);
     const fecha = new Date().toISOString().slice(0, 10);
     res.status(200);
     res.setHeader('Content-Type', 'application/zip');
@@ -38,14 +45,8 @@ export class ExportarDatosController {
     );
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    await this.exportador.exportar(
-      {
-        organizacionId: ctx.organizacionId!,
-        usuarioId: ctx.usuarioId,
-        secciones: query.secciones,
-        incluirMedios: query.medios === true,
-      },
-      res,
-    );
+    // Tamaño aproximado para la barra de avance (el ZIP no tiene Content-Length).
+    res.setHeader('X-Export-Estimado', String(estimado));
+    await this.exportador.exportar(opciones, res);
   }
 }

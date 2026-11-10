@@ -347,6 +347,32 @@ export class ExportarDatosService {
     await agregar(Buffer.from(indice.join(''), 'utf8'), 'chats/medios.csv');
   }
 
+  /**
+   * Tamaño aproximado del ZIP para la barra de avance del cliente (el ZIP va
+   * en streaming y no tiene Content-Length). Los archivos de WhatsApp ya están
+   * comprimidos, así que pesan casi lo mismo dentro del ZIP; los CSV se estiman
+   * por cantidad de filas con un promedio por fila.
+   */
+  async estimarBytes(opciones: OpcionesExport): Promise<number> {
+    const where = { organizacionId: opciones.organizacionId };
+    const conChats = opciones.secciones.includes('chats');
+    const [leads, mensajes, conversaciones, medios] = await Promise.all([
+      opciones.secciones.includes('leads')
+        ? this.prisma.lead.count({ where })
+        : 0,
+      conChats ? this.prisma.whatsappMensaje.count({ where }) : 0,
+      conChats ? this.prisma.whatsappConversacion.count({ where }) : 0,
+      opciones.incluirMedios && conChats
+        ? this.prisma.whatsappMediaObjeto.aggregate({
+            where,
+            _sum: { tamanoBytes: true },
+          })
+        : null,
+    ]);
+    const csv = leads * 300 + mensajes * 70 + conversaciones * 80 + 20_000;
+    return Math.round(csv + (medios?._sum.tamanoBytes ?? 0));
+  }
+
   private leeme(opciones: OpcionesExport, zona: string): string {
     return [
       'Exportación de datos del CRM',
