@@ -102,9 +102,42 @@ export function esRechazoMeta(error: unknown): boolean {
   );
 }
 
+const DETALLE_META = Symbol('detalleMeta');
+
+export interface DetalleErrorMeta {
+  status: number | null;
+  code: number | null;
+  subcode: number | null;
+  mensaje: string;
+}
+
+/** Datos crudos del error de Graph (status HTTP, código, mensaje) para
+ * diagnosticar envíos inciertos; null si el error no vino de Meta. */
+export function detalleErrorMeta(error: unknown): DetalleErrorMeta | null {
+  if (typeof error !== 'object' || error === null) return null;
+  return (
+    ((error as Record<symbol, unknown>)[DETALLE_META] as
+      DetalleErrorMeta | undefined) ?? null
+  );
+}
+
 export function excepcionDesdeErrorMeta(error: unknown): HttpException {
   const excepcion = construirExcepcionMeta(error);
   const status = error instanceof AxiosError ? error.response?.status : 0;
+  const graph =
+    error instanceof AxiosError
+      ? (error.response?.data as { error?: MetaGraphErrorBody } | undefined)
+          ?.error
+      : undefined;
+  (excepcion as unknown as Record<symbol, unknown>)[DETALLE_META] = {
+    status: status || null,
+    code: graph?.code ?? null,
+    subcode: graph?.error_subcode ?? null,
+    mensaje:
+      graph?.error_user_msg?.trim() ||
+      graph?.message?.trim() ||
+      (error instanceof Error ? error.message : String(error)),
+  } satisfies DetalleErrorMeta;
   if (status && status >= 400 && status < 500) {
     (excepcion as unknown as Record<symbol, unknown>)[RECHAZADO_POR_META] =
       true;

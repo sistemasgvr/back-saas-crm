@@ -22,7 +22,10 @@ import {
   gestionaTodosLosChats,
   puedeEscribirConversacionWhatsApp,
 } from '../domain/acceso-conversacion-whatsapp';
-import { esRechazoMeta } from '../../../meta/connections/application/mapear-error-meta-graph';
+import {
+  detalleErrorMeta,
+  esRechazoMeta,
+} from '../../../meta/connections/application/mapear-error-meta-graph';
 
 export type ActorSalida =
   | { tipo: 'HUMAN'; usuarioId: string; rol: RolOrganizacion }
@@ -827,8 +830,17 @@ export class ControlAtencionService {
         data: { estado: 'INCIERTO', terminadoEn: new Date() },
       });
       await this.finalizarToma(org, id);
+      const detalle = detalleErrorMeta(error);
+      const motivo =
+        detalle?.mensaje ?? (error instanceof Error ? error.message : null);
+      this.logger.warn(
+        `Envío incierto org=${org} chat=${id} intento=${intento.id} tipo=${tipo} ` +
+          `status=${detalle?.status ?? '-'} code=${detalle?.code ?? '-'} ` +
+          `subcode=${detalle?.subcode ?? '-'} motivo=${motivo ?? '-'}`,
+        error instanceof Error ? error.stack : undefined,
+      );
       throw new ConflictException(
-        'Envío incierto; comprueba la conversación antes de reenviar',
+        `Envío incierto${motivo ? ` (${motivo})` : ''}; comprueba la conversación antes de reenviar`,
       );
     }
     const wamid = (resultado as { wamid?: string } | undefined)?.wamid;
