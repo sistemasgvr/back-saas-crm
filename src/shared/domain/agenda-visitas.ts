@@ -40,8 +40,8 @@ export function normalizarDuracionMinutos(
 }
 
 /**
- * Horario laboral v1: Lun–Sáb 08:00–20:00 America/Lima.
- * La visita completa (inicio y fin) debe caer dentro del mismo día laboral.
+ * Horario laboral: todos los días (incluido domingo) 08:00–20:00 America/Lima.
+ * La visita completa (inicio y fin) debe caer dentro del mismo día.
  */
 export function estaEnHorarioLaboral(
   inicio: Date,
@@ -74,7 +74,6 @@ export function estaEnHorarioLaboral(
   const a = partes(inicio);
   const b = partes(fin);
   if (a.dayKey !== b.dayKey) return false;
-  if (a.weekday === 'Sun') return false;
 
   const minutosInicio = a.hour * 60 + a.minute;
   const minutosFin = b.hour * 60 + b.minute;
@@ -95,7 +94,7 @@ export function mensajeSolapeVisita(): string {
 }
 
 export function mensajeHorarioLaboral(): string {
-  return 'La visita debe agendarse de lunes a sábado entre 08:00 y 20:00 (hora Lima)';
+  return 'La visita debe agendarse entre 08:00 y 20:00 (hora Lima)';
 }
 
 export function mensajeVisitaPasado(): string {

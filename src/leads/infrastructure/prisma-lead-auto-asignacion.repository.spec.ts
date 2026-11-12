@@ -28,7 +28,12 @@ function escenario(
       }),
     },
     lead: {
-      findFirst: jest.fn().mockResolvedValue({ id: 'lead' }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'lead',
+        telefono: '+51999888777',
+        whatsappConversaciones: [],
+      }),
+      findMany: jest.fn().mockResolvedValue([]),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     organizacionUsuario: {
@@ -134,6 +139,29 @@ describe('Asignación automática con cupos diarios', () => {
       limitesDiarios: { u1: 1 },
     });
     expect(await repo.asignarLeadPendiente('org', 'b')).toBeNull();
+  });
+
+  it('si el contacto ya tiene asesor, se lo entrega sin avanzar el round-robin ni consumir cupo', async () => {
+    const { repo, tx, cfg } = escenario(['u1', 'u2'], { u3: 0 });
+    tx.lead.findMany.mockResolvedValue([{ asignadoUsuarioId: 'u3' }]);
+    expect(await repo.asignarLeadPendiente('org', 'dup')).toBe('u3');
+    const [[args]] = tx.lead.findMany.mock.calls as [
+      [{ where: { id: unknown; OR: unknown } }],
+    ];
+    expect(args.where.id).toEqual({ not: 'dup' });
+    expect(args.where.OR).toEqual([{ telefono: { contains: '999888777' } }]);
+    expect(cfg.siguienteIndice).toBe(0);
+    expect(cfg.consumoDiario).toEqual({});
+  });
+
+  it('ignora al asesor previo si ya no está activo y sigue el round-robin', async () => {
+    const { repo, tx } = escenario(['u1', 'u2']);
+    tx.lead.findMany.mockResolvedValue([{ asignadoUsuarioId: 'ex' }]);
+    tx.organizacionUsuario.findFirst.mockImplementation(
+      ({ where }: { where: { usuarioId: string } }) =>
+        Promise.resolve(where.usuarioId === 'ex' ? null : { id: 'm' }),
+    );
+    expect(await repo.asignarLeadPendiente('org', 'dup')).toBe('u1');
   });
 
   it('la cola aplica los mismos cupos y no asigna sobrantes al día siguiente', async () => {

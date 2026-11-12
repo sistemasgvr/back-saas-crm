@@ -182,9 +182,39 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
       return null;
     }
 
+    const ahora = new Date();
+
+    // Si el mismo contacto ya tiene asesor (otro lead con su teléfono o su
+    // chat de WhatsApp), se le entrega a ese asesor: no avanza el round-robin
+    // ni consume cupo diario.
+    const duenoPrevio = await this.asesorPrevioDelContacto(
+      tx,
+      organizacionId,
+      leadId,
+    );
+    if (duenoPrevio) {
+      const result = await tx.lead.updateMany({
+        where: {
+          id: leadId,
+          organizacionId,
+          estado: 1,
+          asignadoUsuarioId: null,
+        },
+        data: {
+          asignadoUsuarioId: duenoPrevio,
+          asignadoEn: ahora,
+          asignadoPorUsuarioId: null,
+          usuarioEdicion: duenoPrevio,
+        },
+      });
+      await tx.leadAutoAsignacionQueue.deleteMany({
+        where: { organizacionId, leadId },
+      });
+      return result.count === 1 ? duenoPrevio : null;
+    }
+
     const usuarioIds = resolverUsuarioIdsRoundRobin(cfg);
     const n = usuarioIds.length;
-    const ahora = new Date();
     const consumo = consumoDelDia(cfg.consumoDiario, fechaLima(ahora));
     const limites = limitesDesdeJson(cfg.limitesDiarios);
     const inicio = n ? ((cfg.siguienteIndice % n) + n) % n : 0;
@@ -234,6 +264,81 @@ export class PrismaLeadAutoAsignacionRepository implements LeadAutoAsignacionRep
     await tx.leadAutoAsignacionQueue.deleteMany({
       where: { organizacionId, leadId },
     });
+    return null;
+  }
+
+  /**
+   * Asesor activo que ya atiende a este contacto en otro lead de la empresa:
+   * mismo teléfono (últimos 9 dígitos) o mismo usuario de WhatsApp (bsuid/wa_id
+   * de los chats vinculados). Se prefiere la asignación más reciente.
+   */
+  private async asesorPrevioDelContacto(
+    tx: Prisma.TransactionClient,
+    organizacionId: string,
+    leadId: string,
+  ): Promise<string | null> {
+    const lead = await tx.lead.findFirst({
+      where: { id: leadId, organizacionId },
+      select: {
+        telefono: true,
+        whatsappConversaciones: {
+          where: { estado: 1 },
+          select: { waId: true, bsuid: true },
+        },
+      },
+    });
+    if (!lead) return null;
+
+    const filtros: Prisma.LeadWhereInput[] = [];
+    const sufijo = (lead.telefono ?? '').replace(/\D/g, '').slice(-9);
+    if (sufijo.length === 9) filtros.push({ telefono: { contains: sufijo } });
+
+    const waIds = lead.whatsappConversaciones
+      .map((c) => c.waId)
+      .filter((v): v is string => !!v);
+    const bsuids = lead.whatsappConversaciones
+      .map((c) => c.bsuid)
+      .filter((v): v is string => !!v);
+    for (const waId of waIds) {
+      const s = waId.replace(/\D/g, '').slice(-9);
+      if (s.length === 9) filtros.push({ telefono: { contains: s } });
+    }
+    if (waIds.length || bsuids.length) {
+      filtros.push({
+        whatsappConversaciones: {
+          some: {
+            estado: 1,
+            OR: [
+              ...(waIds.length ? [{ waId: { in: waIds } }] : []),
+              ...(bsuids.length ? [{ bsuid: { in: bsuids } }] : []),
+            ],
+          },
+        },
+      });
+    }
+    if (!filtros.length) return null;
+
+    const candidatos = await tx.lead.findMany({
+      where: {
+        organizacionId,
+        estado: 1,
+        id: { not: leadId },
+        asignadoUsuarioId: { not: null },
+        OR: filtros,
+      },
+      orderBy: [{ asignadoEn: { sort: 'desc', nulls: 'last' } }],
+      select: { asignadoUsuarioId: true },
+      take: 10,
+    });
+
+    for (const c of candidatos) {
+      const usuarioId = c.asignadoUsuarioId!;
+      const miembro = await tx.organizacionUsuario.findFirst({
+        where: { organizacionId, usuarioId, estado: 1, usuario: { estado: 1 } },
+        select: { id: true },
+      });
+      if (miembro) return usuarioId;
+    }
     return null;
   }
 

@@ -412,6 +412,19 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     const soloDigitos = telefonoOWaId.replace(/\D/g, '');
     const sufijo = soloDigitos.slice(-9);
     if (!sufijo) return null;
+    // Preferir el lead que ya tiene asesor: si el contacto tiene duplicados
+    // (p. ej. reenvió el formulario), el chat debe caer con quien ya lo atiende.
+    const asignado = await this.prisma.lead.findFirst({
+      where: {
+        organizacionId,
+        estado: 1,
+        telefono: { contains: sufijo },
+        asignadoUsuarioId: { not: null },
+      },
+      orderBy: { fechaCreacion: 'desc' },
+      select: { id: true },
+    });
+    if (asignado) return asignado.id;
     const lead = await this.prisma.lead.findFirst({
       where: {
         organizacionId,

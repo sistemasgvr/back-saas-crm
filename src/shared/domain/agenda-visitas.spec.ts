@@ -63,17 +63,24 @@ describe('agenda-visitas', () => {
   });
 
   describe('estaEnHorarioLaboral', () => {
-    it('acepta visita dentro de Lun–Sáb 08–20 Lima', () => {
+    it('acepta visita dentro de 08–20 Lima', () => {
       // 2026-09-03 es jueves; 15:00–16:00 UTC = 10:00–11:00 Lima (UTC-5)
       const inicio = new Date('2026-09-03T15:00:00.000Z');
       const fin = new Date('2026-09-03T16:00:00.000Z');
       expect(estaEnHorarioLaboral(inicio, fin)).toBe(true);
     });
 
-    it('rechaza domingo', () => {
+    it('acepta domingo dentro del horario', () => {
       // 2026-09-06 domingo; 15:00 UTC = 10:00 Lima
       const inicio = new Date('2026-09-06T15:00:00.000Z');
       const fin = new Date('2026-09-06T16:00:00.000Z');
+      expect(estaEnHorarioLaboral(inicio, fin)).toBe(true);
+    });
+
+    it('rechaza domingo fuera del horario', () => {
+      // 2026-09-06 domingo; 02:00 UTC del lunes = 21:00 Lima del domingo
+      const inicio = new Date('2026-09-07T01:30:00.000Z');
+      const fin = new Date('2026-09-07T02:30:00.000Z');
       expect(estaEnHorarioLaboral(inicio, fin)).toBe(false);
     });
   });
