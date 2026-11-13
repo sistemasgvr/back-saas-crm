@@ -828,6 +828,8 @@ model OrganizacionUsuarioEvento {
   rolNuevo String? @map("rol_nuevo") @db.VarChar(30)
   estadoAnterior Int? @map("estado_anterior") @db.SmallInt
   estadoNuevo Int? @map("estado_nuevo") @db.SmallInt
+  cantidadLeads Int? @map("cantidad_leads")
+  destinoUsuarioId String? @map("destino_usuario_id") @db.Uuid
   creadoEn DateTime @default(now()) @map("creado_en") @db.Timestamptz
   organizacion Organizacion @relation(fields: [organizacionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   usuario Usuario @relation("MembresiaEventoUsuario", fields: [usuarioId], references: [id], onDelete: NoAction, onUpdate: NoAction)

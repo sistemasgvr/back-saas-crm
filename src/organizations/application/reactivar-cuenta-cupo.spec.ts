@@ -28,7 +28,11 @@ describe('Cupo al reactivar una cuenta desde SaaS', () => {
         update: jest.fn().mockResolvedValue({ id: 'usuario', estado: 1 }),
       },
       organizacionUsuario: {
-        findMany: jest.fn().mockResolvedValue([{ organizacionId: 'empresa' }]),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { organizacionId: 'empresa', usuarioId: 'usuario' },
+          ]),
         count: jest.fn().mockResolvedValue(activos),
       },
       organizacion: {
@@ -36,6 +40,8 @@ describe('Cupo al reactivar una cuenta desde SaaS', () => {
           .fn()
           .mockResolvedValue({ limiteUsuarios: limite }),
       },
+      lead: { updateMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      organizacionUsuarioEvento: { create: jest.fn() },
     };
     const db = {
       $transaction: (fn: (t: typeof tx) => Promise<unknown>) => fn(tx),
@@ -43,7 +49,7 @@ describe('Cupo al reactivar una cuenta desde SaaS', () => {
     const gestion = new GestionMembresiasService(
       db as never,
       {} as never,
-      {} as never,
+      { liberarPorMembresia: jest.fn().mockResolvedValue([]) } as never,
       {} as never,
     );
     const repo = new PrismaUsuariosAdminRepository(db as never, gestion);
@@ -77,6 +83,19 @@ describe('Cupo al reactivar una cuenta desde SaaS', () => {
     expect(tx.usuario.update).toHaveBeenCalledWith({
       where: { id: 'usuario' },
       data: { estado: 0, usuarioEdicion: 'actor' },
+    });
+    expect(tx.lead.updateMany).toHaveBeenCalledWith({
+      where: {
+        organizacionId: 'empresa',
+        asignadoUsuarioId: 'usuario',
+        estado: 1,
+      },
+      data: {
+        asignadoUsuarioId: null,
+        asignadoEn: null,
+        asignadoPorUsuarioId: null,
+        usuarioEdicion: 'actor',
+      },
     });
   });
 

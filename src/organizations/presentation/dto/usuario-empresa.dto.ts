@@ -73,6 +73,9 @@ export class CrearUsuarioEmpresaDto {
 }
 export class EstadoUsuarioEmpresaDto {
   @IsInt() @IsIn([0, 1]) estado!: 0 | 1;
+  @IsOptional()
+  @IsUUID()
+  destinoUsuarioId?: string;
 }
 export class PasswordTemporalDto {
   @IsString() @MinLength(8) @MaxLength(72) password!: string;

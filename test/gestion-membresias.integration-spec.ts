@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { PrismaClient } from '@prisma/client';
+import { PrismaLeadsGestionRepository } from '../src/leads/infrastructure/prisma-leads-gestion.repository';
 import { GestionMembresiasService } from '../src/organizations/application/gestion-membresias.service';
 import { ControlAtencionService } from '../src/whatsapp/messaging/application/control-atencion.service';
 import { PrismaService } from '../src/shared/infrastructure/prisma.service';
@@ -286,7 +287,7 @@ if (connection) {
         'Reactiva',
       );
     });
-    it('desactivar retira la rotación y revoca tokens conservando al usuario y sus leads', async () => {
+    it('desactivar retira la rotación y revoca tokens conservando la cuenta', async () => {
       const u = await service.crear(org, nuevo(), ctx());
       await db.leadAutoAsignacionConfig.upsert({
         where: { organizacionId: org },
@@ -341,7 +342,7 @@ if (connection) {
       ).rejects.toThrow('inmutables');
     });
 
-    it('libera chats activos y tomas pendientes con auditoría, conservando intentos en curso y leads', async () => {
+    it('libera chats y leads con auditoría y conserva los intentos en curso', async () => {
       const u = await service.crear(org, nuevo(), ctx());
       const meta = await db.metaConexion.create({
         data: { organizacionId: org, webhookVerifyToken: randomUUID() },
@@ -388,7 +389,7 @@ if (connection) {
         });
       }
       const resultado = await service.cambiarEstado(org, u.id, 0, ctx());
-      expect(resultado.leadsAsignados).toBe(1);
+      expect(resultado).toMatchObject({ leadsAsignados: 0, leadsMovidos: 1 });
       const chats = await db.whatsappConversacion.findMany({
         where: { leadId: lead.id },
       });
@@ -412,15 +413,89 @@ if (connection) {
         }),
       ).toBe(2);
       expect(
-        (await db.lead.findUniqueOrThrow({ where: { id: lead.id } }))
-          .asignadoUsuarioId,
-      ).toBe(u.id);
-      await service.reasignarLeads(org, u.id, admin, ctx());
+        await db.lead.findUniqueOrThrow({ where: { id: lead.id } }),
+      ).toMatchObject({
+        asignadoUsuarioId: null,
+        asignadoEn: null,
+        asignadoPorUsuarioId: null,
+      });
+      expect(
+        await db.organizacionUsuarioEvento.findFirstOrThrow({
+          where: { usuarioId: u.id, accion: 'LIBERAR_LEADS' },
+        }),
+      ).toMatchObject({ actorId: owner, cantidadLeads: 1 });
+      const leads = new PrismaLeadsGestionRepository(db as PrismaService);
+      await expect(leads.tomar(org, lead.id, u.id)).resolves.toBe(false);
+      await expect(leads.tomar(org, lead.id, asesor)).resolves.toBe(true);
+    });
+
+    it('desactiva y reasigna juntos, o revierte ambos si el destino es inválido', async () => {
+      const u = await service.crear(org, nuevo(), ctx());
+      const lead = await db.lead.create({
+        data: {
+          organizacionId: org,
+          idExterno: randomUUID(),
+          datosCrudos: {},
+          asignadoUsuarioId: u.id,
+        },
+      });
+      await expect(
+        service.cambiarEstado(org, u.id, 0, ctx(), platform),
+      ).rejects.toThrow('usuario activo de esta empresa');
+      expect(
+        await db.organizacionUsuario.findUniqueOrThrow({
+          where: {
+            organizacionId_usuarioId: { organizacionId: org, usuarioId: u.id },
+          },
+        }),
+      ).toMatchObject({ estado: 1 });
+      expect(
+        await db.lead.findUniqueOrThrow({ where: { id: lead.id } }),
+      ).toMatchObject({ asignadoUsuarioId: u.id });
+      await expect(
+        service.cambiarEstado(org, u.id, 0, ctx(), admin),
+      ).resolves.toMatchObject({ leadsMovidos: 1, leadsAsignados: 0 });
       const reasignado = await db.lead.findUniqueOrThrow({
         where: { id: lead.id },
       });
       expect(reasignado.asignadoUsuarioId).toBe(admin);
       expect(reasignado.asignadoPorUsuarioId).toBe(owner);
+    });
+
+    it('libera los leads activos de una cuenta suspendida dentro de su empresa', async () => {
+      const u = await service.crear(org, nuevo(), ctx());
+      await db.usuario.update({ where: { id: u.id }, data: { estado: 0 } });
+      const leads = await Promise.all(
+        [
+          [org, 1],
+          [org, 0],
+          [otra, 1],
+        ].map(([organizacionId, estado]) =>
+          db.lead.create({
+            data: {
+              organizacionId: String(organizacionId),
+              estado: Number(estado),
+              idExterno: randomUUID(),
+              datosCrudos: {},
+              asignadoUsuarioId: u.id,
+            },
+          }),
+        ),
+      );
+      await expect(service.liberarLeads(org, u.id, ctx())).resolves.toEqual({
+        liberados: 1,
+      });
+      await expect(service.liberarLeads(org, u.id, ctx())).resolves.toEqual({
+        liberados: 0,
+      });
+      const actuales = await Promise.all(
+        leads.map(({ id }) => db.lead.findUniqueOrThrow({ where: { id } })),
+      );
+      expect(actuales.map((lead) => lead.asignadoUsuarioId)).toEqual([
+        null,
+        u.id,
+        u.id,
+      ]);
     });
     it('la reasignación masiva rechaza origen activo y destino de otra empresa', async () => {
       const u = await service.crear(org, nuevo(), ctx());

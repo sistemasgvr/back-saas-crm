@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, OrganizacionUsuario } from '@prisma/client';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
+import { bloquearUsuariosEmpresa } from '../../shared/infrastructure/bloquear-usuarios-empresa';
 import {
   PASSWORD_HASHER,
   type PasswordHasher,
@@ -128,7 +129,7 @@ export class GestionMembresiasService {
   ) {
     return this.prisma.$transaction(
       async (tx) => {
-        await this.bloquear(tx, `org-usuarios:${org.toLowerCase()}`);
+        await bloquearUsuariosEmpresa(tx, org);
         const empresa = await tx.organizacion.findUnique({
           where: { id: org },
         });
@@ -259,6 +260,7 @@ export class GestionMembresiasService {
     accion: string,
     antes: OrganizacionUsuario | null,
     despues?: OrganizacionUsuario,
+    traspaso?: { cantidadLeads: number; destinoUsuarioId: string | null },
   ) {
     return tx.organizacionUsuarioEvento.create({
       data: {
@@ -270,6 +272,7 @@ export class GestionMembresiasService {
         estadoAnterior: antes?.estado,
         rolNuevo: despues?.rol ?? antes?.rol,
         estadoNuevo: despues?.estado ?? antes?.estado,
+        ...traspaso,
       },
     });
   }
@@ -428,7 +431,7 @@ export class GestionMembresiasService {
     estado: 0 | 1,
     actorId: string,
   ) {
-    return this.prisma.$transaction(
+    const resultado = await this.prisma.$transaction(
       async (tx) => {
         const actor = await tx.usuario.findUnique({ where: { id: actorId } });
         if (actor?.estado !== 1 || actor.esAdminPlataforma !== 1)
@@ -443,23 +446,22 @@ export class GestionMembresiasService {
         // La reactivación global también vuelve a consumir las plazas de sus
         // membresías activas, aunque estas nunca se hayan desactivado.
         for (const m of membresias)
-          await this.bloquear(
-            tx,
-            `org-usuarios:${m.organizacionId.toLowerCase()}`,
-          );
+          await bloquearUsuariosEmpresa(tx, m.organizacionId);
         await this.bloquear(tx, `usuario-empresa:${usuarioId.toLowerCase()}`);
         const usuario = await tx.usuario.findUnique({
           where: { id: usuarioId },
         });
         if (!usuario) throw new NotFoundException('Usuario no encontrado');
+        const chats: Awaited<
+          ReturnType<ControlAtencionService['liberarPorMembresia']>
+        > = [];
         if (
-          estado === 1 &&
-          usuario.estado !== 1 &&
-          usuario.esAdminPlataforma !== 1
+          estado === 0 ||
+          (usuario.estado !== 1 && usuario.esAdminPlataforma !== 1)
         ) {
           const actuales = await tx.organizacionUsuario.findMany({
             where: { usuarioId, estado: 1 },
-            select: { organizacionId: true },
+            orderBy: { organizacionId: 'asc' },
           });
           const bloqueadas = new Set(membresias.map((m) => m.organizacionId));
           for (const m of actuales) {
@@ -467,17 +469,33 @@ export class GestionMembresiasService {
               throw new ConflictException(
                 'La membresía cambió. Vuelve a intentarlo.',
               );
-            await this.cupo(tx, m.organizacionId);
+            if (estado === 1) await this.cupo(tx, m.organizacionId);
+            else {
+              chats.push(
+                ...(await this.control.liberarPorMembresia(
+                  tx,
+                  m.organizacionId,
+                  usuarioId,
+                  actorId,
+                )),
+              );
+              await this.bloquearRepartoLeads(tx, m.organizacionId);
+              await this.moverLeads(tx, m, null, actorId);
+            }
           }
         }
 
-        return tx.usuario.update({
+        const cuenta = await tx.usuario.update({
           where: { id: usuarioId },
           data: { estado, usuarioEdicion: actorId },
         });
+        return { cuenta, chats };
       },
       { timeout: 20000 },
     );
+    if (resultado.chats.length)
+      this.control.notificarLiberacionMembresia(resultado.chats);
+    return resultado.cuenta;
   }
 
   async crearCuentaPlataforma(
@@ -651,6 +669,7 @@ export class GestionMembresiasService {
     usuarioId: string,
     estado: 0 | 1,
     ctx: RequestContext,
+    destinoUsuarioId?: string,
   ) {
     const resultado = await this.ejecutar(
       org,
@@ -666,7 +685,8 @@ export class GestionMembresiasService {
         await this.protegerCuentaPlataforma(tx, usuarioId, plataforma);
         await this.jerarquia(tx, m, actor);
         await this.ultimoPropietario(tx, m, undefined, estado);
-        if (m.estado === estado) return { id: usuarioId, chats: [] };
+        if (m.estado === estado)
+          return { id: usuarioId, leadsMovidos: 0, chats: [] };
         if (estado === 1) {
           await this.unaEmpresa(tx, org, usuarioId);
           const u = await tx.usuario.findUniqueOrThrow({
@@ -693,7 +713,9 @@ export class GestionMembresiasService {
           where: { id: m.id },
           data: { estado, usuarioEdicion: ctx.usuarioId },
         });
+        let leadsMovidos = 0;
         if (estado === 0) {
+          await this.bloquearRepartoLeads(tx, org);
           const cfg = await tx.leadAutoAsignacionConfig.findUnique({
             where: { organizacionId: org },
           });
@@ -715,6 +737,12 @@ export class GestionMembresiasService {
               },
             });
           }
+          leadsMovidos = await this.moverLeads(
+            tx,
+            m,
+            destinoUsuarioId ?? null,
+            ctx.usuarioId,
+          );
           if (
             !(await tx.organizacionUsuario.count({
               where: { usuarioId, estado: 1 },
@@ -749,10 +777,17 @@ export class GestionMembresiasService {
             estado: 1,
           },
         });
-        return { id: usuarioId, leadsAsignados, chats };
+        return { id: usuarioId, leadsAsignados, leadsMovidos, chats };
       },
     );
     this.control.notificarLiberacionMembresia(resultado.chats);
+    if (estado === 0 && destinoUsuarioId && resultado.leadsMovidos > 0)
+      await this.notificarReasignacion(
+        org,
+        usuarioId,
+        destinoUsuarioId,
+        resultado.leadsMovidos,
+      );
     const { chats, ...respuesta } = resultado;
     return respuesta;
   }
@@ -805,8 +840,28 @@ export class GestionMembresiasService {
     destino: string,
     ctx: RequestContext,
   ) {
-    if (origen === destino)
-      throw new BadRequestException('Selecciona otro usuario de destino');
+    const reasignados = await this.moverLeadsDeInactivo(
+      org,
+      origen,
+      destino,
+      ctx,
+    );
+    if (reasignados > 0)
+      await this.notificarReasignacion(org, origen, destino, reasignados);
+    return { reasignados };
+  }
+
+  async liberarLeads(org: string, origen: string, ctx: RequestContext) {
+    const liberados = await this.moverLeadsDeInactivo(org, origen, null, ctx);
+    return { liberados };
+  }
+
+  private async moverLeadsDeInactivo(
+    org: string,
+    origen: string,
+    destino: string | null,
+    ctx: RequestContext,
+  ) {
     const resultado = await this.ejecutar(
       org,
       ctx,
@@ -818,67 +873,102 @@ export class GestionMembresiasService {
               usuarioId: origen,
             },
           },
+          include: { usuario: { select: { estado: true } } },
         });
         if (!fuente) throw new NotFoundException('Usuario no encontrado');
         this.proteger(fuente, undefined, undefined, ctx, plataforma);
         await this.jerarquia(tx, fuente, actor);
-        if (fuente.estado !== 0)
+        if (fuente.estado === 1 && fuente.usuario.estado === 1)
           throw new ConflictException('Desactiva primero al usuario de origen');
-        const receptor = await tx.organizacionUsuario.findFirst({
-          where: {
-            organizacionId: org,
-            usuarioId: destino,
-            estado: 1,
-            usuario: { estado: 1 },
-          },
-        });
-        if (!receptor)
-          throw new BadRequestException(
-            'El destinatario debe ser un usuario activo de esta empresa',
-          );
-        const resultado = await tx.lead.updateMany({
-          where: { organizacionId: org, asignadoUsuarioId: origen, estado: 1 },
-          data: {
-            asignadoUsuarioId: destino,
-            asignadoEn: new Date(),
-            asignadoPorUsuarioId: ctx.usuarioId,
-            usuarioEdicion: ctx.usuarioId,
-          },
-        });
-        await this.evento(
+        const chats = await this.control.liberarPorMembresia(
           tx,
           org,
           origen,
           ctx.usuarioId,
-          'REASIGNAR_LEADS',
-          fuente,
         );
-        return { reasignados: resultado.count };
+        const count = await this.moverLeads(tx, fuente, destino, ctx.usuarioId);
+        return { count, chats };
       },
     );
-    // Mismo punto de entrada de notificaciones que AsignarLeadUseCase;
-    // solo después del commit y una notificación por lote, nunca por lead.
-    // El historial de estados existente no registra asignaciones individuales.
-    if (resultado.reasignados > 0) {
-      await this.notificar
-        .execute({
-          organizacionId: org,
-          tipo: 'LEAD_ASIGNADO',
-          titulo: 'Leads reasignados',
-          mensaje: `Se te reasignaron ${resultado.reasignados} leads`,
-          payload: {
-            url: '/leads',
-            cantidad: resultado.reasignados,
-            origenUsuarioId: origen,
-          },
-          usuarioIds: [destino],
-        })
-        .catch(() =>
-          this.logger.warn(
-            'Leads reasignados; no se pudo notificar al destinatario',
-          ),
+    this.control.notificarLiberacionMembresia(resultado.chats);
+    return resultado.count;
+  }
+
+  private async moverLeads(
+    tx: Tx,
+    fuente: OrganizacionUsuario,
+    destino: string | null,
+    actorId: string,
+  ) {
+    const { organizacionId, usuarioId } = fuente;
+    if (destino) {
+      if (usuarioId.toLowerCase() === destino.toLowerCase())
+        throw new BadRequestException('Selecciona otro usuario de destino');
+      const receptor = await tx.organizacionUsuario.findFirst({
+        where: {
+          organizacionId,
+          usuarioId: destino,
+          estado: 1,
+          usuario: { estado: 1 },
+        },
+      });
+      if (!receptor)
+        throw new BadRequestException(
+          'El destinatario debe ser un usuario activo de esta empresa',
         );
     }
-    return resultado;
+    const { count } = await tx.lead.updateMany({
+      where: { organizacionId, asignadoUsuarioId: usuarioId, estado: 1 },
+      data: {
+        asignadoUsuarioId: destino,
+        asignadoEn: destino ? new Date() : null,
+        asignadoPorUsuarioId: destino ? actorId : null,
+        usuarioEdicion: actorId,
+      },
+    });
+    if (count > 0)
+      await this.evento(
+        tx,
+        organizacionId,
+        usuarioId,
+        actorId,
+        destino ? 'REASIGNAR_LEADS' : 'LIBERAR_LEADS',
+        fuente,
+        undefined,
+        { cantidadLeads: count, destinoUsuarioId: destino },
+      );
+    return count;
+  }
+
+  private async bloquearRepartoLeads(tx: Tx, org: string) {
+    // Espera a que termine un reparto que aún pudo ver al asesor activo.
+    await tx.$queryRaw`SELECT id FROM lead_auto_asignacion_config
+      WHERE organizacion_id = ${org}::uuid FOR UPDATE`;
+  }
+
+  private async notificarReasignacion(
+    org: string,
+    origen: string,
+    destino: string,
+    cantidad: number,
+  ) {
+    await this.notificar
+      .execute({
+        organizacionId: org,
+        tipo: 'LEAD_ASIGNADO',
+        titulo: 'Leads reasignados',
+        mensaje: `Se te reasignaron ${cantidad} leads`,
+        payload: {
+          url: '/leads',
+          cantidad,
+          origenUsuarioId: origen,
+        },
+        usuarioIds: [destino],
+      })
+      .catch(() =>
+        this.logger.warn(
+          'Leads reasignados; no se pudo notificar al destinatario',
+        ),
+      );
   }
 }

@@ -55,7 +55,13 @@ export class UsuariosEmpresaController {
     @Param('usuarioId', ParseUUIDPipe) id: string,
     @Body() dto: EstadoUsuarioEmpresaDto,
   ) {
-    return this.gestion.cambiarEstado(ctx.organizacionId!, id, dto.estado, ctx);
+    return this.gestion.cambiarEstado(
+      ctx.organizacionId!,
+      id,
+      dto.estado,
+      ctx,
+      dto.destinoUsuarioId,
+    );
   }
   @Post(':usuarioId/password-temporal') password(
     @CurrentUser() ctx: RequestContext,
@@ -80,5 +86,12 @@ export class UsuariosEmpresaController {
       dto.destinoUsuarioId,
       ctx,
     );
+  }
+
+  @Post(':usuarioId/liberar-leads') liberar(
+    @CurrentUser() ctx: RequestContext,
+    @Param('usuarioId', ParseUUIDPipe) id: string,
+  ) {
+    return this.gestion.liberarLeads(ctx.organizacionId!, id, ctx);
   }
 }

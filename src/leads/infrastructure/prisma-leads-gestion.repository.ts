@@ -2,7 +2,9 @@ import {
   construirResultadoPaginado,
   type ResultadoPaginado,
 } from '../../shared/application/paginacion';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
+import { bloquearUsuariosEmpresa } from '../../shared/infrastructure/bloquear-usuarios-empresa';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
   CambiosGestionLead,
@@ -40,16 +42,21 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
   ): Promise<boolean> {
     // updateMany + where asignado_usuario_id IS NULL: atómico, sin condición
     // de carrera entre el check y el write (PLAN §9).
-    const resultado = await this.prisma.lead.updateMany({
-      where: { id, organizacionId, estado: 1, asignadoUsuarioId: null },
-      data: {
-        asignadoUsuarioId: usuarioId,
-        asignadoEn: new Date(),
-        asignadoPorUsuarioId: null,
-        usuarioEdicion: usuarioId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await bloquearUsuariosEmpresa(tx, organizacionId);
+      if (!(await this.esMiembroActivo(organizacionId, usuarioId, tx)))
+        return false;
+      const resultado = await tx.lead.updateMany({
+        where: { id, organizacionId, estado: 1, asignadoUsuarioId: null },
+        data: {
+          asignadoUsuarioId: usuarioId,
+          asignadoEn: new Date(),
+          asignadoPorUsuarioId: null,
+          usuarioEdicion: usuarioId,
+        },
+      });
+      return resultado.count === 1;
     });
-    return resultado.count === 1;
   }
 
   async asignar(
@@ -58,22 +65,30 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     usuarioId: string,
     asignadoPorUsuarioId: string,
   ): Promise<void> {
-    await this.prisma.lead.updateMany({
-      where: { id, organizacionId, estado: 1 },
-      data: {
-        asignadoUsuarioId: usuarioId,
-        asignadoEn: new Date(),
-        asignadoPorUsuarioId,
-        usuarioEdicion: asignadoPorUsuarioId,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await bloquearUsuariosEmpresa(tx, organizacionId);
+      if (!(await this.esMiembroActivo(organizacionId, usuarioId, tx)))
+        throw new BadRequestException(
+          'El usuario destino no es miembro activo de esta organización',
+        );
+      await tx.lead.updateMany({
+        where: { id, organizacionId, estado: 1 },
+        data: {
+          asignadoUsuarioId: usuarioId,
+          asignadoEn: new Date(),
+          asignadoPorUsuarioId,
+          usuarioEdicion: asignadoPorUsuarioId,
+        },
+      });
     });
   }
 
   async esMiembroActivo(
     organizacionId: string,
     usuarioId: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<boolean> {
-    const membresia = await this.prisma.organizacionUsuario.findFirst({
+    const membresia = await tx.organizacionUsuario.findFirst({
       where: { organizacionId, usuarioId, estado: 1, usuario: { estado: 1 } },
       select: { id: true },
     });
@@ -367,42 +382,55 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
       return { id: existente.id, creado: false };
     }
 
-    const ahora = new Date();
-    const asignadoUsuarioId = input.asignadoUsuarioId;
-    const lead = await this.prisma.lead.create({
-      data: {
-        organizacionId: input.organizacionId,
-        idExterno: input.idExterno,
-        nombre: input.nombre,
-        email: input.email,
-        telefono: input.telefono,
-        tipoLead: input.tipoLead,
-        origen: 'WHATSAPP',
-        datosCrudos: input.datosCrudos as object,
-        fechaLead: ahora,
-        estadoGestion: 'NUEVO',
-        estadoGestionEn: ahora,
-        estadoGestionPorUsuarioId: input.usuarioId,
-        asignadoUsuarioId,
-        asignadoEn: asignadoUsuarioId ? ahora : null,
-        asignadoPorUsuarioId: null,
-        usuarioCreacion: input.usuarioId,
-        estadoHistorial: {
-          create: {
-            id: input.historialId,
-            organizacionId: input.organizacionId,
-            tipoLead: input.tipoLead,
-            desde: null,
-            hacia: 'NUEVO',
-            nota: 'Lead creado desde chat de WhatsApp',
-            metadata: { origen: 'whatsapp_chat' },
-            usuarioId: input.usuarioId,
+    return this.prisma.$transaction(async (tx) => {
+      const ahora = new Date();
+      let asignadoUsuarioId = input.asignadoUsuarioId;
+      if (asignadoUsuarioId) {
+        await bloquearUsuariosEmpresa(tx, input.organizacionId);
+        if (
+          !(await this.esMiembroActivo(
+            input.organizacionId,
+            asignadoUsuarioId,
+            tx,
+          ))
+        )
+          asignadoUsuarioId = null;
+      }
+      const lead = await tx.lead.create({
+        data: {
+          organizacionId: input.organizacionId,
+          idExterno: input.idExterno,
+          nombre: input.nombre,
+          email: input.email,
+          telefono: input.telefono,
+          tipoLead: input.tipoLead,
+          origen: 'WHATSAPP',
+          datosCrudos: input.datosCrudos as object,
+          fechaLead: ahora,
+          estadoGestion: 'NUEVO',
+          estadoGestionEn: ahora,
+          estadoGestionPorUsuarioId: input.usuarioId,
+          asignadoUsuarioId,
+          asignadoEn: asignadoUsuarioId ? ahora : null,
+          asignadoPorUsuarioId: null,
+          usuarioCreacion: input.usuarioId,
+          estadoHistorial: {
+            create: {
+              id: input.historialId,
+              organizacionId: input.organizacionId,
+              tipoLead: input.tipoLead,
+              desde: null,
+              hacia: 'NUEVO',
+              nota: 'Lead creado desde chat de WhatsApp',
+              metadata: { origen: 'whatsapp_chat' },
+              usuarioId: input.usuarioId,
+            },
           },
         },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
+      return { id: lead.id, creado: true };
     });
-    return { id: lead.id, creado: true };
   }
 
   async buscarIdPorTelefonoSufijo(
