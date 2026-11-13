@@ -118,7 +118,7 @@ export interface LeadsGestionRepository {
     usuarioId: string,
     asignadoPorUsuarioId: string,
   ): Promise<void>;
-  liberar(organizacionId: string, id: string): Promise<void>;
+  liberar(organizacionId: string, id: string, actorId: string): Promise<void>;
   /** Evita asignar a alguien fuera de la organización. */
   esMiembroActivo(organizacionId: string, usuarioId: string): Promise<boolean>;
   /** Actualiza tipoLead/estadoGestion/motivoCierre/notaCierre y, si

@@ -517,7 +517,7 @@ export class LeadsController {
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    return this.liberarLead.execute(ctx.organizacionId!, id);
+    return this.liberarLead.execute(ctx.organizacionId!, id, ctx.usuarioId);
   }
 
   @Patch(':id/gestion')

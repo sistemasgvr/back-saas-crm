@@ -10,11 +10,15 @@ export class LiberarLeadUseCase {
     private readonly leads: LeadsGestionRepository,
   ) {}
 
-  async execute(organizacionId: string, leadId: string): Promise<void> {
+  async execute(
+    organizacionId: string,
+    leadId: string,
+    actorId: string,
+  ): Promise<void> {
     const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
     if (!lead) {
       throw new NotFoundException('Lead no encontrado');
     }
-    await this.leads.liberar(organizacionId, leadId);
+    await this.leads.liberar(organizacionId, leadId, actorId);
   }
 }

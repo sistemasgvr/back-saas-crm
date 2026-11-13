@@ -30,10 +30,6 @@ export class AsignarLeadUseCase {
       throw new NotFoundException('Lead no encontrado');
     }
 
-    if (lead.asignadoUsuarioId === usuarioDestinoId) {
-      return;
-    }
-
     const esMiembro = await this.leads.esMiembroActivo(
       organizacionId,
       usuarioDestinoId,
@@ -51,7 +47,10 @@ export class AsignarLeadUseCase {
       asignadoPorUsuarioId,
     );
 
-    if (usuarioDestinoId !== asignadoPorUsuarioId) {
+    if (
+      usuarioDestinoId !== asignadoPorUsuarioId &&
+      lead.asignadoUsuarioId !== usuarioDestinoId
+    ) {
       const nombre = lead.nombre?.trim();
       void this.crearNotificacion
         .execute({

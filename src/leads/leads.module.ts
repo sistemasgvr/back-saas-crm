@@ -3,6 +3,7 @@ import { MetaConnectionsModule } from '../meta/connections/meta-connections.modu
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { InmueblesModule } from '../inmuebles/inmuebles.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { WhatsappMessagingModule } from '../whatsapp/messaging/whatsapp-messaging.module';
 import { LeadsController } from './presentation/leads.controller';
 import { ListarLeadsUseCase } from './application/use-cases/listar-leads.use-case';
 import { ObtenerLeadUseCase } from './application/use-cases/obtener-lead.use-case';
@@ -41,6 +42,7 @@ import { PrismaLeadAutoAsignacionRepository } from './infrastructure/prisma-lead
     OrganizationsModule,
     InmueblesModule,
     forwardRef(() => NotificationsModule),
+    forwardRef(() => WhatsappMessagingModule),
   ],
   controllers: [LeadsController],
   providers: [

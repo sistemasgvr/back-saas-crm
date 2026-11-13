@@ -26,7 +26,9 @@ if (connection) {
       admin = randomUUID(),
       asesor = randomUUID(),
       platform = randomUUID();
-    let db: PrismaClient, service: GestionMembresiasService;
+    let db: PrismaClient,
+      service: GestionMembresiasService,
+      control: ControlAtencionService;
     const ctx = (id = owner, plataforma = false): RequestContext => ({
       usuarioId: id,
       organizacionId: org,
@@ -79,7 +81,7 @@ if (connection) {
             data: { organizacionId: org, usuarioId: id, rol },
           });
       }
-      const control = new ControlAtencionService(
+      control = new ControlAtencionService(
         db as PrismaService,
         { emitirAOrganizacion: jest.fn() } as never,
         {} as never,
@@ -424,7 +426,10 @@ if (connection) {
           where: { usuarioId: u.id, accion: 'LIBERAR_LEADS' },
         }),
       ).toMatchObject({ actorId: owner, cantidadLeads: 1 });
-      const leads = new PrismaLeadsGestionRepository(db as PrismaService);
+      const leads = new PrismaLeadsGestionRepository(
+        db as PrismaService,
+        control,
+      );
       await expect(leads.tomar(org, lead.id, u.id)).resolves.toBe(false);
       await expect(leads.tomar(org, lead.id, asesor)).resolves.toBe(true);
     });
@@ -460,6 +465,86 @@ if (connection) {
       });
       expect(reasignado.asignadoUsuarioId).toBe(admin);
       expect(reasignado.asignadoPorUsuarioId).toBe(owner);
+    });
+
+    it('reasignar desde Leads libera el control anterior y conserva la actividad agendada', async () => {
+      const lead = await db.lead.create({
+        data: {
+          organizacionId: org,
+          idExterno: randomUUID(),
+          datosCrudos: {},
+          asignadoUsuarioId: asesor,
+        },
+      });
+      const meta = await db.metaConexion.create({
+        data: { organizacionId: org, webhookVerifyToken: randomUUID() },
+      });
+      const linea = await db.whatsappConexion.create({
+        data: {
+          organizacionId: org,
+          metaConexionId: meta.id,
+          wabaId: randomUUID(),
+          phoneNumberId: randomUUID(),
+        },
+      });
+      const chat = await db.whatsappConversacion.create({
+        data: {
+          organizacionId: org,
+          whatsappConexionId: linea.id,
+          leadId: lead.id,
+          waId: randomUUID(),
+          modoAtencion: 'HUMANO_ACTIVO',
+          controlUsuarioId: asesor,
+          controlVersion: 1,
+        },
+      });
+      const actividad = await db.leadActividad.create({
+        data: {
+          organizacionId: org,
+          leadId: lead.id,
+          asignadoUsuarioId: asesor,
+          tipo: 'LLAMADA',
+          titulo: 'Seguimiento',
+          programadaEn: new Date('2026-11-15T15:00:00Z'),
+          programadaFin: new Date('2026-11-15T16:00:00Z'),
+        },
+      });
+      const repo = new PrismaLeadsGestionRepository(
+        db as PrismaService,
+        control,
+      );
+      const notificar = jest.spyOn(control, 'notificarAsignacionLead');
+      try {
+        await repo.asignar(org, lead.id, admin, owner);
+        expect(
+          await db.lead.findUniqueOrThrow({ where: { id: lead.id } }),
+        ).toMatchObject({ asignadoUsuarioId: admin });
+        expect(
+          await db.whatsappConversacion.findUniqueOrThrow({
+            where: { id: chat.id },
+          }),
+        ).toMatchObject({
+          modoAtencion: 'MANUAL',
+          controlUsuarioId: null,
+          controlVersion: 2,
+        });
+        expect(
+          await db.leadActividad.findUniqueOrThrow({
+            where: { id: actividad.id },
+          }),
+        ).toMatchObject({ asignadoUsuarioId: asesor });
+        expect(notificar).toHaveBeenCalledWith(org, lead.id, [
+          expect.objectContaining({ id: chat.id, controlVersion: 2 }),
+        ]);
+        await repo.asignar(org, lead.id, admin, owner);
+        expect(
+          await db.whatsappControlEvento.count({
+            where: { conversacionId: chat.id },
+          }),
+        ).toBe(1);
+      } finally {
+        notificar.mockRestore();
+      }
     });
 
     it('libera los leads activos de una cuenta suspendida dentro de su empresa', async () => {

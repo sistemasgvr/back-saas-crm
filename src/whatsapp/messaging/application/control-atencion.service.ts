@@ -107,6 +107,56 @@ export class ControlAtencionService {
     chats.forEach((c) => this.emitir(c));
   }
 
+  async sincronizarAsignacionLead(
+    tx: Prisma.TransactionClient,
+    org: string,
+    leadId: string,
+    destino: string | null,
+    actorId: string,
+  ) {
+    const chats = await tx.whatsappConversacion.findMany({
+      where: { organizacionId: org, leadId, estado: 1 },
+      orderBy: { id: 'asc' },
+    });
+    for (const chat of chats) {
+      if (
+        !['HUMANO_ACTIVO', 'TOMANDO_CONTROL'].includes(chat.modoAtencion) ||
+        chat.controlUsuarioId === destino
+      )
+        continue;
+
+      const nuevo = await tx.whatsappConversacion.update({
+        where: { id: chat.id },
+        data: {
+          modoAtencion: 'MANUAL',
+          controlUsuarioId: null,
+          controlSolicitadoEn: null,
+          controlTomadoEn: null,
+          controlVersion: { increment: 1 },
+          controlMotivo: 'asignacion_lead',
+        },
+      });
+      await this.auditar(tx, nuevo, 'asignacion_lead', 'HUMAN', actorId);
+      Object.assign(chat, nuevo);
+    }
+    return chats;
+  }
+
+  notificarAsignacionLead(
+    org: string,
+    leadId: string,
+    chats: WhatsappConversacion[],
+  ) {
+    chats.forEach((chat) => this.emitir(chat));
+    try {
+      this.ws.emitirAOrganizacion(org, 'lead:asignacion', { leadId });
+    } catch {
+      this.logger.warn(
+        'Asignación persistida; no se pudo emitir actualización del socket',
+      );
+    }
+  }
+
   private async conversacion(
     tx: Prisma.TransactionClient,
     org: string,
@@ -187,10 +237,12 @@ export class ControlAtencionService {
         throw new ConflictException(
           'Espera a que terminen los envíos anteriores',
         );
-      if (actual.leadId && actual.lead?.asignadoUsuarioId !== ctx.usuarioId) {
+      const leadCambiado =
+        actual.lead?.asignadoUsuarioId !== ctx.usuarioId ? actual.leadId : null;
+      if (leadCambiado) {
         const cambio = await tx.lead.updateMany({
           where: {
-            id: actual.leadId,
+            id: leadCambiado,
             organizacionId: org,
             estado: 1,
             asignadoUsuarioId: asignadoEsperado,
@@ -229,9 +281,24 @@ export class ControlAtencionService {
         );
       const nuevo = await this.conversacion(tx, org, id);
       await this.auditar(tx, nuevo, 'toma_chat_humano', 'HUMAN', ctx.usuarioId);
-      return nuevo;
+      const chats = leadCambiado
+        ? await this.sincronizarAsignacionLead(
+            tx,
+            org,
+            leadCambiado,
+            ctx.usuarioId,
+            ctx.usuarioId,
+          )
+        : [];
+      return { nuevo, leadCambiado, chats };
     });
-    this.emitir(c);
+    this.emitir(c.nuevo);
+    if (c.leadCambiado)
+      this.notificarAsignacionLead(
+        org,
+        c.leadCambiado,
+        c.chats.filter((chat) => chat.id !== id),
+      );
     return this.estado(org, id);
   }
 
@@ -601,10 +668,12 @@ export class ControlAtencionService {
         );
       // La transferencia entrega también el lead: el destinatario podrá
       // escribir y encontrará la conversación entre sus chats.
-      if (c.leadId && c.lead && c.lead.asignadoUsuarioId !== destino) {
+      const leadCambiado =
+        c.lead && c.lead.asignadoUsuarioId !== destino ? c.leadId : null;
+      if (leadCambiado && c.lead) {
         const cambio = await tx.lead.updateMany({
           where: {
-            id: c.leadId,
+            id: leadCambiado,
             organizacionId: org,
             estado: 1,
             asignadoUsuarioId: c.lead.asignadoUsuarioId,
@@ -630,9 +699,24 @@ export class ControlAtencionService {
         },
       });
       await this.auditar(tx, nuevo, 'transferencia', 'HUMAN', ctx.usuarioId);
-      return nuevo;
+      const chats = leadCambiado
+        ? await this.sincronizarAsignacionLead(
+            tx,
+            org,
+            leadCambiado,
+            destino,
+            ctx.usuarioId,
+          )
+        : [];
+      return { nuevo, leadCambiado, chats };
     });
-    this.emitir(c);
+    this.emitir(c.nuevo);
+    if (c.leadCambiado)
+      this.notificarAsignacionLead(
+        org,
+        c.leadCambiado,
+        c.chats.filter((chat) => chat.id !== id),
+      );
     return this.estado(org, id);
   }
 

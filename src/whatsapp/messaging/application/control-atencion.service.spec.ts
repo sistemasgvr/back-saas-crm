@@ -73,6 +73,9 @@ function fixture() {
           ? { ...c }
           : null,
       ),
+      findMany: jest.fn(async ({ where }) =>
+        matches(c, where) ? [{ ...c }] : [],
+      ),
       update: jest.fn(async ({ data }) => {
         for (const [k, v] of Object.entries(data) as any)
           c[k] = v?.increment ? c[k] + v.increment : v;

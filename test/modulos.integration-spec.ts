@@ -316,7 +316,10 @@ if (connection) {
           datosCrudos: {},
         });
         expect(resultado.creado).toBe(true);
-        const whatsapp = new PrismaLeadsGestionRepository(f.client);
+        const whatsapp = new PrismaLeadsGestionRepository(
+          f.client,
+          {} as never,
+        );
         const wa = await whatsapp.crearDesdeWhatsApp({
           organizacionId: f.org,
           idExterno: randomUUID(),

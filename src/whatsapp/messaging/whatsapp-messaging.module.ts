@@ -49,7 +49,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     forwardRef(() => MetaConnectionsModule),
     WhatsappConnectionsModule,
     forwardRef(() => NotificationsModule),
-    LeadsModule,
+    forwardRef(() => LeadsModule),
   ],
   controllers: [WhatsappChatsController, BotEmpresaController],
   providers: [

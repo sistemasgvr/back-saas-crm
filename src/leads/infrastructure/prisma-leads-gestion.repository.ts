@@ -5,6 +5,8 @@ import {
 import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { bloquearUsuariosEmpresa } from '../../shared/infrastructure/bloquear-usuarios-empresa';
+import { lockBotOrganizacion } from '../../whatsapp/messaging/application/bot-organizacion-lock';
+import { ControlAtencionService } from '../../whatsapp/messaging/application/control-atencion.service';
 import { PrismaService } from '../../shared/infrastructure/prisma.service';
 import type {
   CambiosGestionLead,
@@ -16,7 +18,10 @@ import type {
 
 @Injectable()
 export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly control: ControlAtencionService,
+  ) {}
 
   async buscarParaGestion(
     organizacionId: string,
@@ -42,10 +47,11 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
   ): Promise<boolean> {
     // updateMany + where asignado_usuario_id IS NULL: atómico, sin condición
     // de carrera entre el check y el write (PLAN §9).
-    return this.prisma.$transaction(async (tx) => {
+    const chats = await this.prisma.$transaction(async (tx) => {
       await bloquearUsuariosEmpresa(tx, organizacionId);
       if (!(await this.esMiembroActivo(organizacionId, usuarioId, tx)))
-        return false;
+        return null;
+      await lockBotOrganizacion(tx, organizacionId);
       const resultado = await tx.lead.updateMany({
         where: { id, organizacionId, estado: 1, asignadoUsuarioId: null },
         data: {
@@ -55,8 +61,18 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           usuarioEdicion: usuarioId,
         },
       });
-      return resultado.count === 1;
+      if (!resultado.count) return null;
+      return this.control.sincronizarAsignacionLead(
+        tx,
+        organizacionId,
+        id,
+        usuarioId,
+        usuarioId,
+      );
     });
+    if (!chats) return false;
+    this.control.notificarAsignacionLead(organizacionId, id, chats);
+    return true;
   }
 
   async asignar(
@@ -65,22 +81,37 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     usuarioId: string,
     asignadoPorUsuarioId: string,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
+    const chats = await this.prisma.$transaction(async (tx) => {
       await bloquearUsuariosEmpresa(tx, organizacionId);
       if (!(await this.esMiembroActivo(organizacionId, usuarioId, tx)))
         throw new BadRequestException(
           'El usuario destino no es miembro activo de esta organización',
         );
-      await tx.lead.updateMany({
+      await lockBotOrganizacion(tx, organizacionId);
+      const lead = await tx.lead.findFirst({
         where: { id, organizacionId, estado: 1 },
-        data: {
-          asignadoUsuarioId: usuarioId,
-          asignadoEn: new Date(),
-          asignadoPorUsuarioId,
-          usuarioEdicion: asignadoPorUsuarioId,
-        },
+        select: { asignadoUsuarioId: true },
       });
+      if (!lead) return null;
+      if (lead.asignadoUsuarioId !== usuarioId)
+        await tx.lead.updateMany({
+          where: { id, organizacionId, estado: 1 },
+          data: {
+            asignadoUsuarioId: usuarioId,
+            asignadoEn: new Date(),
+            asignadoPorUsuarioId,
+            usuarioEdicion: asignadoPorUsuarioId,
+          },
+        });
+      return this.control.sincronizarAsignacionLead(
+        tx,
+        organizacionId,
+        id,
+        usuarioId,
+        asignadoPorUsuarioId,
+      );
     });
+    if (chats) this.control.notificarAsignacionLead(organizacionId, id, chats);
   }
 
   async esMiembroActivo(
@@ -95,15 +126,33 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     return membresia !== null;
   }
 
-  async liberar(organizacionId: string, id: string): Promise<void> {
-    await this.prisma.lead.updateMany({
-      where: { id, organizacionId, estado: 1 },
-      data: {
-        asignadoUsuarioId: null,
-        asignadoEn: null,
-        asignadoPorUsuarioId: null,
-      },
+  async liberar(
+    organizacionId: string,
+    id: string,
+    actorId: string,
+  ): Promise<void> {
+    const chats = await this.prisma.$transaction(async (tx) => {
+      await bloquearUsuariosEmpresa(tx, organizacionId);
+      await lockBotOrganizacion(tx, organizacionId);
+      const { count } = await tx.lead.updateMany({
+        where: { id, organizacionId, estado: 1 },
+        data: {
+          asignadoUsuarioId: null,
+          asignadoEn: null,
+          asignadoPorUsuarioId: null,
+          usuarioEdicion: actorId,
+        },
+      });
+      if (!count) return null;
+      return this.control.sincronizarAsignacionLead(
+        tx,
+        organizacionId,
+        id,
+        null,
+        actorId,
+      );
     });
+    if (chats) this.control.notificarAsignacionLead(organizacionId, id, chats);
   }
 
   async actualizarGestion(
