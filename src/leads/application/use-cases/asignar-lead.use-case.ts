@@ -24,6 +24,7 @@ export class AsignarLeadUseCase {
     leadId: string,
     usuarioDestinoId: string,
     asignadoPorUsuarioId: string,
+    asesorEsperadoId?: string | null,
   ): Promise<void> {
     const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
     if (!lead) {
@@ -40,17 +41,17 @@ export class AsignarLeadUseCase {
       );
     }
 
-    await this.leads.asignar(
+    const cambio = await this.leads.asignar(
       organizacionId,
       leadId,
       usuarioDestinoId,
       asignadoPorUsuarioId,
+      asesorEsperadoId === undefined
+        ? lead.asignadoUsuarioId
+        : asesorEsperadoId,
     );
 
-    if (
-      usuarioDestinoId !== asignadoPorUsuarioId &&
-      lead.asignadoUsuarioId !== usuarioDestinoId
-    ) {
+    if (usuarioDestinoId !== asignadoPorUsuarioId && cambio) {
       const nombre = lead.nombre?.trim();
       void this.crearNotificacion
         .execute({

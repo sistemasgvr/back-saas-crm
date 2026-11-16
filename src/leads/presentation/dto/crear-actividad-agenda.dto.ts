@@ -13,6 +13,13 @@ import {
 } from 'class-validator';
 
 export class CrearActividadAgendaDto {
+  @ApiPropertyOptional({
+    description: 'Identificador estable para reintentar la misma solicitud',
+  })
+  @IsOptional()
+  @IsUUID('4')
+  solicitudId?: string;
+
   @ApiProperty({ description: 'Lead asociado' })
   @IsUUID()
   leadId: string;

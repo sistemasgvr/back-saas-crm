@@ -50,7 +50,7 @@ import { ActualizarAutoAsignacionConfigUseCase } from '../application/use-cases/
 import { LEADS_LECTURA_REPOSITORY } from '../application/ports/leads-lectura.repository.port';
 import type { LeadsLecturaRepository } from '../application/ports/leads-lectura.repository.port';
 import { ListarLeadsQueryDto } from './dto/listar-leads.query.dto';
-import { AsignarLeadDto } from './dto/asignar-lead.dto';
+import { AsesorEsperadoDto, AsignarLeadDto } from './dto/asignar-lead.dto';
 import { ActualizarGestionLeadDto } from './dto/actualizar-gestion-lead.dto';
 import { AutoAsignacionLeadsConfigDto } from './dto/auto-asignacion-leads-config.dto';
 import { CrearVisitaAgendaDto } from './dto/crear-visita-agenda.dto';
@@ -499,6 +499,7 @@ export class LeadsController {
       id,
       dto.usuarioId,
       ctx.usuarioId,
+      dto.asesorEsperadoId,
     );
   }
 
@@ -516,8 +517,9 @@ export class LeadsController {
   release(
     @CurrentUser() ctx: RequestContext,
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto?: AsesorEsperadoDto,
   ) {
-    return this.liberarLead.execute(ctx.organizacionId!, id, ctx.usuarioId);
+    return this.liberarLead.execute(ctx.organizacionId!, id, ctx.usuarioId, dto?.asesorEsperadoId);
   }
 
   @Patch(':id/gestion')

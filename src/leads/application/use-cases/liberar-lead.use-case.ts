@@ -14,11 +14,19 @@ export class LiberarLeadUseCase {
     organizacionId: string,
     leadId: string,
     actorId: string,
+    asesorEsperadoId?: string | null,
   ): Promise<void> {
     const lead = await this.leads.buscarParaGestion(organizacionId, leadId);
     if (!lead) {
       throw new NotFoundException('Lead no encontrado');
     }
-    await this.leads.liberar(organizacionId, leadId, actorId);
+    await this.leads.liberar(
+      organizacionId,
+      leadId,
+      actorId,
+      asesorEsperadoId === undefined
+        ? lead.asignadoUsuarioId
+        : asesorEsperadoId,
+    );
   }
 }

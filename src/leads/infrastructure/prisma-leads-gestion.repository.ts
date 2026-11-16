@@ -2,7 +2,7 @@ import {
   construirResultadoPaginado,
   type ResultadoPaginado,
 } from '../../shared/application/paginacion';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { bloquearUsuariosEmpresa } from '../../shared/infrastructure/bloquear-usuarios-empresa';
 import { lockBotOrganizacion } from '../../whatsapp/messaging/application/bot-organizacion-lock';
@@ -15,6 +15,9 @@ import type {
   LeadsGestionRepository,
   RegistrarHistorialInput,
 } from '../application/ports/leads-gestion.repository.port';
+
+const MENSAJE_ASESOR_CAMBIO =
+  'El asesor de este lead cambió mientras tenías la pantalla abierta. Revisa el asesor actual antes de volver a guardar.';
 
 @Injectable()
 export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
@@ -80,38 +83,49 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     id: string,
     usuarioId: string,
     asignadoPorUsuarioId: string,
-  ): Promise<void> {
-    const chats = await this.prisma.$transaction(async (tx) => {
+    asesorEsperadoId?: string | null,
+  ): Promise<boolean> {
+    const resultado = await this.prisma.$transaction(async (tx) => {
       await bloquearUsuariosEmpresa(tx, organizacionId);
       if (!(await this.esMiembroActivo(organizacionId, usuarioId, tx)))
         throw new BadRequestException(
           'El usuario destino no es miembro activo de esta organización',
         );
       await lockBotOrganizacion(tx, organizacionId);
-      const lead = await tx.lead.findFirst({
-        where: { id, organizacionId, estado: 1 },
-        select: { asignadoUsuarioId: true },
+      const { count } = await tx.lead.updateMany({
+        where: {
+          id,
+          organizacionId,
+          estado: 1,
+          ...(asesorEsperadoId === undefined ? {} : { asignadoUsuarioId: asesorEsperadoId }),
+          OR: [{ asignadoUsuarioId: null }, { asignadoUsuarioId: { not: usuarioId } }],
+        },
+        data: {
+          asignadoUsuarioId: usuarioId,
+          asignadoEn: new Date(),
+          asignadoPorUsuarioId,
+          usuarioEdicion: asignadoPorUsuarioId,
+        },
       });
-      if (!lead) return null;
-      if (lead.asignadoUsuarioId !== usuarioId)
-        await tx.lead.updateMany({
+      if (!count) {
+        const lead = await tx.lead.findFirst({
           where: { id, organizacionId, estado: 1 },
-          data: {
-            asignadoUsuarioId: usuarioId,
-            asignadoEn: new Date(),
-            asignadoPorUsuarioId,
-            usuarioEdicion: asignadoPorUsuarioId,
-          },
+          select: { asignadoUsuarioId: true },
         });
-      return this.control.sincronizarAsignacionLead(
+        if (!lead) throw new NotFoundException('Lead no encontrado');
+        if (lead.asignadoUsuarioId !== usuarioId) throw new ConflictException(MENSAJE_ASESOR_CAMBIO);
+      }
+      const chats = await this.control.sincronizarAsignacionLead(
         tx,
         organizacionId,
         id,
         usuarioId,
         asignadoPorUsuarioId,
       );
+      return { chats, cambio: count === 1 };
     });
-    if (chats) this.control.notificarAsignacionLead(organizacionId, id, chats);
+    if (resultado.chats) this.control.notificarAsignacionLead(organizacionId, id, resultado.chats);
+    return resultado.cambio;
   }
 
   async esMiembroActivo(
@@ -130,12 +144,16 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     organizacionId: string,
     id: string,
     actorId: string,
+    asesorEsperadoId?: string | null,
   ): Promise<void> {
     const chats = await this.prisma.$transaction(async (tx) => {
       await bloquearUsuariosEmpresa(tx, organizacionId);
       await lockBotOrganizacion(tx, organizacionId);
       const { count } = await tx.lead.updateMany({
-        where: { id, organizacionId, estado: 1 },
+        where: {
+          id, organizacionId, estado: 1,
+          ...(asesorEsperadoId === undefined ? {} : { asignadoUsuarioId: asesorEsperadoId }),
+        },
         data: {
           asignadoUsuarioId: null,
           asignadoEn: null,
@@ -143,7 +161,15 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
           usuarioEdicion: actorId,
         },
       });
-      if (!count) return null;
+      if (!count) {
+        const lead = await tx.lead.findFirst({
+          where: { id, organizacionId, estado: 1 },
+          select: { asignadoUsuarioId: true },
+        });
+        if (!lead) throw new NotFoundException('Lead no encontrado');
+        if (lead.asignadoUsuarioId !== null) throw new ConflictException(MENSAJE_ASESOR_CAMBIO);
+        return null;
+      }
       return this.control.sincronizarAsignacionLead(
         tx,
         organizacionId,
@@ -482,35 +508,47 @@ export class PrismaLeadsGestionRepository implements LeadsGestionRepository {
     });
   }
 
-  async buscarIdPorTelefonoSufijo(
+  async buscarIdPorIdentidadWhatsApp(
     organizacionId: string,
-    telefonoOWaId: string,
+    conversacionId: string,
   ): Promise<string | null> {
-    const soloDigitos = telefonoOWaId.replace(/\D/g, '');
-    const sufijo = soloDigitos.slice(-9);
-    if (!sufijo) return null;
-    // Preferir el lead que ya tiene asesor: si el contacto tiene duplicados
-    // (p. ej. reenvió el formulario), el chat debe caer con quien ya lo atiende.
-    const asignado = await this.prisma.lead.findFirst({
-      where: {
-        organizacionId,
-        estado: 1,
-        telefono: { contains: sufijo },
-        asignadoUsuarioId: { not: null },
-      },
-      orderBy: { fechaCreacion: 'desc' },
-      select: { id: true },
-    });
-    if (asignado) return asignado.id;
-    const lead = await this.prisma.lead.findFirst({
-      where: {
-        organizacionId,
-        estado: 1,
-        telefono: { contains: sufijo },
-      },
-      orderBy: { fechaCreacion: 'desc' },
-      select: { id: true },
-    });
+    const [lead] = await this.prisma.$queryRaw<{ id: string }[]>`
+      WITH contacto AS (
+        SELECT
+          c.bsuid,
+          c.wa_id,
+          right(regexp_replace(c.wa_id, '[^0-9]', '', 'g'), 9) AS sufijo,
+          conexion.waba_id
+        FROM whatsapp_conversaciones c
+        JOIN whatsapp_conexiones conexion ON conexion.id = c.whatsapp_conexion_id
+        WHERE c.organizacion_id = ${organizacionId}::uuid
+          AND c.id = ${conversacionId}::uuid
+      )
+      SELECT l.id
+      FROM leads l
+      CROSS JOIN contacto
+      WHERE l.organizacion_id = ${organizacionId}::uuid
+        AND l.estado = 1
+        AND (
+          (length(contacto.sufijo) = 9
+            AND right(regexp_replace(l.telefono, '[^0-9]', '', 'g'), 9) = contacto.sufijo)
+          OR EXISTS (
+            SELECT 1
+            FROM whatsapp_conversaciones anterior
+            JOIN whatsapp_conexiones conexion ON conexion.id = anterior.whatsapp_conexion_id
+            WHERE anterior.organizacion_id = l.organizacion_id
+              AND anterior.lead_id = l.id
+              AND anterior.estado = 1
+              AND (
+                anterior.wa_id = contacto.wa_id
+                OR (anterior.bsuid = contacto.bsuid AND conexion.waba_id = contacto.waba_id)
+              )
+          )
+        )
+      ORDER BY (l.asignado_usuario_id IS NOT NULL) DESC,
+        l.asignado_en DESC NULLS LAST, l.fecha_creacion DESC, l.id
+      LIMIT 1
+    `;
     return lead?.id ?? null;
   }
 

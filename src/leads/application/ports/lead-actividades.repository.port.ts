@@ -63,6 +63,13 @@ export interface ActualizarActividadRepoInput {
 }
 
 export interface LeadActividadesRepository {
+  obtenerReintento(
+    organizacionId: string,
+    id: string,
+    leadId: string,
+    creadorId: string,
+  ): Promise<ActividadAgendaRow | null>;
+
   listarAgenda(
     organizacionId: string,
     filtros: {

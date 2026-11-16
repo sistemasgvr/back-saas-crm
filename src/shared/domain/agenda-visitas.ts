@@ -90,7 +90,7 @@ export function esVisitaEnPasado(inicio: Date, ahora = new Date()): boolean {
 }
 
 export function mensajeSolapeVisita(): string {
-  return 'El asesor ya tiene una visita programada que se solapa con ese horario';
+  return 'El asesor ya tiene una actividad o visita que se solapa con ese horario. Elige otro horario.';
 }
 
 export function mensajeHorarioLaboral(): string {

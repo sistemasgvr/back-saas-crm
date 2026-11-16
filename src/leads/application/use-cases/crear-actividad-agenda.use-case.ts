@@ -56,6 +56,7 @@ export class CrearActividadAgendaUseCase {
   async execute(
     organizacionId: string,
     input: {
+      solicitudId?: string;
       leadId: string;
       tipo: string;
       titulo?: string;
@@ -108,6 +109,19 @@ export class CrearActividadAgendaUseCase {
       asignadoUsuarioId = ctx.usuarioId;
     }
 
+    const id = input.solicitudId ?? randomUUID();
+    const obtenerReintento = async () =>
+      input.solicitudId
+        ? this.actividades.obtenerReintento(
+            organizacionId,
+            id,
+            input.leadId,
+            ctx.usuarioId,
+          )
+        : null;
+    const anterior = await obtenerReintento();
+    if (anterior) return { origen: 'actividad' as const, ...anterior };
+
     const programadaEn = new Date(input.programadaEn);
     if (Number.isNaN(programadaEn.getTime())) {
       throw new BadRequestException('Fecha/hora inválida');
@@ -152,24 +166,34 @@ export class CrearActividadAgendaUseCase {
         programadaFin,
       );
       if (solapaVisita || solapaAct) {
+        const reintento = await obtenerReintento();
+        if (reintento) return { origen: 'actividad' as const, ...reintento };
         throw new ConflictException(mensajeSolapeVisita());
       }
     }
 
-    const creada = await this.actividades.crear(organizacionId, {
-      id: randomUUID(),
-      leadId: input.leadId,
-      tipo,
-      titulo,
-      programadaEn,
-      programadaFin,
-      duracionMinutos,
-      referenciaInmueble,
-      modalidad,
-      nota: input.nota?.trim() || null,
-      asignadoUsuarioId,
-      creadoPorUsuarioId: ctx.usuarioId,
-    });
+    let creada;
+    try {
+      creada = await this.actividades.crear(organizacionId, {
+        id,
+        leadId: input.leadId,
+        tipo,
+        titulo,
+        programadaEn,
+        programadaFin,
+        duracionMinutos,
+        referenciaInmueble,
+        modalidad,
+        nota: input.nota?.trim() || null,
+        asignadoUsuarioId,
+        creadoPorUsuarioId: ctx.usuarioId,
+      });
+    } catch (error: unknown) {
+      // Un intento concurrente puede haber confirmado la misma solicitud.
+      const reintento = await obtenerReintento();
+      if (!reintento) throw error;
+      return { origen: 'actividad' as const, ...reintento };
+    }
 
     if (asignadoUsuarioId && asignadoUsuarioId !== ctx.usuarioId) {
       const cuandoIso = programadaEn.toISOString();

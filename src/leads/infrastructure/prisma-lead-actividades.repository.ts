@@ -8,6 +8,11 @@ import type {
   LeadActividadesRepository,
 } from '../application/ports/lead-actividades.repository.port';
 
+const incluirAgenda = {
+  lead: { select: { id: true, nombre: true, telefono: true } },
+  asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
+} as const;
+
 @Injectable()
 export class PrismaLeadActividadesRepository implements LeadActividadesRepository {
   constructor(private readonly prisma: PrismaService) {}
@@ -28,10 +33,7 @@ export class PrismaLeadActividadesRepository implements LeadActividadesRepositor
           ? { asignadoUsuarioId: filtros.asignadoUsuarioId }
           : {}),
       },
-      include: {
-        lead: { select: { id: true, nombre: true, telefono: true } },
-        asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
-      },
+      include: incluirAgenda,
       orderBy: { programadaEn: 'asc' },
     });
     return filas.map((f) => this.mapAgenda(f));
@@ -61,6 +63,19 @@ export class PrismaLeadActividadesRepository implements LeadActividadesRepositor
     };
   }
 
+  async obtenerReintento(
+    organizacionId: string,
+    id: string,
+    leadId: string,
+    creadorId: string,
+  ) {
+    const fila = await this.prisma.leadActividad.findFirst({
+      where: { id, organizacionId, leadId, creadoPorUsuarioId: creadorId },
+      include: incluirAgenda,
+    });
+    return fila ? this.mapAgenda(fila) : null;
+  }
+
   async crear(
     organizacionId: string,
     input: CrearActividadRepoInput,
@@ -82,10 +97,7 @@ export class PrismaLeadActividadesRepository implements LeadActividadesRepositor
         asignadoUsuarioId: input.asignadoUsuarioId,
         creadoPorUsuarioId: input.creadoPorUsuarioId,
       },
-      include: {
-        lead: { select: { id: true, nombre: true, telefono: true } },
-        asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
-      },
+      include: incluirAgenda,
     });
     return this.mapAgenda(f);
   }
@@ -125,10 +137,7 @@ export class PrismaLeadActividadesRepository implements LeadActividadesRepositor
 
     const f = await this.prisma.leadActividad.findFirst({
       where: { id: actividadId, organizacionId },
-      include: {
-        lead: { select: { id: true, nombre: true, telefono: true } },
-        asignadoUsuario: { select: { id: true, nombre: true, apellido: true } },
-      },
+      include: incluirAgenda,
     });
     if (!f) throw new Error('Actividad no encontrada tras actualizar');
     return this.mapAgenda(f);

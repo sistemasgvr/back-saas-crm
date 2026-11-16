@@ -17,7 +17,7 @@ export interface ResultadoAsegurarLeadWhatsApp {
 
 /**
  * Garantiza que una conversación WA tenga lead vinculado:
- * match por teléfono (si hay) → crear lead sin asignar → vincular → AutoAsignar (si pool ON).
+ * buscar el contacto → reutilizar o crear lead → vincular → autoasignar si sigue sin dueño.
  * Usado solo desde el inbound de mensajes (sin actor humano).
  *
  * Si el chat ya tiene lead pero sigue sin dueño, reintenta auto-asignación
@@ -104,14 +104,10 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
     }
 
     let creado = false;
-    let leadId: string | null = null;
-
-    if (conversacion.waId) {
-      leadId = await this.leadsGestion.buscarIdPorTelefonoSufijo(
-        organizacionId,
-        conversacion.waId,
-      );
-    }
+    let leadId = await this.leadsGestion.buscarIdPorIdentidadWhatsApp(
+      organizacionId,
+      conversacionId,
+    );
 
     if (!leadId) {
       const telefono = conversacion.waId
@@ -143,12 +139,12 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       leadId = alta.id;
       creado = alta.creado;
 
-      if (!creado && conversacion.waId) {
-        const porTelefono = await this.leadsGestion.buscarIdPorTelefonoSufijo(
+      if (!creado) {
+        const porIdentidad = await this.leadsGestion.buscarIdPorIdentidadWhatsApp(
           organizacionId,
-          conversacion.waId,
+          conversacionId,
         );
-        if (porTelefono) leadId = porTelefono;
+        if (porIdentidad) leadId = porIdentidad;
       }
     }
 
@@ -160,11 +156,24 @@ export class AsegurarLeadParaConversacionWhatsAppUseCase {
       );
     }
 
-    await this.conversaciones.asignarLeadSiLibre(
+    const vinculado = await this.conversaciones.asignarLeadSiLibre(
       organizacionId,
       conversacionId,
       leadId,
     );
+
+    if (!vinculado) {
+      const actual = await this.conversaciones.findPorId(
+        organizacionId,
+        conversacionId,
+      );
+      return {
+        leadId: actual?.lead?.id ?? null,
+        creado: false,
+        fueAutoAsignado: false,
+        asignadoUsuarioId: actual?.lead?.asignadoUsuarioId ?? null,
+      };
+    }
 
     return this.intentarAutoAsignarExistente(
       organizacionId,

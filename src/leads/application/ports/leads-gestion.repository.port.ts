@@ -117,8 +117,9 @@ export interface LeadsGestionRepository {
     id: string,
     usuarioId: string,
     asignadoPorUsuarioId: string,
-  ): Promise<void>;
-  liberar(organizacionId: string, id: string, actorId: string): Promise<void>;
+    asesorEsperadoId?: string | null,
+  ): Promise<boolean>;
+  liberar(organizacionId: string, id: string, actorId: string, asesorEsperadoId?: string | null): Promise<void>;
   /** Evita asignar a alguien fuera de la organización. */
   esMiembroActivo(organizacionId: string, usuarioId: string): Promise<boolean>;
   /** Actualiza tipoLead/estadoGestion/motivoCierre/notaCierre y, si
@@ -164,13 +165,10 @@ export interface LeadsGestionRepository {
     historialId: string;
   }): Promise<{ id: string; creado: boolean }>;
 
-  /**
-   * Busca un lead de la org cuyo teléfono contiene el sufijo de dígitos del
-   * waId/teléfono (misma heurística que findOCrearConversacion).
-   */
-  buscarIdPorTelefonoSufijo(
+  /** Busca el lead del contacto, priorizando una asignación existente. */
+  buscarIdPorIdentidadWhatsApp(
     organizacionId: string,
-    telefonoOWaId: string,
+    conversacionId: string,
   ): Promise<string | null>;
 
   /**

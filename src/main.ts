@@ -7,6 +7,7 @@ import { ConfigIoAdapter } from './shared/infrastructure/config-io.adapter';
 import { Logger as PinoNestLogger, LoggerErrorInterceptor } from 'nestjs-pino';
 import pino from 'pino';
 import { createLoggerOptions } from './shared/infrastructure/logging.config';
+import { AgendaConflictInterceptor } from './shared/infrastructure/agenda-conflict.interceptor';
 
 /** EasyPanel a veces guarda DATABASE_URL con comillas literales; Prisma lee process.env. */
 function stripEnvQuotes(value: string): string {
@@ -35,7 +36,7 @@ async function bootstrap() {
   });
   const logger = app.get(PinoNestLogger);
   app.useLogger(logger);
-  app.useGlobalInterceptors(new LoggerErrorInterceptor());
+  app.useGlobalInterceptors(new LoggerErrorInterceptor(), new AgendaConflictInterceptor());
   const config = app.get(ConfigService);
 
   app.setGlobalPrefix('api');
