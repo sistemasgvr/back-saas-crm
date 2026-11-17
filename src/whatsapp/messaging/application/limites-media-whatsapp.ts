@@ -108,3 +108,19 @@ export function validarArchivoWhatsApp(
   }
   return { categoria };
 }
+
+/** Para preparar una carga antes de disponer de los bytes. */
+export function validarTamanoDeclaradoWhatsApp(mimeType: string, tamano: number): void {
+  const categoria = categoriaMediaPorMimeType(mimeType);
+  if (!categoria) throw new BadRequestException(`WhatsApp no admite este tipo de archivo (${mimeType})`);
+  const { nombre, maxBytes } = LIMITES_MEDIA_WHATSAPP[categoria];
+  if (tamano <= 0 || !Number.isSafeInteger(tamano)) {
+    throw new BadRequestException('Selecciona un archivo con contenido.');
+  }
+  if (tamano > maxBytes) {
+    const maximo = categoria === 'sticker' ? `${maxBytes / 1024} KB` : `${maxBytes / (1024 * 1024)} MB`;
+    throw new BadRequestException(
+      `El archivo supera el límite de WhatsApp de ${maximo} por ${nombre}. Elige un archivo más liviano.`,
+    );
+  }
+}

@@ -63,6 +63,15 @@ $ npm run test:cov
 
 ## Deployment
 
+Los adjuntos grandes de WhatsApp se cargan directamente en el MinIO configurado
+en `MINIO_SERVER_URL`. Ese origen debe ser accesible desde el navegador y
+permitir `PUT` desde el dominio del CRM con los encabezados `Content-Type` e
+`If-None-Match`. El bucket permanece privado.
+
+Configura una regla de expiración de un día para el prefijo `tmp-whatsapp/`
+del bucket. Así se eliminan las cargas abandonadas y las marcas temporales que
+impiden confirmar el mismo archivo dos veces.
+
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 
 If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:

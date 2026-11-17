@@ -8,6 +8,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
@@ -20,6 +21,7 @@ import type {
 export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
   private readonly logger = new Logger(MinioObjectStorage.name);
   private readonly client: S3Client;
+  private readonly firmador: S3Client;
   private readonly bucket: string;
 
   constructor(private readonly config: ConfigService) {
@@ -30,11 +32,16 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
     );
     this.bucket = this.config.getOrThrow<string>('MINIO_BUCKET');
 
-    this.client = new S3Client({
+    const options = {
       endpoint,
       region: 'us-east-1',
       forcePathStyle: true,
       credentials: { accessKeyId, secretAccessKey },
+    };
+    this.client = new S3Client(options);
+    this.firmador = new S3Client({
+      ...options,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
     });
   }
 
@@ -105,5 +112,50 @@ export class MinioObjectStorage implements ObjectStorage, OnModuleInit {
     await this.client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
+  }
+
+  firmarPut(
+    key: string,
+    contentType: string,
+    contentLength: number,
+    expiresIn: number,
+  ) {
+    return getSignedUrl(
+      this.firmador,
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ContentType: contentType,
+        ContentLength: contentLength,
+        IfNoneMatch: '*',
+      }),
+      {
+        expiresIn,
+        signableHeaders: new Set([
+          'content-type',
+          'content-length',
+          'if-none-match',
+        ]),
+      },
+    );
+  }
+
+  async crearMarca(key: string): Promise<boolean> {
+    try {
+      await this.client.send(
+        new PutObjectCommand({
+          Bucket: this.bucket,
+          Key: key,
+          Body: Buffer.alloc(0),
+          IfNoneMatch: '*',
+        }),
+      );
+      return true;
+    } catch (error) {
+      const status = (error as { $metadata?: { httpStatusCode?: number } })
+        .$metadata?.httpStatusCode;
+      if (status === 412 || status === 409) return false;
+      throw error;
+    }
   }
 }

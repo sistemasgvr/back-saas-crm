@@ -16,4 +16,11 @@ export interface ObjectStorage {
   getStream(key: string): Promise<Readable>;
   getBuffer(key: string): Promise<Buffer>;
   delete(key: string): Promise<void>;
+  firmarPut(
+    key: string,
+    contentType: string,
+    contentLength: number,
+    expiresIn: number,
+  ): Promise<string>;
+  crearMarca(key: string): Promise<boolean>;
 }

@@ -67,6 +67,8 @@ import { CrearLeadDesdeChatDto } from './dto/crear-lead-desde-chat.dto';
 import { EnviarReaccionDto } from './dto/enviar-reaccion.dto';
 import { CrearPlantillaDto } from './dto/crear-plantilla.dto';
 import { SubirMediaDto } from './dto/subir-media.dto';
+import { ConfirmarCargaDirectaMediaDto, PrepararCargaDirectaMediaDto } from './dto/carga-directa-media.dto';
+import { CargaDirectaMediaWhatsAppService } from '../application/carga-directa-media-whatsapp.service';
 import { EnviarUbicacionDto } from './dto/enviar-ubicacion.dto';
 import { EnviarContactoDto } from './dto/enviar-contacto.dto';
 import { EnviarInteractivoDto } from './dto/enviar-interactivo.dto';
@@ -102,6 +104,7 @@ export class WhatsappChatsController {
     private readonly enviarMensaje: EnviarMensajeWhatsAppUseCase,
     private readonly enviarReaccion: EnviarReaccionWhatsAppUseCase,
     private readonly enviarMedia: EnviarMediaWhatsAppUseCase,
+    private readonly cargaDirectaMedia: CargaDirectaMediaWhatsAppService,
     private readonly enviarUbicacion: EnviarUbicacionWhatsAppUseCase,
     private readonly enviarContacto: EnviarContactoWhatsAppUseCase,
     private readonly enviarInteractivo: EnviarInteractivoWhatsAppUseCase,
@@ -512,6 +515,38 @@ export class WhatsappChatsController {
       id,
       mensajeId,
       dto.emoji,
+      { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
+    );
+  }
+
+  @Post(':id/media/preparar')
+  @RequirePermission('chats.responder')
+  @HttpCode(HttpStatus.OK)
+  prepararCargaMedia(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: PrepararCargaDirectaMediaDto,
+  ) {
+    return this.cargaDirectaMedia.preparar(ctx.organizacionId!, id, dto, {
+      usuarioId: ctx.usuarioId,
+      rol: ctx.rol!,
+      permisos: ctx.permisos,
+    });
+  }
+
+  @Post(':id/media/confirmar')
+  @RequirePermission('chats.responder')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseInterceptors(AvisarCambioChatInterceptor)
+  confirmarCargaMedia(
+    @CurrentUser() ctx: RequestContext,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ConfirmarCargaDirectaMediaDto,
+  ) {
+    return this.cargaDirectaMedia.confirmar(
+      ctx.organizacionId!,
+      id,
+      { ...dto, esVoz: dto.esVoz === '1' || dto.esVoz?.toLowerCase() === 'true' },
       { usuarioId: ctx.usuarioId, rol: ctx.rol!, permisos: ctx.permisos },
     );
   }

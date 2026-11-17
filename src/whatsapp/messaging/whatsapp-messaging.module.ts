@@ -40,6 +40,7 @@ import { SincronizarContactoAppBusinessUseCase } from './application/use-cases/s
 import { ProcesarPreferenciaMarketingWhatsAppUseCase } from './application/use-cases/procesar-preferencia-marketing-whatsapp.use-case';
 import { EnviarRecordatorioAgendaWhatsAppUseCase } from './application/use-cases/enviar-recordatorio-agenda-whatsapp.use-case';
 import { GuardarMediaWhatsAppService } from './application/guardar-media-whatsapp.service';
+import { CargaDirectaMediaWhatsAppService } from './application/carga-directa-media-whatsapp.service';
 import { WHATSAPP_CONVERSACIONES_REPOSITORY } from './application/ports/whatsapp-conversaciones.repository.port';
 import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-whatsapp-conversaciones.repository';
 
@@ -85,6 +86,7 @@ import { PrismaWhatsappConversacionesRepository } from './infrastructure/prisma-
     ProcesarPreferenciaMarketingWhatsAppUseCase,
     EnviarRecordatorioAgendaWhatsAppUseCase,
     GuardarMediaWhatsAppService,
+    CargaDirectaMediaWhatsAppService,
     TiempoRealChatsService,
     MediaWebhookWhatsAppService,
     {

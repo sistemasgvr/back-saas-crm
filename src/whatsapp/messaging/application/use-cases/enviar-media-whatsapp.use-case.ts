@@ -32,6 +32,12 @@ export interface EnviarMediaInput {
   esVoz?: boolean;
 }
 
+export interface ContextoEnvioMedia {
+  usuarioId: string;
+  rol: RolOrganizacion;
+  permisos?: readonly string[];
+}
+
 /** Envía un archivo (imagen/video/audio/documento/sticker) a un chat —
  * mismo flujo que texto: solo funciona DENTRO de la ventana de 24h, Meta no
  * admite archivos libres fuera de ella (solo plantillas). Sube el archivo a
@@ -51,21 +57,11 @@ export class EnviarMediaWhatsAppUseCase {
     private readonly guardarMedia: GuardarMediaWhatsAppService,
   ) {}
 
-  async execute(
+  async autorizarConversacion(
     organizacionId: string,
     conversacionId: string,
-    input: EnviarMediaInput,
-    ctx: {
-      usuarioId: string;
-      rol: RolOrganizacion;
-      permisos?: readonly string[];
-    },
-  ): Promise<void> {
-    const { categoria } = validarArchivoWhatsApp(
-      input.mimeType,
-      input.buffer,
-    );
-
+    ctx: ContextoEnvioMedia,
+  ) {
     const conversacion = await this.conversaciones.findPorId(
       organizacionId,
       conversacionId,
@@ -89,6 +85,17 @@ export class EnviarMediaWhatsAppUseCase {
           'enviar plantillas aprobadas, no archivos libres',
       );
     }
+    return conversacion;
+  }
+
+  async execute(
+    organizacionId: string,
+    conversacionId: string,
+    input: EnviarMediaInput,
+    ctx: ContextoEnvioMedia,
+  ): Promise<void> {
+    const { categoria } = validarArchivoWhatsApp(input.mimeType, input.buffer);
+    const conversacion = await this.autorizarConversacion(organizacionId, conversacionId, ctx);
 
     const conexionActiva = await this.conexionesWa.findPorId(
       organizacionId,
