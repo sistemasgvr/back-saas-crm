@@ -4,6 +4,7 @@ import type { TipoMediaWhatsApp } from '../../../meta/connections/application/po
 export type CategoriaMediaWhatsApp = TipoMediaWhatsApp;
 
 interface LimiteMedia {
+  nombre: string;
   maxBytes: number;
   mimesPermitidos: string[];
 }
@@ -20,14 +21,17 @@ export const LIMITES_MEDIA_WHATSAPP: Record<
   LimiteMedia
 > = {
   image: {
+    nombre: 'imagen',
     maxBytes: 5 * 1024 * 1024,
     mimesPermitidos: ['image/jpeg', 'image/png'],
   },
   video: {
+    nombre: 'video',
     maxBytes: 16 * 1024 * 1024,
     mimesPermitidos: ['video/mp4', 'video/3gpp'],
   },
   audio: {
+    nombre: 'audio',
     maxBytes: 16 * 1024 * 1024,
     mimesPermitidos: [
       'audio/aac',
@@ -38,6 +42,7 @@ export const LIMITES_MEDIA_WHATSAPP: Record<
     ],
   },
   document: {
+    nombre: 'documento',
     maxBytes: 100 * 1024 * 1024,
     mimesPermitidos: [
       'application/pdf',
@@ -51,6 +56,7 @@ export const LIMITES_MEDIA_WHATSAPP: Record<
     ],
   },
   sticker: {
+    nombre: 'sticker animado',
     maxBytes: 500 * 1024,
     mimesPermitidos: ['image/webp'],
   },
@@ -74,7 +80,7 @@ export function categoriaMediaPorMimeType(
  * error claro en español en vez de dejar que Meta lo rechace después. */
 export function validarArchivoWhatsApp(
   mimeType: string,
-  tamanoBytes: number,
+  archivo: Buffer,
 ): { categoria: CategoriaMediaWhatsApp } {
   const categoria = categoriaMediaPorMimeType(mimeType);
   if (!categoria) {
@@ -82,11 +88,22 @@ export function validarArchivoWhatsApp(
       `WhatsApp no admite este tipo de archivo (${mimeType})`,
     );
   }
-  const limite = LIMITES_MEDIA_WHATSAPP[categoria];
-  if (tamanoBytes > limite.maxBytes) {
+  let { nombre, maxBytes } = LIMITES_MEDIA_WHATSAPP[categoria];
+  if (categoria === 'sticker' && archivo.length > 100 * 1024) {
+    // En un WebP animado, la cabecera VP8X tiene activo el bit de animación.
+    const animado = archivo.toString('ascii', 8, 16) === 'WEBPVP8X'
+      && (archivo[20] & 0x02) !== 0;
+    if (!animado) {
+      nombre = 'sticker estático';
+      maxBytes = 100 * 1024;
+    }
+  }
+  if (archivo.length > maxBytes) {
+    const maximo = categoria === 'sticker'
+      ? `${maxBytes / 1024} KB`
+      : `${maxBytes / (1024 * 1024)} MB`;
     throw new BadRequestException(
-      `El archivo pesa más de lo que WhatsApp admite para ${categoria} ` +
-        `(máximo ${Math.round(limite.maxBytes / (1024 * 1024)) || 0.5}MB)`,
+      `El archivo supera el límite de WhatsApp de ${maximo} por ${nombre}. Elige un archivo más liviano.`,
     );
   }
   return { categoria };

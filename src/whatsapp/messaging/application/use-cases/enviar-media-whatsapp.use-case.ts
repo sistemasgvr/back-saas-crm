@@ -63,7 +63,7 @@ export class EnviarMediaWhatsAppUseCase {
   ): Promise<void> {
     const { categoria } = validarArchivoWhatsApp(
       input.mimeType,
-      input.buffer.length,
+      input.buffer,
     );
 
     const conversacion = await this.conversaciones.findPorId(

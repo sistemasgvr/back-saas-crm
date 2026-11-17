@@ -84,7 +84,8 @@ import { RenombrarConversacionDto } from './dto/renombrar-conversacion.dto';
 // El límite real por tipo lo valida validarArchivoWhatsApp() en el use-case
 // (5MB imagen / 16MB audio-video / 100MB documento) — este es solo el tope
 // del interceptor, generoso para no rechazar antes de dar el mensaje claro.
-const LIMITE_MULTER_BYTES = 100 * 1024 * 1024;
+// Busboy rechaza al alcanzar su límite. El byte extra permite documentos de 100 MB exactos.
+const LIMITE_MULTER_BYTES = 100 * 1024 * 1024 + 1;
 
 @ApiTags('WhatsApp Chats')
 @ApiBearerAuth('JWT-auth')
