@@ -91,17 +91,19 @@ export function validarArchivoWhatsApp(
   let { nombre, maxBytes } = LIMITES_MEDIA_WHATSAPP[categoria];
   if (categoria === 'sticker' && archivo.length > 100 * 1024) {
     // En un WebP animado, la cabecera VP8X tiene activo el bit de animación.
-    const animado = archivo.toString('ascii', 8, 16) === 'WEBPVP8X'
-      && (archivo[20] & 0x02) !== 0;
+    const animado =
+      archivo.toString('ascii', 8, 16) === 'WEBPVP8X' &&
+      (archivo[20] & 0x02) !== 0;
     if (!animado) {
       nombre = 'sticker estático';
       maxBytes = 100 * 1024;
     }
   }
   if (archivo.length > maxBytes) {
-    const maximo = categoria === 'sticker'
-      ? `${maxBytes / 1024} KB`
-      : `${maxBytes / (1024 * 1024)} MB`;
+    const maximo =
+      categoria === 'sticker'
+        ? `${maxBytes / 1024} KB`
+        : `${maxBytes / (1024 * 1024)} MB`;
     throw new BadRequestException(
       `El archivo supera el límite de WhatsApp de ${maximo} por ${nombre}. Elige un archivo más liviano.`,
     );
@@ -110,17 +112,54 @@ export function validarArchivoWhatsApp(
 }
 
 /** Para preparar una carga antes de disponer de los bytes. */
-export function validarTamanoDeclaradoWhatsApp(mimeType: string, tamano: number): void {
+export function validarTamanoDeclaradoWhatsApp(
+  mimeType: string,
+  tamano: number,
+): void {
   const categoria = categoriaMediaPorMimeType(mimeType);
-  if (!categoria) throw new BadRequestException(`WhatsApp no admite este tipo de archivo (${mimeType})`);
+  if (!categoria)
+    throw new BadRequestException(
+      `WhatsApp no admite este tipo de archivo (${mimeType})`,
+    );
   const { nombre, maxBytes } = LIMITES_MEDIA_WHATSAPP[categoria];
   if (tamano <= 0 || !Number.isSafeInteger(tamano)) {
     throw new BadRequestException('Selecciona un archivo con contenido.');
   }
   if (tamano > maxBytes) {
-    const maximo = categoria === 'sticker' ? `${maxBytes / 1024} KB` : `${maxBytes / (1024 * 1024)} MB`;
+    const maximo =
+      categoria === 'sticker'
+        ? `${maxBytes / 1024} KB`
+        : `${maxBytes / (1024 * 1024)} MB`;
     throw new BadRequestException(
       `El archivo supera el límite de WhatsApp de ${maximo} por ${nombre}. Elige un archivo más liviano.`,
+    );
+  }
+}
+
+/** Límite del original, separado del límite del archivo ya comprimido para Meta. */
+export function validarTamanoCargaWhatsApp(
+  mimeType: string,
+  tamano: number,
+): void {
+  const maxBytes = [
+    'video/mp4',
+    'video/3gpp',
+    'video/quicktime',
+    'video/webm',
+    'video/x-msvideo',
+  ].includes(mimeType)
+    ? 100 * 1024 * 1024
+    : ['image/jpeg', 'image/png'].includes(mimeType)
+      ? 25 * 1024 * 1024
+      : null;
+  if (maxBytes === null)
+    return validarTamanoDeclaradoWhatsApp(mimeType, tamano);
+  if (!Number.isSafeInteger(tamano) || tamano <= 0) {
+    throw new BadRequestException('Selecciona un archivo con contenido.');
+  }
+  if (tamano > maxBytes) {
+    throw new BadRequestException(
+      `El archivo original supera los ${maxBytes / (1024 * 1024)} MB permitidos para comprimirlo.`,
     );
   }
 }

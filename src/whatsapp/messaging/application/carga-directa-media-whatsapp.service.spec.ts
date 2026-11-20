@@ -7,7 +7,7 @@ import type { EnviarMediaWhatsAppUseCase } from './use-cases/enviar-media-whatsa
 const ctx = { usuarioId: 'asesor', rol: 'USUARIO' as const };
 const metadata = {
   mimeType: 'video/mp4',
-  tamanoBytes: Math.ceil(6.1 * 1024 ** 2),
+  tamanoBytes: Math.ceil(20.1 * 1024 ** 2),
 };
 
 it('firma el PUT con el tamaño, MIME y la condición que impide sobrescribir', async () => {

@@ -11,7 +11,7 @@ import {
   OBJECT_STORAGE,
   type ObjectStorage,
 } from '../../../shared/application/ports/object-storage.port';
-import { validarTamanoDeclaradoWhatsApp } from './limites-media-whatsapp';
+import { validarTamanoCargaWhatsApp } from './limites-media-whatsapp';
 import {
   EnviarMediaWhatsAppUseCase,
   type ContextoEnvioMedia,
@@ -36,7 +36,7 @@ export class CargaDirectaMediaWhatsAppService {
     input: { mimeType: string; tamanoBytes: number },
     ctx: ContextoEnvioMedia,
   ) {
-    validarTamanoDeclaradoWhatsApp(input.mimeType, input.tamanoBytes);
+    validarTamanoCargaWhatsApp(input.mimeType, input.tamanoBytes);
     await this.enviar.autorizarConversacion(
       organizacionId,
       conversacionId,
@@ -77,7 +77,7 @@ export class CargaDirectaMediaWhatsAppService {
         'Venció la carga del archivo. Vuelve a seleccionarlo.',
       );
     }
-    validarTamanoDeclaradoWhatsApp(input.mimeType, input.tamanoBytes);
+    validarTamanoCargaWhatsApp(input.mimeType, input.tamanoBytes);
     // La creación condicional impide confirmar dos veces la misma carga.
     if (!(await this.storage.crearMarca(`${key}.envio`))) {
       throw new ConflictException(

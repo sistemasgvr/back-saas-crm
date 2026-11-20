@@ -20,6 +20,7 @@ import { validarArchivoWhatsApp } from '../limites-media-whatsapp';
 import { puedeEscribirConversacionWhatsApp } from '../../domain/acceso-conversacion-whatsapp';
 import { idParaEnvioWhatsApp } from '../../domain/identidad-contacto-whatsapp';
 import { GuardarMediaWhatsAppService } from '../guardar-media-whatsapp.service';
+import { ComprimirMediaWhatsAppService } from '../comprimir-media-whatsapp.service';
 
 export interface EnviarMediaInput {
   buffer: Buffer;
@@ -55,6 +56,7 @@ export class EnviarMediaWhatsAppUseCase {
     @Inject(META_GRAPH_CLIENT) private readonly graph: MetaGraphClient,
     private readonly tokenEncryption: TokenEncryptionService,
     private readonly guardarMedia: GuardarMediaWhatsAppService,
+    private readonly comprimirMedia: ComprimirMediaWhatsAppService,
   ) {}
 
   async autorizarConversacion(
@@ -94,8 +96,11 @@ export class EnviarMediaWhatsAppUseCase {
     input: EnviarMediaInput,
     ctx: ContextoEnvioMedia,
   ): Promise<void> {
-    const { categoria } = validarArchivoWhatsApp(input.mimeType, input.buffer);
-    const conversacion = await this.autorizarConversacion(organizacionId, conversacionId, ctx);
+    const conversacion = await this.autorizarConversacion(
+      organizacionId,
+      conversacionId,
+      ctx,
+    );
 
     const conexionActiva = await this.conexionesWa.findPorId(
       organizacionId,
@@ -142,6 +147,12 @@ export class EnviarMediaWhatsAppUseCase {
       respondeAWamid = citado.wamid;
     }
 
+    // Ambos tipos de carga pasan por aquí. La copia del historial y Meta
+    // reciben exactamente los mismos bytes, MIME y nombre ya normalizados.
+    input = { ...input, ...(await this.comprimirMedia.comprimir(input)) };
+    const { categoria } = validarArchivoWhatsApp(input.mimeType, input.buffer);
+    // La compresión puede haber consumido el resto de la ventana de 24 h.
+    await this.autorizarConversacion(organizacionId, conversacionId, ctx);
     const subido = await this.graph.subirMediaWhatsApp(
       conexionActiva.phoneNumberId,
       accessToken,
