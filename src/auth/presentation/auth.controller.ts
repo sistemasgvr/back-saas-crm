@@ -16,6 +16,10 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import {
+  requestClientIp,
+  requestClientAgent,
+} from '../../shared/infrastructure/client-ip.service';
 import { JwtService } from '@nestjs/jwt';
 import type { AccessTokenPayload } from '../domain/jwt-payload.interface';
 import { LoginUseCase } from '../application/use-cases/login.use-case';
@@ -62,8 +66,8 @@ export class AuthController {
     const resultado = await this.loginUseCase.execute({
       email: dto.email,
       password: dto.password,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      ip: requestClientIp(req),
+      userAgent: requestClientAgent(req),
     });
     this.identificarSesionEmitida(req, resultado.accessToken);
     return resultado;
@@ -86,8 +90,8 @@ export class AuthController {
   async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
     const resultado = await this.refreshUseCase.execute({
       refreshToken: dto.refreshToken,
-      ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      ip: requestClientIp(req),
+      userAgent: requestClientAgent(req),
     });
     this.identificarSesionEmitida(req, resultado.accessToken);
     return resultado;

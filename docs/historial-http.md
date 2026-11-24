@@ -40,14 +40,39 @@ configurar únicamente las IP/CIDR controladas, separadas por comas. Express res
 la cadena X-Forwarded-For desde esos proxies; no se confía indiscriminadamente en
 cabeceras recibidas. El proxy debe sobrescribir las cabeceras de procedencia.
 
-Si Next realiza la petición servidor a servidor y no reenvía la IP del navegador,
-el backend solo ve la IP del servidor Next/proxy. Este cambio solo de backend no
-puede reconstruir la IP original que no recibió. `solicitud.ipConexion` permite
+Para las llamadas servidor a servidor de Next se implementó reenvío firmado:
+
+1. Configurar `CLIENT_IP_FORWARD_SECRET` con el **mismo secreto privado aleatorio**
+   de al menos 32 caracteres en backend y frontend. Nunca usar `NEXT_PUBLIC_`.
+   Se puede generar una sola vez con `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
+2. En frontend, `CLIENT_IP_HEADER=x-real-ip` (por defecto). La entrada del hosting
+   debe sobrescribir esta cabecera con el peer real, y el frontend no debe ser
+   accesible por una ruta que eluda ese proxy. Si el hosting solo agrega XFF,
+   configurar `CLIENT_IP_HEADER=x-forwarded-for`; se usa el **último** valor agregado
+   por el proxy, nunca el primero que un visitante podría falsificar. Si hay un
+   CDN adicional, ese último valor podría ser el CDN: hay que usar una cabecera
+   que el proveedor garantice y sobrescriba con la IP original verificada.
+3. Desplegar ambos servicios. No hay migración nueva: se conserva `registros_http`.
+
+Next firma IP, navegador, método, ruta y timestamp. El backend verifica HMAC-SHA256
+y ventana de 60 segundos. Cabeceras sin firma válida se ignoran. Esta firma asegura
+el transporte entre aplicaciones; no sustituye la configuración del proxy de entrada.
+Sin secreto o sin cabecera válida se mantiene la IP de conexión/proxy. No se inventa
+una IP del visitante. `solicitud.ipOrigen` indica `frontend_firmado`, `proxy_confiable`
+o `conexion`. Login y refresh guardan también la IP resuelta en `tokens_refresco`.
+
+Las descargas de medios conservan su caché privada del navegador; las peticiones
+que sí llegan a Next no comparten la respuesta del backend en su caché de servidor,
+para no mezclar el contexto firmado entre visitantes.
+
+Los registros históricos con `10.11.0.23` no se pueden corregir retrospectivamente
+sin una fuente adicional que haya guardado la IP original. `solicitud.ipConexion` permite
 distinguir el peer de la IP resuelta. User-agent y request ID son metadatos
 aportados por el cliente, no pruebas de identidad; usuario y sesión proceden
 del proceso de autenticación.
 
-Referencia: [Express detrás de proxies](https://expressjs.com/en/guide/behind-proxies/).
+Referencias: [Express detrás de proxies](https://expressjs.com/en/guide/behind-proxies/),
+[IP de visitantes en Hostinger CDN](https://www.hostinger.com/support/hostinger-cdn-visitor-ip-addresses-in-logs-and-analytics/).
 
 ## Retención y funcionamiento
 
@@ -71,7 +96,8 @@ Buscar una IP y resolver usuario y empresa:
 ```sql
 SELECT r.fecha AT TIME ZONE 'America/Lima' AS fecha_lima,
        r.request_id, u.nombre, u.email, o.nombre AS empresa,
-       r.sesion_id, r.ip, r.solicitud->>'metodo' AS metodo,
+       r.sesion_id, r.ip, r.solicitud->>'ipOrigen' AS origen_ip,
+       r.solicitud->>'ipConexion' AS ip_conexion, r.solicitud->>'metodo' AS metodo,
        r.solicitud->>'ruta' AS ruta, r.estado_http, r.duracion_ms,
        r.error_tipo, r.error_mensaje
 FROM registros_http r

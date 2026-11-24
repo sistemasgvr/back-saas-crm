@@ -32,6 +32,7 @@ function stripEnvQuotes(value: string): string {
  */
 export const envValidationSchema = Joi.object({
   HTTP_AUDIT_ENABLED: Joi.boolean().default(true),
+  CLIENT_IP_FORWARD_SECRET: Joi.string().min(32).optional(),
   // Lista de IP/CIDR de proxies controlados. Nunca confiar en todos los orígenes.
   TRUSTED_PROXY_CIDRS: Joi.string().optional(),
   LOG_LEVEL: Joi.string()

@@ -1,10 +1,15 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
+import { Injectable, NestMiddleware, Optional } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import type { Request, Response, NextFunction } from 'express';
+import type { Response, NextFunction } from 'express';
 import type { RequestContext } from '../../auth/domain/request-context.interface';
 import { HttpAuditService } from './http-audit.service';
+import {
+  ClientIpService,
+  requestClientIp,
+  type ClientIpRequest,
+} from './client-ip.service';
 
-export type AuditRequest = Request & {
+export type AuditRequest = ClientIpRequest & {
   id?: string;
   user?: RequestContext;
   auditError?: { tipo: string; mensaje: string; stack?: string };
@@ -12,9 +17,13 @@ export type AuditRequest = Request & {
 
 @Injectable()
 export class HttpAuditMiddleware implements NestMiddleware {
-  constructor(private readonly audit: HttpAuditService) {}
+  constructor(
+    private readonly audit: HttpAuditService,
+    @Optional() private readonly ips?: ClientIpService,
+  ) {}
 
   use(req: AuditRequest, res: Response, next: NextFunction) {
+    this.ips?.resolve(req);
     if (!this.audit.habilitado) return next();
     const inicio = performance.now();
     const fecha = new Date();
@@ -45,10 +54,13 @@ export class HttpAuditMiddleware implements NestMiddleware {
           rutaPlantilla:
             typeof route?.path === 'string' ? route.path.slice(0, 512) : null,
           ipConexion: req.socket.remoteAddress?.slice(0, 64) ?? null,
-          userAgent: req.get('user-agent')?.slice(0, 512) ?? null,
+          userAgent:
+            (req.auditClientAgent ?? req.get('user-agent'))?.slice(0, 512) ??
+            null,
+          ipOrigen: req.auditIpSource ?? 'conexion',
           contentType: req.get('content-type')?.slice(0, 120) ?? null,
         },
-        ip: req.ip?.slice(0, 64),
+        ip: requestClientIp(req)?.slice(0, 64),
         estadoHttp: abortada ? 499 : res.statusCode,
         duracionMs: Math.min(
           2147483647,

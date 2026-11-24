@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { createHmac } from 'node:crypto';
 import type { Server } from 'http';
 import type { Response } from 'express';
 import type { Prisma } from '@prisma/client';
@@ -56,6 +57,7 @@ class AuditController {
 }
 
 describe('Historial HTTP persistido', () => {
+  const forwardingSecret = 'synthetic-private-key-with-at-least-32-characters';
   let app: INestApplication<Server>;
   let audit: HttpAuditService;
   type Batch = {
@@ -89,7 +91,10 @@ describe('Historial HTTP persistido', () => {
         { provide: PrismaService, useValue: prisma },
         {
           provide: ConfigService,
-          useValue: new ConfigService({ HTTP_AUDIT_ENABLED: true }),
+          useValue: new ConfigService({
+            HTTP_AUDIT_ENABLED: true,
+            CLIENT_IP_FORWARD_SECRET: forwardingSecret,
+          }),
         },
       ],
       exports: [PrismaService, ConfigService],
@@ -103,7 +108,12 @@ describe('Historial HTTP persistido', () => {
       .overrideProvider(PrismaService)
       .useValue(prisma)
       .overrideProvider(ConfigService)
-      .useValue(new ConfigService({ HTTP_AUDIT_ENABLED: true }))
+      .useValue(
+        new ConfigService({
+          HTTP_AUDIT_ENABLED: true,
+          CLIENT_IP_FORWARD_SECRET: forwardingSecret,
+        }),
+      )
       .compile();
     app = module.createNestApplication({ logger: false });
     audit = app.get(HttpAuditService);
@@ -160,6 +170,37 @@ describe('Historial HTTP persistido', () => {
         expect.objectContaining({ estadoHttp: 404 }),
       ]),
     );
+  });
+
+  it('persiste la IP y el navegador firmados sin reemplazar el peer de conexión', async () => {
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = createHmac('sha256', forwardingSecret)
+      .update(
+        [
+          timestamp,
+          'POST',
+          '/audit-test/abc',
+          '38.56.219.133',
+          'Browser/test',
+        ].join('\n'),
+      )
+      .digest('hex');
+    await request(app.getHttpServer())
+      .post('/audit-test/abc')
+      .set('x-crm-client-ip', '38.56.219.133')
+      .set('x-crm-client-agent', 'Browser/test')
+      .set('x-crm-client-ts', timestamp)
+      .set('x-crm-client-signature', signature)
+      .send({ texto: 'not-recorded' })
+      .expect(201);
+    await audit.flush();
+    const [row] = createMany.mock.calls.flatMap(([call]) => call.data);
+    expect(row).toMatchObject({
+      ip: '38.56.219.133',
+      solicitud: { ipOrigen: 'frontend_firmado', userAgent: 'Browser/test' },
+    });
+    expect(JSON.stringify(row.solicitud)).not.toContain(signature);
+    expect(JSON.stringify(row.solicitud)).not.toContain('not-recorded');
   });
 
   it('conserva frames del error interno sin almacenar su contenido arbitrario', async () => {
