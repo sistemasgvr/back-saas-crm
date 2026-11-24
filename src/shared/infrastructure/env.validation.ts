@@ -31,6 +31,9 @@ function stripEnvQuotes(value: string): string {
  * NOTA: no definas PORT en hPanel — Hostinger lo inyecta vía Passenger.
  */
 export const envValidationSchema = Joi.object({
+  HTTP_AUDIT_ENABLED: Joi.boolean().default(true),
+  // Lista de IP/CIDR de proxies controlados. Nunca confiar en todos los orígenes.
+  TRUSTED_PROXY_CIDRS: Joi.string().optional(),
   LOG_LEVEL: Joi.string()
     .valid('trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent')
     .default('info'),

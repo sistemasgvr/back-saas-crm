@@ -52,16 +52,17 @@ export class LoginUseCase {
 
     await this.usuarios.actualizarUltimoLogin(usuario.id);
 
+    const refresh = this.tokens.firmarRefreshToken({
+      sub: usuario.id,
+      organizacionId: activa?.organizacionId,
+    });
+
     const accessToken = this.tokens.firmarAccessToken({
+      sesionId: refresh.sesionId,
       sub: usuario.id,
       organizacionId: activa?.organizacionId,
       rol: activa?.rol,
       esAdminPlataforma: usuario.esAdminPlataforma === 1,
-    });
-
-    const refresh = this.tokens.firmarRefreshToken({
-      sub: usuario.id,
-      organizacionId: activa?.organizacionId,
     });
 
     await this.tokensRefresco.crear({

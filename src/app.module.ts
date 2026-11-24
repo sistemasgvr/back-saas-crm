@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpAuditModule } from './shared/infrastructure/http-audit.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { createHttpLoggerOptions } from './shared/infrastructure/logging.config';
@@ -40,6 +41,7 @@ import { DataExportModule } from './data-export/data-export.module';
       }),
     }),
     PrismaModule,
+    HttpAuditModule,
     ObjectStorageModule,
     AuthModule,
     OrganizationsModule,

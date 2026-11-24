@@ -16,6 +16,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import type { AccessTokenPayload } from '../domain/jwt-payload.interface';
 import { LoginUseCase } from '../application/use-cases/login.use-case';
 import { RefreshUseCase } from '../application/use-cases/refresh.use-case';
 import { LogoutUseCase } from '../application/use-cases/logout.use-case';
@@ -40,6 +42,7 @@ export class AuthController {
     private readonly meUseCase: MeUseCase,
     private readonly updateMeUseCase: UpdateMeUseCase,
     private readonly changePasswordUseCase: ChangePasswordUseCase,
+    private readonly jwt: JwtService,
   ) {}
 
   @Post('auth/login')
@@ -55,13 +58,15 @@ export class AuthController {
       'Credenciales válidas — devuelve accessToken, refreshToken y el usuario.',
   })
   @ApiResponse({ status: 401, description: 'Email o contraseña incorrectos.' })
-  login(@Body() dto: LoginDto, @Req() req: Request) {
-    return this.loginUseCase.execute({
+  async login(@Body() dto: LoginDto, @Req() req: Request) {
+    const resultado = await this.loginUseCase.execute({
       email: dto.email,
       password: dto.password,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
+    this.identificarSesionEmitida(req, resultado.accessToken);
+    return resultado;
   }
 
   @Post('auth/refresh')
@@ -78,12 +83,27 @@ export class AuthController {
     status: 401,
     description: 'Refresh token inválido, expirado o ya usado.',
   })
-  refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
-    return this.refreshUseCase.execute({
+  async refresh(@Body() dto: RefreshTokenDto, @Req() req: Request) {
+    const resultado = await this.refreshUseCase.execute({
       refreshToken: dto.refreshToken,
       ip: req.ip,
       userAgent: req.headers['user-agent'],
     });
+    this.identificarSesionEmitida(req, resultado.accessToken);
+    return resultado;
+  }
+
+  private identificarSesionEmitida(req: Request, tokenEmitido: string) {
+    // Solo decodifica el token recién firmado por el caso de uso tras autenticar;
+    // nunca usa un JWT recibido sin verificar para atribuir una solicitud.
+    const payload = this.jwt.decode<AccessTokenPayload>(tokenEmitido);
+    (req as Request & { user: RequestContext }).user = {
+      usuarioId: payload.sub,
+      organizacionId: payload.organizacionId,
+      sesionId: payload.sesionId,
+      rol: payload.rol,
+      esAdminPlataforma: payload.esAdminPlataforma,
+    };
   }
 
   @Post('auth/logout')

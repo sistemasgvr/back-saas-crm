@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -30,14 +31,24 @@ async function bootstrap() {
   // rawBody: true — el webhook de Meta necesita los bytes exactos del body
   // para verificar la firma HMAC (X-Hub-Signature-256), antes de que Nest
   // lo parsee a JSON (PLAN.md §8.2).
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true,
     bufferLogs: true,
   });
   const logger = app.get(PinoNestLogger);
   app.useLogger(logger);
-  app.useGlobalInterceptors(new LoggerErrorInterceptor(), new AgendaConflictInterceptor());
+  app.useGlobalInterceptors(
+    new LoggerErrorInterceptor(),
+    new AgendaConflictInterceptor(),
+  );
   const config = app.get(ConfigService);
+  app.enableShutdownHooks();
+  const proxies = config
+    .get<string>('TRUSTED_PROXY_CIDRS')
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (proxies?.length) app.set('trust proxy', proxies);
 
   app.setGlobalPrefix('api');
   app.enableCors({

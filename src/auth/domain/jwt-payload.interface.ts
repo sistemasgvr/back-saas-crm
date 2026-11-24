@@ -1,6 +1,7 @@
 import { RolOrganizacion } from './request-context.interface';
 
 export interface AccessTokenPayload {
+  sesionId?: string;
   sub: string;
   organizacionId?: string;
   rol?: RolOrganizacion;

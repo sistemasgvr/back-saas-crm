@@ -3,6 +3,7 @@ export type RolOrganizacion =
   'PROPIETARIO' | 'ADMINISTRADOR' | 'USUARIO' | 'PERSONALIZADO';
 
 export interface RequestContext {
+  sesionId?: string;
   usuarioId: string;
   organizacionId?: string;
   rol?: RolOrganizacion;

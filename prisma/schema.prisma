@@ -7,6 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Sin FK: el historial debe sobrevivir a bajas de usuarios/empresas.
+model RegistroHttp {
+  id String @id @default(uuid()) @db.Uuid
+  fecha DateTime @default(now()) @db.Timestamptz
+  requestId String @map("request_id") @db.VarChar(64)
+  usuarioId String? @map("usuario_id") @db.Uuid
+  organizacionId String? @map("organizacion_id") @db.Uuid
+  sesionId String? @map("sesion_id") @db.Uuid
+  solicitud Json @db.JsonB
+  ip String? @db.VarChar(64)
+  estadoHttp Int @map("estado_http")
+  duracionMs Int @map("duracion_ms")
+  abortada Boolean @default(false)
+  errorTipo String? @map("error_tipo") @db.VarChar(120)
+  errorMensaje String? @map("error_mensaje") @db.VarChar(4000)
+  errorStack String? @map("error_stack") @db.VarChar(12000)
+
+  @@index([fecha])
+  @@index([ip, fecha])
+  @@index([usuarioId, fecha])
+  @@index([organizacionId, fecha])
+  @@index([sesionId, fecha])
+  @@index([requestId])
+  @@index([estadoHttp, fecha])
+  @@map("registros_http")
+}
+
 // Fase 1 — núcleo SaaS / multi-tenant (PLAN.md §4.2-4.6).
 // Fase 2 — auth (§4.13): tokens_refresco.
 // Fase 7 — Meta OAuth (§4.8): meta_conexiones.

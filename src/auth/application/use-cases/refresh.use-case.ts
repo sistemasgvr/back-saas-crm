@@ -77,6 +77,7 @@ export class RefreshUseCase {
     }
 
     const accessToken = this.tokens.firmarAccessToken({
+      sesionId: fila.familiaId ?? fila.id,
       sub: usuario.id,
       organizacionId,
       rol,

@@ -2,14 +2,14 @@ import {
   Injectable,
   Logger,
   OnModuleInit,
-  OnModuleDestroy,
+  OnApplicationShutdown,
 } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
 @Injectable()
 export class PrismaService
   extends PrismaClient
-  implements OnModuleInit, OnModuleDestroy
+  implements OnModuleInit, OnApplicationShutdown
 {
   private readonly logger = new Logger(PrismaService.name);
   async onModuleInit() {
@@ -22,7 +22,8 @@ export class PrismaService
     }
   }
 
-  async onModuleDestroy() {
+  // Después de beforeApplicationShutdown: permite drenar la auditoría pendiente.
+  async onApplicationShutdown() {
     await this.$disconnect();
   }
 }
