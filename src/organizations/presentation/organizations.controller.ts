@@ -1,6 +1,14 @@
 import { ModuleGuard } from '../../shared/presentation/guards/module.guard';
 import { RequireModule } from '../../shared/presentation/decorators/require-module.decorator';
-import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -17,6 +25,7 @@ import { GetOrganizacionActualUseCase } from '../application/use-cases/get-organ
 import { ActualizarOrganizacionActualUseCase } from '../application/use-cases/actualizar-organizacion-actual.use-case';
 import { ObtenerPipelineConfigUseCase } from '../application/use-cases/obtener-pipeline-config.use-case';
 import { ActualizarPipelineConfigUseCase } from '../application/use-cases/actualizar-pipeline-config.use-case';
+import { ImpactoPipelineConfigUseCase } from '../application/use-cases/impacto-pipeline-config.use-case';
 import { UpdateOrganizacionDto } from './dto/update-organizacion.dto';
 import { ActualizarPipelineConfigDto } from './dto/actualizar-pipeline-config.dto';
 
@@ -31,6 +40,7 @@ export class OrganizationsController {
     private readonly actualizarOrganizacionActual: ActualizarOrganizacionActualUseCase,
     private readonly obtenerPipelineConfig: ObtenerPipelineConfigUseCase,
     private readonly actualizarPipelineConfig: ActualizarPipelineConfigUseCase,
+    private readonly impactoPipeline: ImpactoPipelineConfigUseCase,
   ) {}
 
   @Get('current')
@@ -76,6 +86,25 @@ export class OrganizationsController {
   @ApiResponse({ status: 200, description: 'Config actual + defaults.' })
   getPipelineConfig(@CurrentUser() context: RequestContext) {
     return this.obtenerPipelineConfig.execute(context.organizacionId!);
+  }
+
+  @UseGuards(ModuleGuard)
+  @RequireModule('LEADS')
+  @Post('current/pipeline-config/impacto')
+  @HttpCode(200)
+  @RequirePermission('leads.configurar')
+  @ApiOperation({
+    summary: 'Leads que retrocederían de etapa si se guarda esta configuración',
+    description:
+      'Solo lectura. Body `{ config }` igual que el PATCH. Devuelve, por cada ' +
+      'etapa eliminada con leads, cuántos hay y a qué etapa retroceden.',
+  })
+  @ApiResponse({ status: 200, description: 'Impacto calculado.' })
+  impactoPipelineConfig(
+    @CurrentUser() context: RequestContext,
+    @Body() dto: ActualizarPipelineConfigDto,
+  ) {
+    return this.impactoPipeline.execute(context.organizacionId!, dto.config);
   }
 
   @UseGuards(ModuleGuard)

@@ -6,6 +6,7 @@ import { GetOrganizacionActualUseCase } from './application/use-cases/get-organi
 import { ActualizarOrganizacionActualUseCase } from './application/use-cases/actualizar-organizacion-actual.use-case';
 import { ObtenerPipelineConfigUseCase } from './application/use-cases/obtener-pipeline-config.use-case';
 import { ActualizarPipelineConfigUseCase } from './application/use-cases/actualizar-pipeline-config.use-case';
+import { ImpactoPipelineConfigUseCase } from './application/use-cases/impacto-pipeline-config.use-case';
 import { ORGANIZACIONES_REPOSITORY } from './application/ports/organizaciones.repository.port';
 import { PrismaOrganizacionesRepository } from './infrastructure/prisma-organizaciones.repository';
 
@@ -17,6 +18,7 @@ import { PrismaOrganizacionesRepository } from './infrastructure/prisma-organiza
     ActualizarOrganizacionActualUseCase,
     ObtenerPipelineConfigUseCase,
     ActualizarPipelineConfigUseCase,
+    ImpactoPipelineConfigUseCase,
     {
       provide: ORGANIZACIONES_REPOSITORY,
       useClass: PrismaOrganizacionesRepository,

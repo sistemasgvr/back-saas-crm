@@ -322,6 +322,7 @@ function esRecord(value: unknown): value is Record<string, unknown> {
 function validarEmbudo(
   tipo: TipoLeadInmobiliaria,
   raw: unknown,
+  estricto: boolean,
 ): EmbudoPipelineConfig {
   if (!esRecord(raw)) {
     throw new Error(`pipeline_config.${tipo} debe ser un objeto`);
@@ -395,6 +396,15 @@ function validarEmbudo(
         `pipeline_config.${tipo}.transiciones.${estado}: un estado terminal no puede tener salidas`,
       );
     }
+    if (
+      estricto &&
+      !(ESTADOS_TERMINALES as readonly string[]).includes(estado) &&
+      destinos.length === 0
+    ) {
+      throw new Error(
+        `pipeline_config.${tipo}.transiciones.${estado}: una etapa no terminal necesita al menos una salida (los leads quedarían atascados)`,
+      );
+    }
     transiciones[estado] = destinos;
   }
 
@@ -436,7 +446,12 @@ function validarEmbudo(
  * Valida y normaliza el JSON de override. Lanza Error con mensaje en español
  * si la forma es inválida.
  */
-export function validarPipelineConfig(raw: unknown): PipelineConfigOverride {
+export function validarPipelineConfig(
+  raw: unknown,
+  /** true al guardar: exige que toda etapa no terminal tenga salida. Al leer
+   * (parsePipelineConfig) no se exige, para no descartar configs ya guardadas. */
+  estricto = false,
+): PipelineConfigOverride {
   if (!esRecord(raw)) {
     throw new Error('pipeline_config debe ser un objeto');
   }
@@ -446,7 +461,7 @@ export function validarPipelineConfig(raw: unknown): PipelineConfigOverride {
     if (!(tipo in raw)) {
       throw new Error(`pipeline_config debe incluir ${tipo}`);
     }
-    resultado[tipo] = validarEmbudo(tipo, raw[tipo]);
+    resultado[tipo] = validarEmbudo(tipo, raw[tipo], estricto);
   }
 
   const extras = Object.keys(raw).filter(
@@ -458,6 +473,42 @@ export function validarPipelineConfig(raw: unknown): PipelineConfigOverride {
     );
   }
 
+  return resultado;
+}
+
+/** Leads de `tipoLead` que están en `desde` deben pasar a `hacia`. */
+export interface ReubicacionEstado {
+  tipoLead: TipoLeadInmobiliaria;
+  desde: string;
+  hacia: string;
+}
+
+/**
+ * Por cada estado que existía en `anterior` y ya no está en `nuevo`, decide a
+ * qué estado retroceden sus leads: el estado previo más cercano (según el
+ * orden de la lista anterior) que siga existiendo. NUEVO es obligatorio, así
+ * que siempre hay destino.
+ */
+export function calcularReubicaciones(
+  anterior: PipelineConfigOverride,
+  nuevo: PipelineConfigOverride,
+): ReubicacionEstado[] {
+  const resultado: ReubicacionEstado[] = [];
+  for (const tipo of TIPOS_LEAD_INMOBILIARIA) {
+    const vigentes = new Set(nuevo[tipo].estados);
+    const previos = anterior[tipo].estados;
+    previos.forEach((codigo, idx) => {
+      if (vigentes.has(codigo)) return;
+      let hacia = 'NUEVO';
+      for (let i = idx - 1; i >= 0; i--) {
+        if (vigentes.has(previos[i])) {
+          hacia = previos[i];
+          break;
+        }
+      }
+      resultado.push({ tipoLead: tipo, desde: codigo, hacia });
+    });
+  }
   return resultado;
 }
 
@@ -544,13 +595,18 @@ function estadosTableroUnificado(
   override?: PipelineConfigOverride | null,
 ): readonly string[] {
   if (!override) return ESTADOS_TABLERO_UNIFICADO;
-  const vistos = new Set<string>();
+  // Une los embudos conservando el orden de cada uno: una etapa que aún no
+  // está se inserta justo después de la etapa que la precede en su embudo.
   const resultado: string[] = [];
   for (const tipo of TIPOS_LEAD_INMOBILIARIA) {
+    let anterior = -1;
     for (const codigo of override[tipo].estados) {
-      if (vistos.has(codigo)) continue;
-      vistos.add(codigo);
-      resultado.push(codigo);
+      let idx = resultado.indexOf(codigo);
+      if (idx === -1) {
+        idx = anterior + 1;
+        resultado.splice(idx, 0, codigo);
+      }
+      anterior = idx;
     }
   }
   return [

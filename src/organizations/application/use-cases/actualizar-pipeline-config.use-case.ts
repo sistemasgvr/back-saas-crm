@@ -14,6 +14,7 @@ import {
   type PipelineConfigOverride,
 } from '../../../shared/domain/pipeline-inmobiliaria';
 import type { PipelineConfigResponse } from './obtener-pipeline-config.use-case';
+import { reubicacionesParaConfig } from './impacto-pipeline-config.use-case';
 
 @Injectable()
 export class ActualizarPipelineConfigUseCase {
@@ -44,6 +45,11 @@ export class ActualizarPipelineConfigUseCase {
         organizacionId,
         null,
         usuarioEdicion,
+        await reubicacionesParaConfig(
+          this.organizaciones,
+          organizacionId,
+          pipelineConfigPorDefecto(),
+        ),
       );
       return {
         config: null,
@@ -54,7 +60,7 @@ export class ActualizarPipelineConfigUseCase {
 
     let normalizado: PipelineConfigOverride;
     try {
-      normalizado = validarPipelineConfig(config);
+      normalizado = validarPipelineConfig(config, true);
     } catch (err) {
       throw new BadRequestException(
         err instanceof Error ? err.message : 'pipeline_config inválido',
@@ -65,6 +71,12 @@ export class ActualizarPipelineConfigUseCase {
       organizacionId,
       normalizado as unknown as Prisma.InputJsonValue,
       usuarioEdicion,
+      // Los leads de etapas eliminadas retroceden a la etapa anterior vigente.
+      await reubicacionesParaConfig(
+        this.organizaciones,
+        organizacionId,
+        normalizado,
+      ),
     );
 
     return {
